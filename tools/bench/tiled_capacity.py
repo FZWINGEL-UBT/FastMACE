@@ -111,6 +111,12 @@ def parse_args(argv=None):
     p.add_argument("--memory-history", action="store_true",
                    help="record the CUDA allocator's trace during the build and keep the allocations live at the "
                         "build's device peak, by the source line that made them (build_peak in the record)")
+    p.add_argument("--call-history", type=int, default=None, metavar="CALL",
+                   help="record the CUDA allocator's trace during tiled call CALL (0-based) and keep the allocations "
+                        "made in it that are live at its peak, by source line (call_peak in the record; the peak "
+                        "above what was allocated before the call)")
+    p.add_argument("--history-entries", type=int, default=4_000_000,
+                   help="the trace's ring buffer for --call-history (call_peak reports whether it overflowed)")
     p.add_argument("--tile-list", action="store_true",
                    help="per-tile neighbour lists (TileConfig.neighbours='tiles'); the force field's own list is "
                         "left empty, so it costs no memory")
@@ -443,8 +449,20 @@ def main(argv=None):
                 started = time.perf_counter()
                 record["profile"], out = tiled_corun.profile_call(tiled, positions, host_ops=25)
             else:
+                history = args.call_history == call
+                if history:
+                    torch.cuda.memory._record_memory_history(max_entries=args.history_entries, stacks="python")
                 started = time.perf_counter()
                 out = tiled(positions)
+                if history:
+                    torch.cuda.synchronize()
+                    snapshot = torch.cuda.memory._snapshot()
+                    torch.cuda.memory._record_memory_history(enabled=None)
+                    entries = sum(len(trace) for trace in snapshot.get("device_traces", []))
+                    record["call_peak"] = dict(call=call, entries=entries,
+                                               overflowed=entries >= args.history_entries,
+                                               **peak_live_set(snapshot, top=40))
+                    del snapshot
             torch.cuda.synchronize()
             entry = dict(seconds=time.perf_counter() - started, **mem(before), **tiled.last)
             # A call that measures its tiles' workspace resets the peak at its first tile: its peak is the larger of
