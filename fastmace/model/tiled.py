@@ -156,6 +156,22 @@ TILE_HOST_ROWS = True
 # TILE_WHOLE_BLOCK_ORDER (A/B only; billion-atom step 1): True binds the whole-system BLOCK_ORDER receiver order in the
 # tiled call as before (int32 [N], 4 B/atom; its per-tile kernels never read it). False (default): not built.
 TILE_WHOLE_BLOCK_ORDER = False
+# TILE_LARGE_CAPS (B3, 11 November 2026, results/tiled-caps-20261111): a host-state call whose budget_receivers were
+# left at their default may also take receiver caps of TILE_LARGE_CAP_RECEIVERS where the memory budget fits them
+# (``_choose_receivers``: the first call's measured workspace per receiver, times the cap, plus 10 %, within the
+# memory left; at the capacity limit it keeps the smaller cap). A100 against R 16,384 (Alex 4984555), b/a both
+# orders: 58^3 host state 0.886 / 0.893 at 32,768 and 0.549 / 0.549 at 65,536, wavefront 0.675 / 0.671 and 0.410 /
+# 0.409; 160^3 host state 0.732 / 0.724 and 0.597 / 0.599, wavefront 0.722 / 0.723 and 0.573 / 0.583. None: on for
+# TILE_LARGE_CAP_GPUS (decision 66, per family); True / False force it.
+TILE_LARGE_CAPS = None
+TILE_LARGE_CAP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+TILE_LARGE_CAP_RECEIVERS = (32768, 65536)
+# The large caps' host cost (the size rule): host-state tiles hold per-tile host buffers (kept lists, staging) that grow
+# with the cap. SrTiO3 160^3 on the A100 (Alex 4985398): host peak 24.3 / 28.0 / 31.9 / 43.3 GB at R 8,192 / 16,384 /
+# 32,768 / 65,536, about 0.33 MB per receiver, while the device workspace fits at every size. ``_choose_receivers``
+# takes a large cap only where the host keeps this much per added receiver (plus 10 %) above ``list_reuse_floor``:
+# at the 397.5M record (229 of the cgroup's 231.5 GB) the cap stays where it was.
+TILE_LARGE_CAP_HOST_BYTES = 350_000
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -344,6 +360,8 @@ class TileConfig:
         if self.budget_receivers is None:  # compiled tiles take the larger caps when they fit (tiled-speed.md)
             compiled = self.mode in ("compiled", "auto")  # "auto": only once its tiles compile
             object.__setattr__(self, "budget_receivers", (8192, 16384) if compiled else ())
+            # (not a field: TiledForceField adds TILE_LARGE_CAP_RECEIVERS to a default budget only)
+            object.__setattr__(self, "_budget_default", compiled)
         if any(int(r) < 1 for r in self.budget_receivers):
             raise ValueError(f"TileConfig.budget_receivers must be positive, got {self.budget_receivers!r}")
         if self.edges is not None and int(self.edges) < 1:
@@ -1472,6 +1490,10 @@ class TiledForceField:
         self._compiled = {}
         self._slots = {}  # edge bucket -> padded slot (with its graphs)
         self._edge_step = None
+        # TILE_LARGE_CAPS: a default budget of a host-state call takes the large caps too, where they fit
+        if getattr(self.config, "_budget_default", False) and self.config.state == "host" and self._large_caps():
+            self.config = dataclasses.replace(self.config, budget_receivers=tuple(sorted(
+                {*map(int, self.config.budget_receivers), *TILE_LARGE_CAP_RECEIVERS})))
         self.receivers = int(self.config.receivers)  # the receiver cap (budget_receivers may raise it once)
         # mode "auto": a compiled force field's first call runs eager tiles and measures its peak; the later calls
         # compile when the compiled residency and a margin fit (``_choose_mode``). An eager field stays eager.
@@ -1620,6 +1642,14 @@ class TiledForceField:
         if free is not None:
             workspace = 1.1 * self._per_receiver * self.receivers if self._per_receiver else 0
             self._pieces, self._piece_budget = {}, int(float(fraction) * max(0.0, free - workspace))
+
+    def _large_caps(self):
+        """``TILE_LARGE_CAPS``: the constant when set, else on for ``TILE_LARGE_CAP_GPUS``."""
+        import torch
+
+        if TILE_LARGE_CAPS is not None:
+            return bool(TILE_LARGE_CAPS)
+        return self.device.type == "cuda" and torch.cuda.get_device_name(self.device) in TILE_LARGE_CAP_GPUS
 
     def _speed(self, value, on=True):
         """A tiled speed switch's value (``TILE_VIRIAL``, ``TILE_PREFETCH_DEVICE``, ``TILE_GRAPH_CACHE``, ...): the
@@ -2762,8 +2792,16 @@ class TiledForceField:
             return
         workspace, available = memory
         per_receiver = workspace / self.receivers
-        fits = [r for r in (self.receivers, *map(int, self.config.budget_receivers))
-                if 1.1 * per_receiver * r <= available]
+        candidates = (self.receivers, *map(int, self.config.budget_receivers))
+        host = _host_available() if any(r in TILE_LARGE_CAP_RECEIVERS for r in candidates) else None
+        floor = int(self.config.list_reuse_floor)
+
+        def host_fits(r):  # TILE_LARGE_CAP_HOST_BYTES: the large caps' host buffers
+            if r not in TILE_LARGE_CAP_RECEIVERS or r <= self.receivers or host is None:
+                return True
+            return host - floor >= 1.1 * TILE_LARGE_CAP_HOST_BYTES * (r - self.receivers)
+
+        fits = [r for r in candidates if 1.1 * per_receiver * r <= available and host_fits(r)]
         chosen = max(fits, default=self.receivers)
         if chosen != self.receivers:
             self._budget_raised = chosen > int(self.config.receivers)

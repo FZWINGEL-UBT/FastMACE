@@ -3619,3 +3619,11 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Gates pass on both GPUs. `NESTED_RADIAL_GPUS` is empty.
 - Kept: the switch (opt-in), the route fix (nested routing after the radial tables), and proof counters for A/Bs and gates (`ab_rewrites --b-expect`, `force_stress_gate --production-expect`). The H200 is not measured.
 - Suite on the merged tip 55685b55 (murphy): 5,623 passed, 204 skipped. The 18 failures there were all in `test_colab_driver.py`, from murphy's git setup; that file passes 32/32 on leeloo for the same tree.
+
+**A100 receiver caps 32,768 / 65,536 (11 November 2026; rev2 queue §3 B3, worker tiled-speed, conductor): ADOPTED on the A100 family.**
+- `TILE_LARGE_CAPS` (None = on for `TILE_LARGE_CAP_GPUS`): a host-state tiled call with the default budget also offers receiver caps 32,768 and 65,536. An explicit budget, device state and other GPUs are unchanged.
+- MD A/B against R 16,384, b/a both orders (Alex 4984555). 58³: host state 0.886 / 0.893 (32,768) and 0.549 / 0.549 (65,536); wavefront 0.675 / 0.671 and 0.410 / 0.409. 160³: host state 0.732 / 0.724 and 0.597 / 0.599; wavefront 0.722 / 0.723 and 0.573 / 0.583. Energy within 1e-5 meV/atom.
+- Peak memory at 160³ (Alex 4985398), device / host: 8,192 2.83 GiB / 24.3 GB; 16,384 3.33 / 28.0; 32,768 4.20 / 31.9; 65,536 6.11 / 43.3. The device fits every cap; the host grows about 0.33 MB per receiver.
+- Size rule `TILE_LARGE_CAP_HOST_BYTES` (0.35 MB per added receiver, plus 10 %, above `list_reuse_floor`). Without it, the 397.5M record (229 of 231.5 GB) would have taken 65,536 and run out of host memory.
+- Also: `test_colab_driver` takes its git config from the environment (safe.directory, identity), which fixes murphy's 18 "dubious ownership" failures (32/32 there). Billion-atom plan notes (documentation only).
+- Suite on the merged tip 16da79e2 (leeloo): 5,643 passed, 204 skipped, 0 failed.

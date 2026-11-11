@@ -147,6 +147,59 @@ segmentation fault before the build (exit 139 ten minutes in, the stack in ASE's
 while the supercell was made on the host; `tiled-host-state-dtype.md`) is unexplained; a 703M point (520³) first would
 separate it from the 10^9 question, at a second node-day.
 
+**Before step 4 (documented 11 November 2026, owner: "only document for now"):**
+
+*Where the 397.5M record's 4 h 38 min went* (Alex 4973640, `results/tiled-capacity-20261109/alex/cap-4973640`; the
+job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
+
+| Phase | 397.5M | B/atom or us/atom | Scaled to 10^9 |
+| --- | ---: | ---: | ---: |
+| supercell (`tiled_capacity.supercell`: ASE `repeat` + `wrap`), plan, checks | about 10 min | | about 25 min |
+| force-field build (`phases.build`) | 660 s, host peak 111 GB | 1.66 us/atom | about 28 min |
+| first call, eager (mode auto measures its memory) | 11,468 s | 28.8 us/atom | about 8 h |
+| second call, compiled | 3,913 s | 9.84 us/atom | about 2.7 h |
+
+1. **Our own supercell builder** (the ASE step). `Atoms.repeat` loops in Python over every unit-cell copy (about 200M
+   passes at 585^3, a slice write each), and `wrap` makes whole-system fractional temporaries (several 24 GB float64
+   arrays at 10^9); the 519M segmentation fault came out of this step (ASE `cell.py` `__array__`). Replacement, about
+   50 lines in `tools/bench/tiled_capacity.py` (or `fastmace.io` if it is to serve users): allocate the float64
+   positions once, fill them a chunk of cell copies at a time by broadcasting (copy positions plus lattice offsets),
+   no `wrap` (a perfect repeat is inside the box; rattle and strain chunked where asked), narrow atomic numbers, and
+   wrap the arrays in an `ase.Atoms` without a copy (the force field takes one). Check: bitwise ASE's positions,
+   numbers and cell at small and medium sizes; then a CPU-only dry run of this step at 520^3 and 585^3 (no GPU), which
+   also answers the 519M fault.
+2. **The eager first call** is the largest cost (about 8 of the run's 11 h at 10^9). Mode auto runs a whole call
+   eager to measure the tile workspace before compiling. The workspace is not size-independent (R 16,384: 1.8 GiB
+   above the call's start at 20.48M, Alex 4985398; 3.4 GB at 397.5M), so a small run's number cannot simply be
+   handed in; a measurement on a few of the run's own largest tiles (eager, then compile for the rest of the call)
+   would give the same decision in minutes. Also: re-measure the eager call with 16 CPUs (the record had one; the
+   host-state writes and gathers are host work).
+3. **The force-field build** (660 s, host peak 111 GB, about 279 B/atom at its peak): profile it at 20M (cProfile and
+   the host peak by step) before changing anything; the one-hot and species tables built on the host at construction
+   are the first suspects.
+
+Together, 1 and 2 would take about 8.5 of the 10^9 run's 11.5 h (the supercell's 25 min and most of the eager call's
+8 h); 2 is the less certain one (a few tiles must decide as a whole call does). Order: 1 (also the 519M fault's
+answer), the 16-CPU re-measurement, then 2, then 3's profile.
+
+## Feasibility of 10^9 atoms (owner's question, 11 November 2026)
+
+Still possible on paper; step 3's measured peak decides it.
+- **Device (the hard limit):** about 101 B/atom before the tiles (census), less step 1's 34 (host positions 24, uint8
+  maps 6, no whole-system order 4): about 67 B/atom, so about 67 GB of per-atom arrays and 3-4 GB of tile workspace
+  at 10^9, about 71 GB of the A100-80's 85.9 GB (about 15 GB left). Step 3 measures it at 397.5M (projected
+  28.0 GiB). If it lands above, the held-back cuts remain: the plan's order in int32 (4 B/atom), the bins' atom
+  bins (6).
+- **32-bit indices:** audited; the one real overflow (the tile lists' sort key) is fixed and the 750M probe is
+  bitwise on every check. The 10^9 run is still the first to cross 716M end to end, beyond the probe's per-tile paths.
+- **Host:** about 0.6-0.8 TB at 10^9; one A100's share of an Alex node (231.5 GB) does not hold it, a whole node
+  (2 TB) does. Needs the owner's go for a whole node (step 4).
+- **Time:** about 30 min of build, about 8 h of eager first call, about 2.7 h per compiled call, plus 2-4 % for host
+  positions: inside 24 h (and much less with "Before step 4" 1-2).
+- **Risks:** the 519M segmentation fault in ASE's supercell (answered by our own builder and a CPU-only dry run);
+  ASE's slow `repeat` loop and whole-system `wrap` temporaries; the large receiver caps (B3) are no risk here, as the
+  host rule (`TILE_LARGE_CAP_HOST_BYTES`) keeps the cap at the host limit.
+
 ## Status
 
 | Step | State | Record |
