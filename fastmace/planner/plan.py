@@ -170,7 +170,12 @@ class MemoryProbeStage:
     - ``replica_reserved``, ``replica_allocated``: its measured peaks (bytes, the largest over build and steps);
     - ``scale``: the measured over the estimated peak, both without the fixed part (``memory.fixed_bytes``);
     - ``estimate``, ``corrected``: rule 12's estimate of the run's cell, before and after the correction;
-    - ``seconds``: the probe's wall time (its child, build and steps).
+    - ``seconds``: the probe's wall time (its child, build and steps);
+    - ``offset``: the size-independent reserve above ``fixed_bytes`` that two replica sizes of the first stage
+      measured (``planner.memory_probe.REPLICA_LARGE_ATOMS``; 0 with one size); ``scale`` is then the one that
+      brings this run's cell to the affine fit (offset plus the replica's slope times the estimate);
+    - ``large_atoms``, ``large_estimate``, ``large_reserved``: the larger replica's size, estimate and measured peak
+      (0 where it was not measured).
     """
 
     stage: str
@@ -183,6 +188,10 @@ class MemoryProbeStage:
     estimate: int
     corrected: int
     seconds: float
+    offset: int = 0
+    large_atoms: int = 0
+    large_estimate: int = 0
+    large_reserved: int = 0
 
     def __post_init__(self):
         object.__setattr__(self, "rewrites", tuple(tuple(item) for item in self.rewrites))

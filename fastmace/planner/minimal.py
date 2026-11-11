@@ -1019,6 +1019,8 @@ class MinimalPlanner:
                     return False
                 if name in memory.RESCUE_FLOAT32_ONLY and dtype != "float32":
                     return False
+                if any(rung == name and other in enabled for rung, other in memory.RESCUE_NOT_BESIDE):
+                    return False  # it saves nothing beside that record and keeps more
                 record = registry[name]
                 return _family_applies(record, traits) and all(other in enabled for other in record.requires)
 

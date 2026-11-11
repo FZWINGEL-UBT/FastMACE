@@ -18,6 +18,11 @@ is stable across sizes, so a small replica of the structure measures it:
 - **the correction**: rule 12 re-plans the run with each probed stage's estimate corrected (``memory.probed``):
   the fixed part (``memory.fixed_bytes``) stays, the rest is scaled by the replica's measured over estimated peak
   (both less the fixed part) and kept ``memory.PROBE_HEADROOM`` above. A stage it did not probe keeps its estimate;
+- **two sizes** (``REPLICA_LARGE_ATOMS``): a structure larger than the larger replica has the first stage measured
+  on both, and the two peaks fit an offset (a reserve that does not grow with the cell: the CUDA libraries'
+  workspaces, the allocator's rounding, the build's transients) and a slope. Every stage's scale is then the one
+  that brings the run's own cell to that line (``fitted_scale``). One replica's ratio carried the offset to the
+  whole cell: 0.70 at 16,875 atoms of SrTiO3 where 233,280 atoms measured 0.52 (results/rung-b-20261109);
 - **the record** (``Plan.memory_probe``, ``MemoryProbeRecord``): every probed stage, the choice before and after,
   the cost; in the plan text, the report and provenance. The scales are kept in ``simulation.json``, so a resume
   plans with them and never probes.
@@ -46,6 +51,9 @@ if TYPE_CHECKING:
 # The replica's size: at 15,000 atoms and more the reserve's ratio to the live peak was stable across sizes in the
 # rescue matrix; below it the build's fixed transient sets the peak (docs/validation/capacity/estimate-band.md).
 REPLICA_ATOMS = (15_000, 20_000)
+# The larger replica for the offset (``fitted_scale``): about three times the small one, so the two estimates differ
+# well beyond the peaks' noise, and still a few GiB on any GPU that probes.
+REPLICA_LARGE_ATOMS = (45_000, 60_000)
 # MD steps a probe runs after its build: the captures and the first padded-size growth are in them.
 PROBE_STEPS = 20
 # How far rule 12's estimate may lie above the measured peak at one stage (the rescue matrix's highest stage band,
@@ -84,6 +92,41 @@ def stages_to_probe(ladder: MemoryLadder | None, setting: str) -> tuple[LadderSt
     if not (near or cheaper_might_fit):
         return ()
     return (ladder.chosen,) + ((cheaper,) if cheaper_might_fit else ())
+
+
+def cheaper_after(ladder: MemoryLadder, scale: float) -> bool:
+    """Whether the next-cheaper stage is measured too once the chosen rescue stage measured ``scale``: when its
+    estimate, overstated as much as the chosen one's, might fit (``PROBE_SPREAD`` between the stages). Rule 12
+    overstates the default plan more than ``PROBE_SPREAD`` (SrTiO3 32^3 with MACE-OMAT-0 medium on the RTX 4000 Ada:
+    24.4 GiB estimated, 12.0 GiB measured), so ``stages_to_probe`` alone left the default plan unmeasured and the run
+    took generic_recompute_first_table, 8 % slower, far below the limit (results/rung-b-20261109)."""
+    cheaper = ladder.cheaper
+    return (cheaper is not None and bool(ladder.chosen.stage)
+            and cheaper.fixed + (cheaper.estimate - cheaper.fixed) * scale / PROBE_SPREAD <= ladder.limit)
+
+
+def fitted_offset(fixed: int, small: tuple[int, int], large: tuple[int, int]) -> int:
+    """The reserve above ``fixed`` that does not grow with the cell, from two replica sizes of one stage
+    (``(estimate, reserved)`` each): the line through both peaks against the estimates, at an estimate of
+    ``fixed``. 0 where the two do not give a rising line with an offset between 0 and the small replica's peak
+    above ``fixed`` (the one-size correction then stays)."""
+    (e1, r1), (e2, r2) = small, large
+    if e2 <= e1 or r2 <= r1:
+        return 0
+    slope = (r2 - r1) / (e2 - e1)
+    offset = r1 - fixed - slope * (e1 - fixed)
+    return int(offset) if 0 < offset < r1 - fixed else 0
+
+
+def fitted_scale(fixed: int, offset: int, replica_estimate: int, replica_reserved: int, estimate: int) -> float:
+    """The scale (``memory.probed``) that brings an estimate of ``estimate`` to the affine fit: ``offset`` plus the
+    replica's slope above it, ``(replica_reserved - fixed - offset) / (replica_estimate - fixed)``, times the
+    estimate less ``fixed``. With ``offset`` 0, the replica's own ratio."""
+    variable = replica_estimate - fixed
+    slope = (replica_reserved - fixed - offset) / variable
+    if offset <= 0 or estimate <= fixed:
+        return slope
+    return (offset + slope * (estimate - fixed)) / (estimate - fixed)
 
 
 def repeat_unit(atoms: Any, tolerance_A: float = POSITION_TOLERANCE_A) -> tuple[Any, tuple[int, int, int]] | None:
@@ -189,18 +232,25 @@ def with_scales(planner: Any, scales) -> Any:
 
 
 def probe(planner: Any, ladder: MemoryLadder, stages, launch: Callable[[LadderStage], dict], *,
-          plan_with: Callable[[Any], Plan], clock: Callable[[], float] = time.perf_counter) -> Outcome:
+          plan_with: Callable[[Any], Plan], clock: Callable[[], float] = time.perf_counter,
+          launch_large: Callable[[LadderStage], dict] | None = None) -> Outcome:
     """Measure ``stages`` of rule 12's choice ``ladder`` with ``launch(stage)`` (one fresh child: ``replica_atoms``,
     ``estimate``, ``reserved``, ``allocated``, ``seconds``) and re-plan with ``plan_with`` on a planner with the
-    measured scales. A launch that raises ends the probing: the rules' plan stays, the warning says what failed."""
+    measured scales. ``launch_large`` (the larger replica, ``REPLICA_LARGE_ATOMS``) measures the first stage again
+    for the offset (``fitted_offset``). A launch that raises ends the probing: the rules' plan stays, the warning
+    says what failed."""
     from fastmace.planner import memory
     from fastmace.planner.plan import MemoryProbeRecord, MemoryProbeStage
 
     started = clock()
     measured = []
+    stages = list(stages)
+    offset, large = 0, None
     for stage in stages:
         try:
             result = launch(stage)
+            if launch_large is not None and not measured:
+                large = launch_large(stage)
         except Exception as error:  # an optional measurement: the rules' plan stays (the child's log is kept)
             from fastmace.planner.fallback import error_text
 
@@ -210,13 +260,25 @@ def probe(planner: Any, ladder: MemoryLadder, stages, launch: Callable[[LadderSt
         if variable <= 0 or result["reserved"] <= stage.fixed:
             return Outcome(None, planner, note=f"not used: the {stage.stage or 'default'} stage's replica measured "
                                                f"{result['reserved'] / 2**30:.2f} GiB, below its fixed part")
-        scale = (result["reserved"] - stage.fixed) / variable
+        extra = {}
+        if large is not None and not measured:
+            offset = fitted_offset(stage.fixed, (result["estimate"], result["reserved"]),
+                                   (large["estimate"], large["reserved"]))
+            extra = dict(large_atoms=int(large["replica_atoms"]), large_estimate=int(large["estimate"]),
+                         large_reserved=int(large["reserved"]))
+        if result["reserved"] - stage.fixed <= offset:
+            offset = 0  # this stage's replica lies below the offset: its own ratio
+        scale = fitted_scale(stage.fixed, offset, result["estimate"], result["reserved"], stage.estimate)
         corrected = stage.fixed + (stage.estimate - stage.fixed) * scale * memory.PROBE_HEADROOM
         measured.append(MemoryProbeStage(
             stage=stage.stage, rewrites=stage.rewrites, replica_atoms=int(result["replica_atoms"]),
             replica_estimate=int(result["estimate"]), replica_reserved=int(result["reserved"]),
             replica_allocated=int(result["allocated"]), scale=float(scale), estimate=int(stage.estimate),
-            corrected=int(math.ceil(corrected)), seconds=float(result["seconds"])))
+            corrected=int(math.ceil(corrected)),
+            seconds=float(result["seconds"]) + (float(large["seconds"]) if extra else 0.0), offset=int(offset),
+            **extra))
+        if stage == ladder.chosen and cheaper_after(ladder, scale) and ladder.cheaper not in stages:
+            stages.append(ladder.cheaper)  # measured too: the loop goes on over the list it grows
     scaled = with_scales(planner, [(stage.stage, stage.scale) for stage in measured])
     plan = plan_with(scaled)
     ladder_after = plan.memory_ladder
@@ -242,8 +304,14 @@ def report_line(record: MemoryProbeRecord | None, note: str | None = None) -> st
     def name(stage):
         return stage or "default"
 
+    def large(s):
+        if not s.large_atoms:
+            return ""
+        return (f", and {s.large_atoms} atoms {s.large_reserved / 2**30:.2f} GiB against "
+                f"{s.large_estimate / 2**30:.2f} (offset {s.offset / 2**30:.2f} GiB)")
+
     parts = [f"{name(s.stage)}: replica {s.replica_atoms} atoms measured {s.replica_reserved / 2**30:.2f} GiB "
-             f"against {s.replica_estimate / 2**30:.2f} estimated, so {s.corrected / 2**30:.2f} GiB here "
+             f"against {s.replica_estimate / 2**30:.2f} estimated{large(s)}, so {s.corrected / 2**30:.2f} GiB here "
              f"(estimate {s.estimate / 2**30:.2f})" for s in record.stages]
     verdict = (f"memory probe chose the {name(record.chosen)} stage, not {name(record.before)}" if record.changed_plan
                else f"memory probe kept the {name(record.chosen)} stage")
@@ -261,20 +329,22 @@ class ChildProbe:
         self.simulation, self.replica_atoms, self.steps = simulation, replica_atoms, steps
         self.runner = SubprocessRunner(dataclasses.replace(simulation.options.runner, persistent=False))
 
-    def __call__(self, stage: LadderStage) -> dict:
+    def __call__(self, stage: LadderStage, atoms: Any = None) -> dict:
+        """One child on ``atoms`` (default: ``replica_atoms``)."""
         from fastmace.config import AdaptationConfig, CalibrationConfig
 
+        atoms = self.replica_atoms if atoms is None else atoms
         engine = self.simulation._planner.engine  # the planner's (the caller's options may hold none)
         options = dataclasses.replace(self.simulation.options, engine=dataclasses.replace(engine, memory_probe="off"),
                                       adaptation=AdaptationConfig(adapt="off"), calibration=CalibrationConfig())
         started = time.perf_counter()
-        result = self.runner.memory_probe(self.simulation, options, self.replica_atoms, dict(stage.rewrites),
-                                          steps=self.steps)
-        return {**result, "replica_atoms": len(self.replica_atoms), "seconds": time.perf_counter() - started}
+        result = self.runner.memory_probe(self.simulation, options, atoms, dict(stage.rewrites), steps=self.steps)
+        return {**result, "replica_atoms": len(atoms), "seconds": time.perf_counter() - started}
 
     def close(self) -> None:
         self.runner.close()
 
 
-__all__ = ("ChildProbe", "Outcome", "POSITION_TOLERANCE_A", "PROBE_SPREAD", "PROBE_STEPS", "REPLICA_ATOMS", "apply",
-           "probe", "repeat_unit", "replica", "report_line", "stages_to_probe", "with_scales")
+__all__ = ("ChildProbe", "Outcome", "POSITION_TOLERANCE_A", "PROBE_SPREAD", "PROBE_STEPS", "REPLICA_ATOMS",
+           "REPLICA_LARGE_ATOMS", "apply", "cheaper_after", "fitted_offset", "fitted_scale", "probe", "repeat_unit",
+           "replica", "report_line", "stages_to_probe", "with_scales")
