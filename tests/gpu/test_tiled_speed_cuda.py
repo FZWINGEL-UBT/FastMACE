@@ -188,3 +188,66 @@ def test_filter32_keeps_exactly_the_float64_tests_edges_on_cuda(reach):
     assert int(((vectors.norm(dim=1) - cutoff).abs() < 1e-6).sum()) > 50_000
     for a, b in zip(got, expected):
         assert torch.equal(a, b)
+
+
+GRAPHS_CHILD = r"""
+import fastmace  # before torch: soft file locks (SPEC §14)
+import dataclasses, json, sys
+
+import numpy as np
+import torch
+
+import fastmace as fm
+from fastmace.model.tiled import TileConfig, TiledForceField
+from fastmace.planner import minimal
+
+sys.path.insert(0, "tools/bench")
+import tiled_capacity
+
+atoms = tiled_capacity.supercell("SrTiO3", (6, 6, 6), 0.05, 0.01)
+user = fm.ForceField(fm.load("omat0-medium"), atoms, precision="float32")
+planner = minimal.default_planner(user)
+plan = planner.plan_evaluation(user, atoms)
+field = planner.build_evaluation(plan, user, atoms)
+tiled = TiledForceField(field, TileConfig(256, mode="compiled", budget_receivers=()))
+configs = {"off": tiled.config, "on": dataclasses.replace(tiled.config, compiled_graphs=True)}
+kept, results = {}, {"off": [], "on": []}
+# Each side with its own globals, alternating in one process (tools/bench/tiled_ab.py's TileConfig sides): every
+# switch of side changes the graph key, and the uncaptured side replaces the slots' outputs.
+for side in ("on", "off", "on", "off", "on", "on"):
+    tiled.config = configs[side]
+    tiled._g = kept.get(side)
+    energy, forces, stress = tiled.evaluate(atoms, stress=True)
+    kept[side] = tiled._g
+    results[side].append((float(energy), np.asarray(forces, np.float64), np.asarray(stress, np.float64)))
+
+
+def relative(got, expected):
+    return float(np.abs(got - expected).max() / np.abs(expected).max())
+
+
+off, on = results["off"][-1], results["on"][-1]
+print(json.dumps(dict(tiles=tiled.last["tiles"], calls=len(results["on"]),
+                      energy_rel=abs(on[0] - off[0]) / abs(off[0]), forces=relative(on[1], off[1]),
+                      stress=relative(on[2], off[2]),
+                      repeat_forces=relative(results["on"][-1][1], results["on"][0][1]))))
+"""
+
+
+def test_compiled_graphs_alternate_with_uncaptured_calls():
+    """``TileConfig.compiled_graphs`` beside uncaptured calls on the same tiled force field (11 November 2026, Alex
+    4981422 and 4981467): a capture after every slot's graphs were dropped by a new graph key took a new private pool
+    (the released one failed PyTorch's allocator assertion), and a replay after an uncaptured call, which replaces the
+    slots' outputs, still hands its scatter the graphs' own outputs (it raised KeyError). The sides agree to the GPU's
+    atomics (float32)."""
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), os.environ.get("PYTHONPATH", "")]),
+               PYTHONDONTWRITEBYTECODE="1")
+    result = subprocess.run([sys.executable, "-c", textwrap.dedent(GRAPHS_CHILD)], cwd=REPOSITORY_ROOT, env=env,
+                            capture_output=True, text=True, timeout=1800, check=False)
+    assert result.returncode == 0, result.stdout[-4000:] + result.stderr[-8000:]
+    report = json.loads(result.stdout.strip().splitlines()[-1])
+    print(json.dumps(report, indent=1))
+    assert report["tiles"] > 1 and report["calls"] == 4, report
+    assert report["energy_rel"] <= 1e-8, report
+    assert report["forces"] <= 1e-5 and report["stress"] <= 1e-5, report
+    assert report["repeat_forces"] <= 1e-5, report
