@@ -1,0 +1,110 @@
+{
+ "meta": {
+  "tool": "first_interaction_lab",
+  "created_utc": "2026-11-11T15:14:38.440914+00:00",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "triton": "3.8.0",
+  "edges": 368752,
+  "slots": 15000,
+  "pairs": 9,
+  "pieces": 896,
+  "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+  "rounds": 41,
+  "repeat": 10,
+  "source_commit": "5caa45297f969cb1b4b3c94baa6ae824b0de102a"
+ },
+ "checks": {
+  "fwd-copy": 8.722841471353604e-08,
+  "fwd-byslot-w1": 2.616852441406081e-07,
+  "fwd-byslot-w2": 2.616852441406081e-07,
+  "fwd-byslot-w4": 2.616852441406081e-07,
+  "bwd-recompute-copy": 0.0,
+  "bwd-power-copy": 0.0
+ },
+ "rows": {
+  "fwd-prod": {
+   "median_us": 725.5712032318115,
+   "p10_us": 716.8691110610962,
+   "p90_us": 754.2073774337769
+  },
+  "fwd-copy": {
+   "median_us": 720.1920032501221,
+   "p10_us": 712.9987096786499,
+   "p90_us": 736.5769529342651
+  },
+  "fwd-fill-only": {
+   "median_us": 187.7183973789215,
+   "p10_us": 163.0396842956543,
+   "p90_us": 198.0608034133911
+  },
+  "fwd-noslot": {
+   "median_us": 401.21281147003174,
+   "p10_us": 396.2672019004822,
+   "p90_us": 422.5599956512451
+  },
+  "fwd-noslot-fill": {
+   "median_us": 594.1567897796631,
+   "p10_us": 587.9878425598145,
+   "p90_us": 614.9833631515503
+  },
+  "fwd-oneload": {
+   "median_us": 666.651201248169,
+   "p10_us": 657.7411270141602,
+   "p90_us": 688.5699033737183
+  },
+  "fwd-byslot-w1": {
+   "median_us": 489.67199325561523,
+   "p10_us": 488.40638637542725,
+   "p90_us": 514.641923904419
+  },
+  "fwd-byslot-w2": {
+   "median_us": 521.4639902114868,
+   "p10_us": 518.586893081665,
+   "p90_us": 542.2694253921509
+  },
+  "fwd-byslot-w4": {
+   "median_us": 893.9631938934326,
+   "p10_us": 889.0895938873291,
+   "p90_us": 918.1923198699951
+  },
+  "bwd-recompute-prod": {
+   "median_us": 841.5472030639648,
+   "p10_us": 821.7359733581543,
+   "p90_us": 866.7600154876709
+  },
+  "bwd-recompute-copy": {
+   "median_us": 825.5648136138916,
+   "p10_us": 822.1030426025391,
+   "p90_us": 845.3971481323242
+  },
+  "bwd-recompute-oneload": {
+   "median_us": 607.3920011520386,
+   "p10_us": 604.7926473617554,
+   "p90_us": 674.8220729827883
+  },
+  "bwd-power-prod": {
+   "median_us": 720.6287860870361,
+   "p10_us": 700.2352094650269,
+   "p90_us": 742.800316810608
+  },
+  "bwd-power-copy": {
+   "median_us": 713.153600692749,
+   "p10_us": 711.8988656997681,
+   "p90_us": 834.5923233032238
+  },
+  "bwd-power-oneload": {
+   "median_us": 622.9471921920776,
+   "p10_us": 621.9158601760864,
+   "p90_us": 641.1097478866577
+  }
+ },
+ "summary": {
+  "C1_noslot_saving_us": 318.97919178009033,
+  "C1_noslot_kernel_saving_us": 126.03521347045898,
+  "C1_byslot_best_saving_us": 230.52000999450684,
+  "C2_forward_saving_us": 53.540802001953125,
+  "C2_backward_recompute_saving_us": 218.17281246185303,
+  "C2_backward_power_saving_us": 90.20640850067139
+ }
+}

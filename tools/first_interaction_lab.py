@@ -430,6 +430,8 @@ def main(argv=None):
     p.add_argument("--jitter", type=float, default=0.07)
     p.add_argument("--pieces", type=int, default=896)
     p.add_argument("--rounds", type=int, default=41)
+    p.add_argument("--repeat", type=int, default=10,
+                   help="calls per timed sample, back to back between two events (keeps host launch time out)")
     p.add_argument("--census", action="store_true")
     p.add_argument("--watchdog", action="store_true")
     p.add_argument("--output", type=Path, required=True)
@@ -556,10 +558,11 @@ def main(argv=None):
         for name in order:
             start, stop = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
             start.record()
-            variants[name]()
+            for _ in range(args.repeat):
+                variants[name]()
             stop.record()
             torch.cuda.synchronize()
-            us = start.elapsed_time(stop) * 1e3
+            us = start.elapsed_time(stop) * 1e3 / args.repeat
             times[name].append(us)
             if round_ == 4:
                 reference[name] = float(np.median(times[name]))
@@ -589,7 +592,7 @@ def main(argv=None):
     meta = {"tool": "first_interaction_lab", "created_utc": datetime.now(timezone.utc).isoformat(),
             "gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "triton": triton.__version__,
             "edges": edges, "slots": slots, "pairs": pairs, "pieces": args.pieces, "structure": args.structure,
-            "rounds": args.rounds, "source_commit": os.environ.get("FASTMACE_SOURCE_COMMIT")}
+            "rounds": args.rounds, "repeat": args.repeat, "source_commit": os.environ.get("FASTMACE_SOURCE_COMMIT")}
     (args.output / "lab.json").write_text(json.dumps({"meta": meta, "checks": checks, "rows": rows,
                                                       "summary": summary}, indent=1))
 
