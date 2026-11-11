@@ -393,19 +393,26 @@ POSITIONS64_KEY = "fastmace_positions64"
 CELL64_KEY = "fastmace_cell64"
 
 
-def float64_edge_vectors(vectors, positions64, edge_index, unit_shifts, cell64, displacement=None):
-    """``vectors`` (MACE's, float32; at zero strain the unstrained ones) corrected to the float64 vectors of
-    ``positions64`` and ``unit_shifts @ cell64``; returns (vectors, lengths)."""
+def float64_edge_vectors(vectors, positions64, edge_index, unit_shifts, cell64, displacement=None, positions=None):
+    """``vectors`` (MACE's, float32) corrected to the float64 vectors of ``positions64`` and ``unit_shifts @ cell64``;
+    returns (vectors, lengths).
+
+    With a strain (``displacement``, and ``positions`` the unstrained float32 positions the forces differentiate by)
+    the vectors are rebuilt from ``positions`` and strained as edges, ``v + v @ sym``: MACE strains the positions,
+    so the stress's gradient sums ``position (x) force`` over the atoms, which cancels in float32 far from the origin
+    (2.1e-4 relative at +1,500 A on the CPU test's 64 atoms, 4.7x the origin call's); the edges' sum does not."""
     import torch
 
     sender, receiver = edge_index[0], edge_index[1]
     shifts64 = (unit_shifts.to(torch.float64).unsqueeze(-1) * cell64).sum(1)  # no FP64 GEMM
     exact = positions64[receiver] - positions64[sender] + shifts64
+    if displacement is not None:
+        vectors = positions[receiver] - positions[sender]  # the shift is a constant: in the correction
     correction = (exact - vectors.detach().to(torch.float64)).to(vectors.dtype)
-    if displacement is not None:  # the strain the stress differentiates by: the correction strains with its edge
-        symmetric = 0.5 * (displacement[0] + displacement[0].transpose(-1, -2))
-        correction = correction + (correction.unsqueeze(-1) * symmetric).sum(1)
     vectors = vectors + correction
+    if displacement is not None:  # the strain the stress differentiates by, on the edges
+        symmetric = 0.5 * (displacement[0] + displacement[0].transpose(-1, -2))
+        vectors = vectors + (vectors.unsqueeze(-1) * symmetric).sum(1)
     return vectors, torch.linalg.vector_norm(vectors, dim=-1, keepdim=True)
 
 
@@ -424,7 +431,8 @@ def _float64_edges(variant):
             return context
         strained = compute_virials or compute_stress or compute_displacement
         vectors, lengths = vectors_of(context.vectors, positions64, data["edge_index"], data["unit_shifts"],
-                                      data[cell_key], context.displacement if strained else None)
+                                      data[cell_key], context.displacement if strained else None,
+                                      data["positions"])
         return context._replace(vectors=vectors, lengths=lengths)
 
     # Its own code object for each variant (Dynamo caches compiled frames per code object; 2-T19b).

@@ -87,25 +87,33 @@ def test_vectors_are_the_float64_vectors_rounding_far_from_the_origin():
     assert torch.allclose(lengths, torch.linalg.vector_norm(vectors, dim=-1, keepdim=True))
     # The gradient is MACE's: the correction is a constant.
     weights = torch.randn(e, 3, dtype=torch.float32)
-    (got,) = torch.autograd.grad((vectors * weights).sum(), positions32)
+    (got,) = torch.autograd.grad((vectors * weights).sum(), positions32, retain_graph=True)
     positions32.grad = None
     (want,) = torch.autograd.grad((plain * weights).sum(), positions32)
     assert torch.equal(got, want)
 
 
-def test_the_correction_strains_with_its_edge():
+def test_the_strain_acts_on_the_edges():
+    """With a strain the vectors are the float64 vectors strained as edges, and the strain's gradient is the edges'
+    ``vector (x) gradient`` sum (no positions far from the origin in it)."""
     rng = np.random.default_rng(7)
-    vectors = torch.tensor(rng.uniform(-3, 3, (50, 3)), dtype=torch.float64)
     positions64 = torch.tensor(rng.uniform(0, 5, (10, 3)) + OFFSET, dtype=torch.float64)
+    positions32 = positions64.to(torch.float32).requires_grad_(True)
     edge_index = torch.tensor(rng.integers(0, 10, (2, 50)))
-    unit = torch.zeros(50, 3)
+    unit = torch.tensor(rng.integers(-1, 2, (50, 3)), dtype=torch.float32)
     cell64 = torch.eye(3, dtype=torch.float64) * 30
-    strain = torch.tensor(rng.uniform(-0.01, 0.01, (1, 3, 3)), dtype=torch.float64)
-    plain, _ = engine.float64_edge_vectors(vectors, positions64, edge_index, unit, cell64)
-    got, _ = engine.float64_edge_vectors(vectors, positions64, edge_index, unit, cell64, strain)
+    strain = torch.tensor(rng.uniform(-0.01, 0.01, (1, 3, 3)), dtype=torch.float32, requires_grad=True)
+    sender, receiver = edge_index
+    mace = positions32[receiver] - positions32[sender] + (unit.double() @ cell64).float()
+    plain, _ = engine.float64_edge_vectors(mace, positions64, edge_index, unit, cell64)
+    got, _ = engine.float64_edge_vectors(mace, positions64, edge_index, unit, cell64, strain, positions32)
     symmetric = 0.5 * (strain[0] + strain[0].T)
-    correction = plain - vectors
-    assert torch.allclose(got, vectors + correction @ (torch.eye(3, dtype=torch.float64) + symmetric))
+    assert torch.allclose(got, plain + plain @ symmetric, atol=1e-5)
+    weights = torch.randn(50, 3)
+    (grad_strain,) = torch.autograd.grad((got * weights).sum(), strain)
+    edges = plain.detach().double().T @ weights.double()  # d/dsym of sum(w * (v + v @ sym)) = v^T w, symmetrised
+    want = 0.5 * (edges + edges.T)
+    assert torch.allclose(grad_strain.double(), want, rtol=1e-5, atol=1e-4)
 
 
 @pytest.mark.parametrize("stress", [False, True], ids=["forces", "stress"])
