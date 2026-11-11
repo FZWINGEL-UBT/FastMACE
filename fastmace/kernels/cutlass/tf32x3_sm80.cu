@@ -24,9 +24,20 @@
 // Shared memory and threads: fm_tf32x3_species_info.
 
 #include <cutlass/cutlass.h>
+#ifdef FM_HYBRID_F16
+#include "hybrid_f16.h"
+#endif
 #include <cutlass/gemm/kernel/default_gemm.h>
 #include <cutlass/gemm/threadblock/threadblock_swizzle.h>
 #include <cutlass/epilogue/thread/linear_combination.h>
+
+// -DFM_HYBRID_F16: every entry with the HYBRID warp op (hybrid_f16.h: TF32 big * big + one FP16 cross product), built
+// into tf32x3_hyb_sm80.cubin / _sm90.cubin; otherwise CUTLASS's 3xTF32.
+#ifdef FM_HYBRID_F16
+#define FM_MATH_OP cutlass::arch::OpMultiplyAddHybridF16
+#else
+#define FM_MATH_OP cutlass::arch::OpMultiplyAddFastF32
+#endif
 
 namespace {
 
@@ -39,7 +50,7 @@ using GemmKernel = typename cutlass::gemm::kernel::DefaultGemm<
     cutlass::gemm::GemmShape<TileM, TileN, 16>, cutlass::gemm::GemmShape<32, 32, 16>, cutlass::gemm::GemmShape<16, 8, 8>,
     cutlass::epilogue::thread::LinearCombination<float, 4, float, float>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<1>, 4, false,
-    cutlass::arch::OpMultiplyAddFastF32>::GemmKernel;
+    FM_MATH_OP>::GemmKernel;
 
 using RowRow = GemmKernel<cutlass::layout::RowMajor>;
 using RowCol = GemmKernel<cutlass::layout::ColumnMajor>;
@@ -55,7 +66,7 @@ using SpeciesRowRow = typename cutlass::gemm::kernel::DefaultGemm<
     cutlass::gemm::GemmShape<64, 64, 16>, cutlass::gemm::GemmShape<32, 32, 16>, cutlass::gemm::GemmShape<16, 8, 8>,
     cutlass::epilogue::thread::LinearCombination<float, 4, float, float>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<1>, 4, false,
-    cutlass::arch::OpMultiplyAddFastF32, cutlass::gemm::SharedMemoryClearOption::kNone, true, false, true>::GemmKernel;
+    FM_MATH_OP, cutlass::gemm::SharedMemoryClearOption::kNone, true, false, true>::GemmKernel;
 
 template <typename Kernel>
 __device__ __forceinline__ void run(int m, int n, int k, float const *a, int lda, float const *b, int ldb, float *c,
