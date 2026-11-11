@@ -36,7 +36,6 @@ import time
 from typing import Any
 
 from fastmace.kernels.gpu_models import GPUModels
-from fastmace.neighbors import tile_list
 from fastmace.model.forces import ForceOutput
 
 # Compiled tiles' device memory held between calls beyond eager tiles' (their padded slots and outputs; 0.065 GiB
@@ -77,6 +76,14 @@ COMPILED_GRAPH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 # workspace per slot, plus the uncaptured warm-ups' own workspace, each with this margin (``compiled_graphs_fit``).
 # A captured call that still runs out of device memory drops its graphs and runs again without them.
 COMPILED_GRAPH_MARGIN = 1.1
+
+
+def _tile_list():
+    """``fastmace.neighbors.tile_list``, imported when a call needs it (it imports torch; this module stays importable
+    without it, as the gate driver's subprocess needs)."""
+    from fastmace.neighbors import tile_list
+
+    return tile_list
 
 
 def compiled_graphs_fit(workspace, available, slots):
@@ -2043,7 +2050,7 @@ class TiledForceField:
         receivers, _, edges = slot["sizes"]
         e = ei.shape[1]
         frame = None if g is None else g.get("local_frame")
-        if frame is not None and tile_list.rows_on_host(frame[0], self.device):
+        if frame is not None and _tile_list().rows_on_host(frame[0], self.device):
             here = nodes.cpu() if host_nodes is None else host_nodes
             layout = torch.zeros(slot["nodes"].shape[0], dtype=torch.int64)
             layout[:r] = here[:r]
@@ -2322,9 +2329,9 @@ class TiledForceField:
         stress = field.compute_stress
         padded = self.mode != "eager"
         with torch.no_grad():
-            if tile_list.rows_on_host(positions, self.device):  # a chunk at a time: no float64 copy on the device
-                for start in range(0, positions.shape[0], tile_list.CHUNK):
-                    stop = start + tile_list.CHUNK
+            if _tile_list().rows_on_host(positions, self.device):  # a chunk at a time: no float64 copy on the device
+                for start in range(0, positions.shape[0], _tile_list().CHUNK):
+                    stop = start + _tile_list().CHUNK
                     field.positions[start:stop].copy_(positions[start:stop].to(self.device))
             else:
                 field.positions.copy_(positions)
@@ -2780,7 +2787,7 @@ class TiledForceField:
         key = (n, cell.tobytes())
         kept = getattr(self, "_frame_choice", None)
         if kept is None or kept[0] != key:
-            largest = tile_list.abs_max(positions) if n else 0.0
+            largest = _tile_list().abs_max(positions) if n else 0.0
             extent = max(largest, forces_module.structure_extent(np.zeros((0, 3)), cell))
             kept = self._frame_choice = (key, forces_module.float64_edges_wanted(None, extent))
         return kept[1]
@@ -2797,7 +2804,7 @@ class TiledForceField:
         cell = torch.as_tensor(cell, dtype=torch.float64).reshape(3, 3)
         if abs(float(torch.linalg.det(cell))) < 1e-9:
             return None, None
-        if tile_list.rows_on_host(positions, self.device) and not TILE_HOST_ROWS:
+        if _tile_list().rows_on_host(positions, self.device) and not TILE_HOST_ROWS:
             return None, self._local_frame(positions, n)
         kept = getattr(self, "_frame_cell", None)  # fixed addresses: the captured tile bodies read them
         if kept is None or not torch.equal(kept[0].cpu(), cell):
@@ -3109,7 +3116,7 @@ class TiledForceField:
         state = g["state"]
         if g.get("local_frame") is not None:  # TILE_LOCAL_FRAME, tile-local
             positions64, cell, inverse = g["local_frame"]
-            if tile_list.rows_on_host(positions64, self.device):  # TILE_HOST_ROWS: the tile's rows from the host
+            if _tile_list().rows_on_host(positions64, self.device):  # TILE_HOST_ROWS: the tile's rows from the host
                 rows64 = positions64[nodes.cpu()].to(self.device)
             else:
                 rows64 = positions64[nodes]

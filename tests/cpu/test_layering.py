@@ -137,7 +137,10 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                 "TILE_HOST_WORKER": "host-state writes on a worker thread; None = per GPU, A/B",
                                 "TILE_COPY_STREAM": "host-state write copies on a side stream; None = per GPU, A/B",
                                 "TILE_HEAP_TRIM": "malloc_trim after dropped kept lists; memory only, default on",
-                                "TILE_LOCAL_FRAME": "tile-local float64-built edge vectors (idea 11); None = by size, A/B"},
+                                "TILE_LOCAL_FRAME": "tile-local float64-built edge vectors (idea 11); None = by size, A/B",
+                                "TILE_HOST_ROWS": "host float64 positions keep the tile-local frame; default on, A/B",
+                                "TILE_WHOLE_BLOCK_ORDER": "whole-system BLOCK_ORDER order in the tiled call; default "
+                                                          "off, A/B only"},
     "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B",
                                    "FUSED_FOURIER": "k-space sums without dense cos/sin; A/B",
                                    "SPIN_BATCHED": "alpha and beta field features in one call; default on",
