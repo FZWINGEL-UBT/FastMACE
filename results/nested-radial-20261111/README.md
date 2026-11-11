@@ -11,12 +11,15 @@ probe `nested_radial_basis.py`).
 - **Ceiling:** 5.4 % of the A100 call, 4.1 % of the H200's.
 - **Scope:** only where COMPOSE_SKIP is on (H200, A100, Ada), not the 5060 Ti.
 
-**Status.**
+**Status: REJECTED on the A100 and the RTX 4000 Ada (step 3b); opt-in only (`NESTED_RADIAL = True`).**
 - Step 1 (certificate): passes.
-- Step 2 (timing bound): passes on the A100. The 5060 Ti run is queued.
-- Step 3 (real kernels): next.
-- **The 3× float32 gate (`tools/force_stress_gate.py`) stays mandatory in step 3.** This is a rounding change under
-  a certificate: the certificate covers the table, the gate covers the whole call.
+- Step 2 (timing bound): passes on the A100. The 5060 Ti run was dropped (conductor).
+- Step 3a (the split kernels in isolation): passes on the A100.
+- Step 3b (production build, MD-step A/B, gate): the gate passes on both GPUs, but the A/B loses NbCl5 on both, and
+  SrTiO3 too on the Ada. `NESTED_RADIAL_GPUS` stays empty. The H200 was not measured (Modal budget; its split forward
+  rises to 118 registers).
+- **The 3× float32 gate (`tools/force_stress_gate.py`) stays mandatory.** This is a rounding change under a
+  certificate: the certificate covers the table, the gate covers the whole call.
 
 ## Step 1: certificate (leto, CPU)
 
@@ -137,3 +140,74 @@ informative only: COMPOSE_SKIP is off there.
 - The sm_80 forward drops to 72 registers, because each half's atomics are 32 scalar `atom` instructions.
 - The sm_90 forward rises from 64 to 118 registers. That matters for the H200's occupancy, so it is for the H200
   census step.
+
+## Step 3b: production build, MD-step A/Bs and gates (A100, RTX 4000 Ada)
+
+**The build** (`fastmace/rewrites/radial/nested.py`; routed by `precision.route_nested` once the generic radial
+tables exist):
+- `nested.install` fits the rotation per table row with 32 far columns and checks it (1e-7); `activate` swaps the
+  rotated rows into the table, so the device holds one table. The plain rows wait on the host.
+- The composed node matrices take the rotation in float64 (`compose_skip.composed(..., rotation=...)`).
+- The tiled path calls `nested.release` (the plain rows and products back): tiled and nested are exclusive at plan
+  time. A whole-system call that is not composed raises.
+- `NESTED_RADIAL = True` with a table that needs more than 32 far columns raises at setup (`nested.require`).
+- `tabled_outer_sum.NESTED_POWER` (default True) runs the split's backward in the power basis; False follows
+  `POWER_BACKWARD`.
+
+**The first A100 runs were void.** The precision record (compose_skip) applies before the radial record installs the
+tables, so the route found no table and nested stayed off; the gate and A/B of job 4984870 measured the default
+twice. Fixed in 8e51aef5. Since 7839954f every run carries a proof: `tabled_outer_sum.split_walks()` counts the split
+walks' launches; `tools/ab_rewrites.py --b-expect [ENTRY@]MODULE:NAME` marks an entry INVALID (exit 3) unless the
+counter advances on its side b and stays at 0 on side a; `tools/force_stress_gate.py --production-expect` fails a
+structure whose builds did not advance it. All runs below passed their proof (a 0; b 10 SrTiO3 / 18 NbCl5; gate 8
+per build).
+
+**Structures** (`tools/far_fraction.py`, cutoff 6 Å, r_far 3.1518 Å; equilibrium / jitter 0.07 Å):
+
+| Structure | Atoms | Edges | Edges per atom | Far fraction |
+| --- | ---: | ---: | ---: | ---: |
+| SrTiO3 10×10×10 | 5,000 | 370,000 / 368,752 | 74.0 / 73.8 | 0.838 / 0.837 |
+| NbCl5 | 1,944 | 51,084 / 52,628 | 26.3 / 27.1 | 0.924 / 0.923 |
+
+**MD-step A/B** (OMAT-0 medium float32, same process, 1 fs, skin 0.5, 6 × 256 steps; b/a, orders ab / ba; a =
+today's defaults; all entries valid, no recompiles during timing):
+
+| GPU, job | Side | SrTiO3 10×10×10 | NbCl5 |
+| --- | --- | --- | --- |
+| A100-SXM4-80GB, Alex 4985143 (7839954f) | b: NESTED_RADIAL (power split) | 0.9834 / 0.9831 | 1.0569 / 1.0568 |
+| A100-SXM4-80GB, Alex 4985314 (a81ed9cc) | b: NESTED_RADIAL (power split) | 0.9843 / 0.9823 | 1.0570 / 1.0572 |
+| | c: POWER_BACKWARD alone | 0.9980 / 0.9958 | 0.9985 / 0.9964 |
+| | d: NESTED_RADIAL, recompute split | 0.9942 / 0.9914 | 1.0633 / 1.0648 |
+| RTX 4000 Ada, murphy (938e5eab) | b: NESTED_RADIAL (power split; the Ada's default backward is power) | 1.0263 / 1.0211 | 1.1185 / 1.1178 |
+| RTX 4000 Ada, murphy (a81ed9cc) | b: NESTED_RADIAL | 1.0264 / 1.0240 | 1.1192 / 1.1135 |
+| | c: POWER_BACKWARD False | 1.0057 / 1.0079 | 1.0072 / 1.0083 |
+| | d: NESTED_RADIAL, POWER_BACKWARD and NESTED_POWER False | 1.0282 / 1.0252 | 1.1224 / 1.1198 |
+
+Step times (a → b): A100 SrTiO3 6.20 → 6.09 ms, NbCl5 1.67 → 1.77 ms; Ada SrTiO3 17.6 → 18.1 ms, NbCl5 3.88 →
+4.34 ms.
+
+**3× float32 gate** (SrTiO3 3×3×3 and NaCl; max-error ratios forces / stress / energy; all pass):
+
+| GPU, side | SrTiO3 | NaCl |
+| --- | --- | --- |
+| A100, b (4985143) | 0.942 / 0.631 / 6.83 (2.1e-3 eV, under the 0.01 floor) | 0.922 / 1.195 / 0.786 |
+| A100, d (4985314) | 0.877 / 0.616 / 6.59 (2.1e-3 eV) | 0.887 / 1.081 / 0.822 |
+| Ada, b (murphy) | 0.794 / 0.565 / 3.33 (1.2e-3 eV) | 0.868 / 0.959 / 0.818 |
+
+**Reading it.**
+- The power basis does not explain the NbCl5 loss: POWER_BACKWARD alone ties on the A100 (c), and on the Ada both
+  sides of b run it. With the recompute split (d against c) nested still loses NbCl5 on both GPUs (A100 about +6.6 %,
+  Ada about +11 %).
+- The loss does not follow the far fraction: NbCl5 has more far edges (0.92) than SrTiO3 (0.84) and loses more. It
+  follows the edges per receiver (26 against 74): with short receiver runs, the split forward's per-run work (two
+  accumulator halves, the high block's atomics when a run has a near edge) and the backward's lazily loaded high
+  block cost more than the 32 skipped columns save.
+- On the Ada even SrTiO3 loses (about +2.2 % in the recompute basis), so a size rule could serve the A100 only.
+  With one structure on each side of any threshold, the A/B does not support one, so none is proposed.
+- The isolated kernel saving of step 3a (276 µs on the A100 SrTiO3 call) shows in the A100 SrTiO3 step as about
+  110 µs.
+
+**Census:** step 3a's table holds; the sm_80 split forward is 72 registers (≤ 128), w′ unchanged.
+
+**Decision (conductor, 11 November 2026):** the A100 and the Ada stay off; `NESTED_RADIAL_GPUS` is empty. The H200
+would need its own census and a Modal pack.
