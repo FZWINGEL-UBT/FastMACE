@@ -11,7 +11,11 @@ latexmk -pdf main.tex
 ```
 
 `main.tex` uses the standard `article` class with common packages (no external style file), and `references.bib`
-with `unsrtnat`. Build outputs are ignored by `paper/.gitignore`.
+with `unsrtnat`.
+
+The built `main.pdf` is committed (owner request, 11 November 2026), so the paper can be read without a LaTeX
+installation. Rebuild it and commit it together with any change to `main.tex` or `references.bib`. The other
+build outputs are ignored by `paper/.gitignore`.
 
 ## Where the numbers come from
 
