@@ -642,7 +642,15 @@ def attach_edge_sh(model, gpus=None):
     parameter = next(model.parameters(), None)
     if not edge_sh_default(parameter.device if parameter is not None else None, gpus):
         return False
-    model.spherical_harmonics = EdgeSH(sh)
+    model.spherical_harmonics = module = EdgeSH(sh)
+    # EDGE_FORCE (idea 13): the w' backward contracts the features' gradient itself and needs the vectors; EdgeSH
+    # keeps them with its output, and the interactions read them where their edge_attrs are that output
+    from fastmace.kernels.oeq_streaming.wprime_backward import edge_force_default
+
+    if parameter is not None and edge_force_default(parameter.device):
+        module.keep_vectors = True
+        for interaction in getattr(model, "interactions", ()):
+            interaction.__dict__["edge_sh_source"] = module  # a reference, not a submodule
     return True
 
 
@@ -653,12 +661,26 @@ class EdgeSH(torch.nn.Module):
     def __init__(self, original):
         super().__init__()
         self.original = original
+        # EDGE_FORCE: the last call's (vectors, output), read by the w' convolution (``edge_vectors``)
+        self.keep_vectors, self.vectors, self.attrs = False, None, None
 
     def forward(self, x):
         if x.is_cuda and x.dtype == torch.float32 and x.dim() == 2 and x.shape[1] == 3:
             from fastmace.kernels.triton.edge_sh import edge_sh3
-            return edge_sh3(x)
+            out = edge_sh3(x)
+            if self.keep_vectors:
+                self.vectors, self.attrs = x, out
+            return out
         return self.original(x)
+
+
+def edge_vectors(interaction, edge_attrs):
+    """The edge vectors ``edge_attrs`` were computed from by the model's ``EdgeSH`` (EDGE_FORCE), or None when
+    ``edge_attrs`` is not that module's last output."""
+    source = interaction.__dict__.get("edge_sh_source")
+    if source is None or source.attrs is not edge_attrs:
+        return None
+    return source.vectors
 
 
 def edge_sh_replaceable(module):

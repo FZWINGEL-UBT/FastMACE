@@ -302,6 +302,15 @@ SPLINE_VECTOR = None
 # NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): 2 again from the Ada set 0.9918
 # / 0.9906 (b = 2):
 # float4 is slower there, so the Ada keeps 2.
+# Idea 13 step 2 (plans/ideas-20261111-tiled-round2.md, 11 November 2026). EDGE_FORCE: the w' backward contracts
+# the edge features' gradient with edge_sh3's Jacobian in its epilogue (one lane per edge) and writes dL/dv [E, 3]
+# instead of dsh [E, 16]: 52 B per edge less at the force call's peak, where dsh is live
+# (results/sh-recompute-20261111).
+# Needs the edge vectors: the model's EdgeSH hands them over with its output (``rewrites.generic.modules.EdgeSH``);
+# without them the convolution keeps dsh. Rounding (interaction 1's share of the features' gradient is contracted
+# before it is added to interaction 0's). None: on for EDGE_FORCE_GPUS (none yet); True / False: an A/B side's choice.
+EDGE_FORCE = None
+EDGE_FORCE_GPUS = GPUModels(())
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 
 
@@ -330,6 +339,43 @@ constexpr int TERMS = {{ terms }};
 constexpr int PADDED_TERMS = {{ padded_terms }};  // a q-major G' row: TERMS, then zero terms (SLOPE_VECTOR)
 constexpr unsigned int FULL_MASK = 0xffffffffu;
 
+{%- if edge_force %}
+// EDGE_FORCE: edge_sh3's constants (fastmace/kernels/triton/edge_sh.py), l <= 3, component normalisation
+constexpr float S3 = 1.7320508075688772f, S5 = 2.23606797749979f, S56 = 0.9128709291752769f;
+constexpr float S38 = 0.6123724356957945f, C1 = 1.7320508075688772f, C2 = 2.23606797749979f;
+constexpr float C3 = 2.6457513110645907f;
+{%- endif %}
+
+{%- macro edge_force_store(g) %}
+        {   // EDGE_FORCE: dL/dv[e] = (I - u u^T) / max(|v|, eps) . sum_c g_c dY_c/du (edge_sh3's backward), one lane
+            const float vx = vec[3 * e], vy = vec[3 * e + 1], vz = vec[3 * e + 2];
+            const float n = sqrtf(vx * vx + vy * vy + vz * vz), d = fmaxf(n, 1e-12f);
+            const float x = vx / d, y = vy / d, z = vz / d;
+            const float g1x = {{ g }}[1] * C1, g1y = {{ g }}[2] * C1, g1z = {{ g }}[3] * C1;
+            const float g20 = {{ g }}[4] * C2, g21 = {{ g }}[5] * C2, g22 = {{ g }}[6] * C2;
+            const float g23 = {{ g }}[7] * C2, g24 = {{ g }}[8] * C2;
+            const float g30 = {{ g }}[9] * C3, g31 = {{ g }}[10] * C3, g32 = {{ g }}[11] * C3;
+            const float g33 = {{ g }}[12] * C3, g34 = {{ g }}[13] * C3, g35 = {{ g }}[14] * C3;
+            const float g36 = {{ g }}[15] * C3;
+            const float s20 = S3 * x * z, s24 = S3 / 2.0f * (z * z - x * x);
+            const float y2 = y * y, x2z2 = x * x + z * z;
+            const float a = 4.0f * y2 - x2z2, b = 2.0f * y2 - 3.0f * x2z2;
+            const float gs20 = g20 + S56 * (g30 * z - g36 * x) + S5 * g31 * y;
+            const float gs24 = g24 + S56 * (g30 * x + g36 * z) + S5 * g35 * y;
+            const float ga = S38 * (g32 * x + g34 * z), gb = 0.5f * y * g33;
+            const float gy2 = g22 + 4.0f * ga + 2.0f * gb, gx2z2 = -0.5f * g22 - ga - 3.0f * gb;
+            const float gx = g1x + S3 * z * gs20 + S3 * y * g21 - S3 * x * gs24 + 2.0f * x * gx2z2
+                             + S56 * (g30 * s24 - g36 * s20) + S38 * a * g32;
+            const float gy = g1y + S3 * x * g21 + S3 * z * g23 + 2.0f * y * gy2 + S5 * (g31 * s20 + g35 * s24)
+                             + 0.5f * b * g33;
+            const float gz = g1z + S3 * x * gs20 + S3 * y * g23 + S3 * z * gs24 + 2.0f * z * gx2z2
+                             + S56 * (g30 * s20 + g36 * s24) + S38 * a * g34;
+            const float dot = n > 1e-12f ? x * gx + y * gy + z * gz : 0.0f;
+            dsh[3 * e + 0] = scalar_t((gx - x * dot) / d);
+            dsh[3 * e + 1] = scalar_t((gy - y * dot) / d);
+            dsh[3 * e + 2] = scalar_t((gz - z * dot) / d);
+        }
+{%- endmacro %}
 {% macro node_offset(start, component, irrep_dim) -%}
     {%- if layout == "ir_mul" -%}
         {{ start + component * schedule.channels }} + channel
@@ -370,7 +416,8 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     scalar_t r_max,
     int32_t n_bins,
     int32_t pieces,
-    scalar_t* dr) {
+    scalar_t* dr{% if edge_force %},
+    const scalar_t* __restrict__ vec{% endif %}) {
 
     const int lane = threadIdx.x % LOGICAL_GROUP_SIZE;
     const int logical_group = threadIdx.x / LOGICAL_GROUP_SIZE;
@@ -493,7 +540,11 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         || receiver < 0 || receiver >= node_count) {
         // An edge with an out-of-range index contributes nothing: its dsh row and dr are written as zeros (the
         // wrappers allocate dsh with empty_like, so a skipped row would hold garbage; kernel review, 5 November 2026).
+        {%- if edge_force %}
+        if (lane < 3) dsh[e * 3 + lane] = scalar_t(0);  // EDGE_FORCE: dL/dv[e]
+        {%- else %}
         for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);
+        {%- endif %}
         if (lane == 0) dr[e] = scalar_t(0);
         {{ "continue" if stage_dout else "return" }};
     }
@@ -803,6 +854,9 @@ extern "C" __global__ void oeq_projected_backward_wprime(
 
     {%- if redux %}
     // REDUX: each component's 32 partials summed in fixed point (redux.sync); lane 0 writes dsh[e, :] and dr[e].
+    {%- if edge_force %}
+    float edge_sum[EDGE_DIM];
+    {%- endif %}
     #pragma unroll
     for (int component = 0; component <= EDGE_DIM; ++component) {
         const float v = float(component < EDGE_DIM ? edge_gradient[component] : radial_gradient);
@@ -811,12 +865,21 @@ extern "C" __global__ void oeq_projected_backward_wprime(
         ex = ex < 30u ? 30u : (finite ? ex : 254u);
         const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);
         const int total = __reduce_add_sync(FULL_MASK, finite ? __float2int_rn(v * scale) : 0);
+        {%- if edge_force %}
+        const float sum = finite ? float(total) * inverse : __int_as_float(0x7fffffff);
+        if (component < EDGE_DIM) edge_sum[component] = sum;
+        else if (lane == 0) dr[e] = scalar_t(sum);
+        {%- else %}
         if (lane == 0) {
             const float sum = finite ? float(total) * inverse : __int_as_float(0x7fffffff);
             if (component < EDGE_DIM) dsh[edge_base + component] = scalar_t(sum);
             else dr[e] = scalar_t(sum);
         }
+        {%- endif %}
     }
+    {%- if edge_force %}
+    if (lane == 0) {{ edge_force_store("edge_sum") }}
+    {%- endif %}
     {%- elif butterfly %}
     // BUTTERFLY: reduce-scatter the edge gradient; lane c << SHIFT writes dsh[e, c], lane 0 dr[e].
     constexpr int SHIFT = {{ 5 - butterfly_steps }};
@@ -839,7 +902,14 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     #pragma unroll
     for (int offset = 16; offset > 0; offset >>= 1)
         radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);
+    {%- if edge_force %}
+    float edge_sum[EDGE_DIM];
+    #pragma unroll
+    for (int c = 0; c < EDGE_DIM; ++c) edge_sum[c] = __shfl_sync(FULL_MASK, edge_gradient[0], c << SHIFT, 32);
+    if (lane == 0) {{ edge_force_store("edge_sum") }}
+    {%- else %}
     if ((lane & ((1 << SHIFT) - 1)) == 0) dsh[edge_base + (lane >> SHIFT)] = scalar_t(edge_gradient[0]);
+    {%- endif %}
     if (lane == 0) dr[e] = scalar_t(radial_gradient);
     {%- else %}
     // Reduce within the logical 32-thread edge owner. Lane 0 writes dsh[e, :] and dr[e].
@@ -851,8 +921,12 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     }
 
     if (lane == 0) {
+        {%- if edge_force %}
+        {{ edge_force_store("edge_gradient") }}
+        {%- else %}
         for (int component = 0; component < EDGE_DIM; ++component)
             dsh[edge_base + component] = scalar_t(edge_gradient[component]);
+        {%- endif %}
         dr[e] = scalar_t(radial_gradient);
     }
     {%- endif %}
@@ -896,7 +970,7 @@ def factored_paths(schedule, scale=False):
 def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, blocks=None, block_ldg=False,
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
            table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
-           stage_quads=False, shared_locator=False, stage_sh=0, stage_edges=False):
+           stage_quads=False, shared_locator=False, stage_sh=0, stage_edges=False, edge_force=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -918,7 +992,10 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     ``spline_locator``'s per-edge int4 record, passed in the ``bins`` argument. ``stage_sh`` (``STAGE_SH``; float32,
     32-lane cohorts): the block's cohort count; each cohort copies its edge's features to shared memory once.
     ``stage_edges`` (``STAGE_EDGES``; with ``stage_dout``, ``stage_sh`` and ``spline``, not ``shared_locator``): the
-    block's chunk of edges staged once at block entry (features, sender, receiver, spline interval)."""
+    block's chunk of edges staged once at block entry (features, sender, receiver, spline interval).
+    ``edge_force`` (``EDGE_FORCE``, idea 13; float32, edge features l <= 3 of ``edge_sh3``): the kernel takes the edge
+    vectors ``vec [E, 3]`` after ``dr`` and writes ``dL/dv [E, 3]`` through ``dsh`` (edge_sh3's backward contracted
+    in the epilogue, one lane per edge) instead of ``dsh [E, 16]``."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -965,6 +1042,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     if stage_edges and not (stage_dout and stage_sh and spline is not None and not shared_locator):
         raise ValueError("stage_edges stages STAGE_DOUT's chunk for SPLINE_W: it needs stage_dout, stage_sh and "
                          "spline, without shared_locator")
+    if edge_force and not edge_force_supported(schedule, scalar):
+        raise ValueError("edge_force contracts edge_sh3's 16 features: it needs float32 and an edge dimension of 16")
     stage_rows, stage_offsets, stage_total = _stage_layout(schedule, blocks)
     quads, quad_of = (None, None)
     if stage_quads:
@@ -988,7 +1067,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             butterfly_steps=int(schedule.edge_dim).bit_length() - 1,
                                             spline=None if spline is None else _spline_lookup(spline, scalar),
                                             shared_locator=bool(shared_locator), stage_sh=int(stage_sh),
-                                            stage_edges=bool(stage_edges),
+                                            stage_edges=bool(stage_edges), edge_force=bool(edge_force),
                                             slab="int64_t(loc.x)" if shared_locator
                                             else "int64_t(stage_slab[stage_k])" if stage_edges
                                             else "(int64_t(pairs[e]) * pieces + piece)")
@@ -1057,6 +1136,11 @@ def redux_supported(schedule, scalar):
     """Whether ``REDUX`` applies: float32 partials, 32-lane cohorts (redux.sync needs compute capability 8.0+,
     FastMACE's floor for these kernels)."""
     return scalar == "float" and int(schedule.launch_config.logical_cohort_width) == 32
+
+
+def edge_force_supported(schedule, scalar):
+    """``EDGE_FORCE`` applies: float32 and edge_sh3's 16 edge features (l <= 3)."""
+    return scalar == "float" and int(schedule.edge_dim) == 16
 
 
 def butterfly_supported(schedule):
@@ -1168,7 +1252,7 @@ class WPrimeBackward:
 
     def __init__(self, kernels, terms, device=None, vector=0, table_w=False, blocks=None, factored=None,
                  horner=False, table_pairs=False, fold_alpha=False, spline=None, shared_locator=False,
-                 model_label=None):
+                 model_label=None, edge_force=False):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -1203,6 +1287,8 @@ class WPrimeBackward:
         self.shared_locator = bool(shared_locator)  # SHARED_LOCATOR: the locator's records come in bins
         self.stage_edges = (self.stage_dout and bool(self.stage_sh) and self.spline is not None
                             and not self.shared_locator and stage_edges_default(device, model_label))
+        self.edge_force = bool(edge_force)  # EDGE_FORCE: dL/dv [E, 3] through dsh; the vectors after dr
+        self.launches = 0  # host-side launch count (tests: the EDGE_FORCE kernel ran)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
                              scale=self.factored and (FACTORED_SCALE or self.fold_alpha), horner=self.horner,
@@ -1210,7 +1296,7 @@ class WPrimeBackward:
                              redux=self.redux, table_pairs=self.table_pairs, hoist_scale=self.hoist_scale,
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
-                             stage_sh=self.stage_sh, stage_edges=self.stage_edges)
+                             stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force)
         options = ()
         if SMEM_SPILL:
             head = 'extern "C" __global__ void oeq_projected_backward_wprime('
@@ -1234,7 +1320,7 @@ class WPrimeBackward:
         _REGISTRY[self.id] = self
 
     def __call__(self, x, sh, weights, senders, receivers, dout, dx, dsh, r, pair, gprime, starts, scales, bins,
-                 r_lo, bin_scale, r_max, dr):
+                 r_lo, bin_scale, r_max, dr, vectors=None):
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check
@@ -1254,6 +1340,11 @@ class WPrimeBackward:
         douts = len(self.blocks) if self.blocks else 1
         types = ((ctypes.c_longlong, ctypes.c_longlong) + (p,) * (13 + douts) + (real, real, real)
                  + (ctypes.c_int, ctypes.c_int, p))
+        if self.edge_force != (vectors is not None):
+            raise ValueError("an EDGE_FORCE w' kernel takes the edge vectors, any other none")
+        if vectors is not None:  # EDGE_FORCE
+            values, types = values + (vectors.data_ptr(),), types + (p,)
+        self.launches += 1
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         _check(driver.cuLaunchKernel(self._function, blocks, 1, 1, self.num_threads, 1, 1, self.shared_memory,
                                      stream, (values, types), 0))
@@ -1349,6 +1440,46 @@ def _(x, sh, senders, receivers, douts, r, pair, gprime, starts, scales, bins, r
     return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0],))
 
 
+@torch.library.custom_op("fastmace::streaming_conv_wprime_backward_force", mutates_args=())
+def streaming_conv_wprime_backward_force(x: torch.Tensor, sh: torch.Tensor, vectors: torch.Tensor,
+                                         senders: torch.Tensor, receivers: torch.Tensor, douts: list[torch.Tensor],
+                                         r: torch.Tensor, pair: torch.Tensor, gprime: torch.Tensor,
+                                         starts: torch.Tensor, scales: torch.Tensor, bins: torch.Tensor, r_lo: float,
+                                         bin_scale: float, r_max: float,
+                                         wprime_id: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """``streaming_conv_wprime_backward_blocks`` of an ``EDGE_FORCE`` kernel: ``(dx, dL/dv [E, 3], dL/dr)``, the
+    edge features' gradient contracted with edge_sh3's Jacobian at ``vectors`` instead of returned."""
+    kernel = _REGISTRY[wprime_id]
+    x, sh, vectors = x.contiguous(), sh.contiguous(), vectors.contiguous()
+    douts = [d.contiguous() for d in douts]
+    dx = torch.zeros_like(x)  # sender gradients are added atomically
+    dv = torch.empty_like(vectors)
+    dr = sh.new_empty((sh.shape[0],))
+    kernel(x, sh, sh.new_empty((0,)), senders.contiguous(), receivers.contiguous(), douts, dx, dv,
+           r.reshape(-1).contiguous(), pair.contiguous(), gprime, starts, scales, bins, r_lo, bin_scale, r_max, dr,
+           vectors)
+    return dx, dv, dr
+
+
+@streaming_conv_wprime_backward_force.register_fake
+def _(x, sh, vectors, senders, receivers, douts, r, pair, gprime, starts, scales, bins, r_lo, bin_scale, r_max,
+      wprime_id):
+    return torch.empty_like(x), torch.empty_like(vectors), sh.new_empty((sh.shape[0],))
+
+
+def _wprime_blocks_backward(x, sh, vectors, senders, receivers, douts, r, pair, gprime, starts, scales, bins,
+                            constants, wprime_id, force_id):
+    """(dx, gradient of sh or None, gradient of vectors or None, dr): EDGE_FORCE's kernel when the forward had the
+    vectors (``force_id`` >= 0), else the dsh kernel."""
+    if vectors is not None and force_id >= 0:
+        dx, dv, dr = streaming_conv_wprime_backward_force(x, sh, vectors, senders, receivers, douts, r, pair, gprime,
+                                                          starts, scales, bins, *constants, force_id)
+        return dx, None, dv, dr
+    dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, gprime, starts,
+                                                        scales, bins, *constants, wprime_id)
+    return dx, dsh, None, dr
+
+
 def _block_rows(rows, x):
     """The node rows a block convolution returns: ``rows`` (a tile's receivers;
     ``rewrites.generic.modules.TILE_BLOCK_ROWS``) where it is in (0, N), else every row of ``x``."""
@@ -1405,7 +1536,8 @@ class _SplineBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None,
+                vectors=None, force_id=-1):
         from fastmace.kernels.oeq_streaming.spline_forward import spline_message_blocks
         from fastmace.kernels.triton.radial_table import radial_table_forward
 
@@ -1416,26 +1548,27 @@ class _SplineBlockConvolution(torch.autograd.Function):
         read = table if forward_table is None else forward_table
         groups = spline_message_blocks(x, sh, senders, row_ptr, r, pair, read, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
-                              bins)
+                              bins, vectors)
         ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
+        ctx.force_id = int(force_id)
         return (*_leading_rows(groups, x, ctx.rows), density)
 
     @staticmethod
     def backward(ctx, *grads):
         (x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
-         bins) = ctx.saved_tensors
+         bins, vectors) = ctx.saved_tensors
         kernel = _REGISTRY[ctx.wprime_id]
         from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
         shapes = block_shapes(kernel.blocks, kernel.channels, ctx.rows)
         douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
         # The spline kernel's piece count is spline_starts' length (its intervals); scales and bins are not read.
-        dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
-                                                            spline_starts, scales, bins, *ctx.constants,
-                                                            ctx.wprime_id)
+        dx, dsh, dv, dr = _wprime_blocks_backward(x, sh, vectors, senders, receivers, douts, r, pair, table,
+                                                  spline_starts, scales, bins, ctx.constants, ctx.wprime_id,
+                                                  ctx.force_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7
+        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table; then vectors, force_id
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7 + (dv, None)
 
 
 class _SplineLocatedBlockConvolution(torch.autograd.Function):
@@ -1444,7 +1577,8 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, r, pair, density_coef, density_dcoef, starts, scales, bins, r_lo, bin_scale, r_max, table,
-                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None):
+                spline_starts, x, sh, senders, receivers, row_ptr, spline_id, wprime_id, rows=0, forward_table=None,
+                vectors=None, force_id=-1):
         # forward_table: unused (PACKED8 needs STAGE_EDGES, which excludes SHARED_LOCATOR)
         from fastmace.kernels.oeq_streaming.spline_forward import spline_locate, spline_message_blocks_located
         from fastmace.kernels.triton.radial_table import radial_table_forward
@@ -1454,25 +1588,26 @@ class _SplineLocatedBlockConvolution(torch.autograd.Function):
         locator = spline_locate(r, pair, spline_id)
         groups = spline_message_blocks_located(x, sh, senders, row_ptr, locator, pair, table, spline_id)
         ctx.save_for_backward(x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
-                              bins, locator)
+                              bins, locator, vectors)
         ctx.constants, ctx.wprime_id, ctx.rows = (r_lo, bin_scale, r_max), wprime_id, _block_rows(rows, x)
+        ctx.force_id = int(force_id)
         return (*_leading_rows(groups, x, ctx.rows), density)
 
     @staticmethod
     def backward(ctx, *grads):
         (x, sh, senders, receivers, r, pair, table, spline_starts, density_dcoef, starts, scales,
-         bins, locator) = ctx.saved_tensors
+         bins, locator, vectors) = ctx.saved_tensors
         kernel = _REGISTRY[ctx.wprime_id]
         from fastmace.kernels.oeq_streaming.fused_forward import block_shapes
         shapes = block_shapes(kernel.blocks, kernel.channels, ctx.rows)
         douts = [x.new_zeros(shape) if g is None else g for g, shape in zip(grads[:-1], shapes)]
-        dx, dsh, dr = streaming_conv_wprime_backward_blocks(x, sh, senders, receivers, douts, r, pair, table,
-                                                            spline_starts, scales, locator, *ctx.constants,
-                                                            ctx.wprime_id)
+        dx, dsh, dv, dr = _wprime_blocks_backward(x, sh, vectors, senders, receivers, douts, r, pair, table,
+                                                  spline_starts, scales, locator, ctx.constants, ctx.wprime_id,
+                                                  ctx.force_id)
         if grads[-1] is not None:
             dr = dr + density_backward(r, pair, density_dcoef, starts, scales, bins, grads[-1], *ctx.constants)
-        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table
-        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7
+        # (None,) * 7: senders, receivers, row_ptr, spline_id, wprime_id, rows, forward_table; then vectors, force_id
+        return (dr.reshape(r.shape),) + (None,) * 11 + (dx, dsh) + (None,) * 7 + (dv, None)
 
 
 def spline_table(coef, row_scale=None):
@@ -1687,6 +1822,11 @@ def stage_edges_default(device, model_label=None):
     return name in STAGE_EDGES_GPUS or name in STAGE_EDGES_MODEL_GPUS.get(model_label, ())
 
 
+def edge_force_default(device):
+    """``EDGE_FORCE`` on ``device``: the constant when set, else on for ``EDGE_FORCE_GPUS``."""
+    return bool(EDGE_FORCE) if EDGE_FORCE is not None else _device_name(device) in EDGE_FORCE_GPUS
+
+
 def stage_quads_default(device):
     """``STAGE_QUADS`` on ``device``: the constant when set, else on for ``STAGE_QUADS_GPUS``."""
     return bool(STAGE_QUADS) if STAGE_QUADS is not None else _device_name(device) in STAGE_QUADS_GPUS
@@ -1827,6 +1967,19 @@ class WPrime(torch.nn.Module):
                 WPrimeBackward(self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
                                horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha,
                                spline=grid, shared_locator=shared, model_label=self.model_label))
+            self.spline_force = None  # EDGE_FORCE: the same kernel writing dL/dv, for calls with the edge vectors
+            if edge_force_default(device) and edge_force_supported(self.kernels.schedule, "float"):
+                self.spline_force = WPrimeBackward(
+                    self.kernels, 4, device, vector=spline_vector_default(device), table_w=True, blocks=blocks,
+                    horner=True, factored=True if self.fold_alpha else None, fold_alpha=self.fold_alpha, spline=grid,
+                    shared_locator=shared, model_label=self.model_label, edge_force=True)
+
+    def _force_arguments(self, vectors):
+        """The SPLINE_W Functions' ``(vectors, force_id)``: EDGE_FORCE's kernel when built and the vectors given."""
+        force = getattr(self, "spline_force", None)
+        if vectors is None or force is None:
+            return None, -1
+        return vectors, force.id
 
     def attach_rebuild(self, kernels, fused):
         """Compile the message-only fused forward and the w-rebuilding backward for ``recompute_conv_weights``
@@ -1845,11 +1998,13 @@ class WPrime(torch.nn.Module):
                                          batch=REBUILD_BATCH))
 
     def convolution(self, lengths, pair, table, weight, x, sh, senders, receivers, row_ptr, kernels, fused=None,
-                    recompute_rows=0, linear=None, block_rows=None):
+                    recompute_rows=0, linear=None, block_rows=None, vectors=None):
         """``(message, edge density)`` of edge lengths ``lengths`` ``[E, 1]`` (differentiable in lengths, x, sh).
         ``recompute_rows`` (``recompute_conv_weights``): keep no per-edge weights for the backward. With the rebuild
         kernels attached (``attach_rebuild``) and ``fused``, the forward stores no ``w`` and the backward builds it on
-        chip; otherwise the backward builds it again in chunks of that many edges."""
+        chip; otherwise the backward builds it again in chunks of that many edges. ``vectors`` (EDGE_FORCE): the edge
+        vectors ``sh`` was computed from by edge_sh3; with an EDGE_FORCE kernel built, the backward returns their
+        gradient instead of sh's (SPLINE_W path)."""
         if weight.requires_grad:
             raise ValueError("wprime_backward: the folded weight must not require a gradient")
         if (self.spline_block is not None and fused is not None and linear is not None
@@ -1860,7 +2015,8 @@ class WPrime(torch.nn.Module):
                 lengths, pair, self.density_coef, self.density_dcoef, table.starts, table.scales, table.bins,
                 float(table.r_lo), float(table.bin_scale), float(table.r_max), self.spline_table, self.spline_starts,
                 x, sh, senders, receivers, row_ptr, self.spline_block[1].id, self.spline_block[2].id,
-                int(block_rows or 0), self.spline_packed if self.spline_block[1].packed8 else None)  # PACKED8
+                int(block_rows or 0), self.spline_packed if self.spline_block[1].packed8 else None,  # PACKED8
+                *self._force_arguments(vectors))
             return tuple(groups), density
         if (self.block is not None and fused is not None and linear is not None and self.block[0] == fused.id
                 and BLOCK_MESSAGE is not False):  # a tuple of linear_1's input groups (prepare_blocks)
@@ -1898,7 +2054,9 @@ class WPrime(torch.nn.Module):
         return f"groups={self.gprime.shape[0]}, terms={self.terms}, outputs={outputs}{vector}{table}"
 
 
-__all__ = ["BLOCK_LDG", "BLOCK_LDG_GPUS", "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
+__all__ = ["EDGE_FORCE", "EDGE_FORCE_GPUS", "edge_force_default", "edge_force_supported",
+           "streaming_conv_wprime_backward_force", "BLOCK_LDG", "BLOCK_LDG_GPUS",
+           "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
            "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",
            "SCALAR_PATHS_GPUS", "SPLINE_VECTOR", "SPLINE_VECTOR_GPUS", "spline_vector_default", "TABLE_W",
            "TABLE_W_GPUS", "WPrime", "WPrimeBackward", "block_ldg_default",

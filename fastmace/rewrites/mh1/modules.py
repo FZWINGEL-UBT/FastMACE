@@ -582,6 +582,7 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     groups of that many leading rows (views), their gradients as short.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
+    from fastmace.rewrites.generic.modules import edge_vectors
     sender, receiver = edge_index[0], edge_index[1]
     plain = wprime_lengths is None and w_lengths is None and table_lengths is None and (
         augmented is None or (getattr(self, "generic_recompute", None) is None
@@ -608,7 +609,7 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
             feats, edge_attrs, sender.to(torch.int32), receiver.to(torch.int32), row_ptr, self.streaming_kernels,
             getattr(self, "fused_folded_forward", None), getattr(self, "recompute_weight_rows", 0),
             linear=getattr(self, "linear", None),  # BLOCK_MESSAGE: a tuple of linear_1's input groups
-            block_rows=block_rows)
+            block_rows=block_rows, vectors=edge_vectors(self, edge_attrs))  # EDGE_FORCE
     elif w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
         message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
                                            sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
