@@ -1009,22 +1009,32 @@ def _slot_local(positions64, nodes, node_mask, local, edge_mask, shifts, cell, i
     """``_tile_local`` on a padded slot's fixed-size buffers (rows ``nodes`` with ``node_mask``, edges ``local`` and
     ``shifts`` with ``edge_mask``; ``receivers`` slot receiver rows): ``(rows, remaining shifts)`` with the padding
     rows zero, as one fixed-shape graph that mode "compiled" compiles once per slot bucket (local job 53: the
-    per-tile eager form cost 1.06x at 320,000 atoms on the RTX 5060 Ti)."""
+    per-tile eager form cost 1.06x at 320,000 atoms on the RTX 5060 Ti).
+
+    Float64 per node only: each edge's integer image ``round(shift @ cell^-1)`` in float32 (exact: |unit| small), a
+    halo row's image the smallest encoded unit among its edges (deterministic, as every sweep must see the same rows),
+    its float64 shift ``unit @ cell`` per row; the remaining shift ``(unit - row unit) @ cell`` in float32 (zero
+    unless an atom reaches the tile through two images, which only a box smaller than two tiles allows)."""
     import torch
 
     from fastmace.neighbors.skin import times_3x3
 
-    count, e = nodes.shape[0], local.shape[1]
+    count = nodes.shape[0]
+    cell32 = cell.to(torch.float32)
+    unit = torch.round(times_3x3(shifts.to(torch.float32), inverse.to(torch.float32)))
+    code = unit.to(torch.int32) + 64  # |unit| < 64
+    code = (code[:, 0] * 128 + code[:, 1]) * 128 + code[:, 2]
+    none = 1 << 21  # above every code
+    code = torch.where(edge_mask > 0, code, torch.full_like(code, none))
+    best = torch.full((count,), none, dtype=code.dtype, device=local.device).scatter_reduce(
+        0, local[0], code, reduce="amin")
+    halo = (best < none) & (torch.arange(count, device=local.device) >= receivers)
+    best = torch.where(halo, best, torch.full_like(best, (64 * 128 + 64) * 128 + 64))  # unit 0
+    row_unit = torch.stack((best // 16384, (best // 128) % 128, best % 128), dim=1).to(torch.float32) - 64
     rows64 = positions64[nodes]
-    shift = times_3x3(torch.round(times_3x3(shifts.to(torch.float64), inverse)), cell)
-    edge = torch.arange(e, device=local.device)
-    edge = torch.where(edge_mask > 0, edge, torch.full_like(edge, e))
-    first = torch.full((count,), e, dtype=edge.dtype, device=local.device).scatter_reduce(
-        0, local[0], edge, reduce="amin")
-    halo = (first < e) & (torch.arange(count, device=local.device) >= receivers)
-    image = torch.where(halo.unsqueeze(1), shift[first.clamp(max=e - 1)], torch.zeros_like(rows64))
-    rows = (rows64 - image - rows64[:1]) * node_mask.unsqueeze(1).to(torch.float64)
-    return rows.to(dtype), (shift - image[local[0]]).to(dtype)
+    rows = (rows64 - times_3x3(row_unit.to(torch.float64), cell) - rows64[:1]) * node_mask.unsqueeze(1).to(
+        torch.float64)
+    return rows.to(dtype), times_3x3(unit - row_unit[local[0]], cell32).to(dtype)
 
 
 def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts, cell, inverse, receivers, dtype,

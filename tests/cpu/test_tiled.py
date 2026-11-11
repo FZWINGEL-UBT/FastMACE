@@ -1408,6 +1408,28 @@ def test_tile_local_edge_vectors_keep_float32_accuracy_in_any_box(length):
     rows2, remaining2 = _tile_local(rows64, r, twice, other, cell, torch.linalg.inv(cell), torch.float32)
     assert torch.equal(rows2, rows) and torch.equal(remaining2[:e], remaining)
     assert float((remaining2[e].double() - cell[0]).abs().max()) <= float(torch.finfo(torch.float32).eps) * length
+    # The padded slot form (in the tile body): same accuracy, padding rows and edges masked, the second image's
+    # shift remaining.
+    from fastmace.model.tiled import _slot_local, _slot_local_vectors
+
+    pad_rows, pad_edges = 7, 11
+    count = r + e + pad_rows
+    nodes = torch.cat([torch.arange(r + e), torch.zeros(pad_rows, dtype=torch.long)])
+    node_mask = torch.cat([torch.ones(r + e), torch.zeros(pad_rows)])
+    slot_local = torch.cat([twice, torch.zeros((2, pad_edges), dtype=torch.long)], dim=1)
+    edge_mask = torch.cat([torch.ones(e + 1), torch.zeros(pad_edges)])
+    slot_shifts = torch.cat([other, torch.full((pad_edges, 3), 7.0)])
+    inverse = torch.linalg.inv(cell)
+    rows3, remaining3 = _slot_local(rows64, nodes, node_mask, slot_local, edge_mask, slot_shifts, cell, inverse, r,
+                                    torch.float32)
+    assert rows3.shape == (count, 3) and float(rows3[r + e:].abs().max()) == 0.0
+    assert float(rows3.abs().max()) < 64 and torch.equal(remaining3[:e], torch.zeros_like(remaining3[:e]))
+    assert float((remaining3[e].double() - cell[0]).abs().max()) <= float(torch.finfo(torch.float32).eps) * length
+    slot_vectors = _slot_local_vectors(rows64, nodes, node_mask, slot_local, edge_mask, slot_shifts, cell, inverse,
+                                       r, torch.float32, far).double()
+    assert float((slot_vectors[:e] - exact).abs().max()) <= 8e-6
+    second = rows64[0] - rows64[r] + shift[0] + cell[0]
+    assert float((slot_vectors[e] - second).abs().max()) <= 8e-6 + float(torch.finfo(torch.float32).eps) * length
 
 
 @pytest.mark.parametrize("mode", ["eager", "padded"])
