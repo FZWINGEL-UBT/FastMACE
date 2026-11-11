@@ -1,0 +1,74 @@
+{
+ "meta": {
+  "tool": "first_interaction_lab",
+  "created_utc": "2026-11-11T16:01:40.914899+00:00",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "torch": "2.14.1+cu130",
+  "triton": "3.8.0",
+  "edges": 368752,
+  "slots": 15000,
+  "pairs": 9,
+  "pieces": 896,
+  "structure": "results/loup-a100-20261103/SrTiO3.cif@10x10x10",
+  "rounds": 61,
+  "repeat": 10,
+  "source_commit": "5b3fb5557df8264eece95fb51ed9ced47fa808f5"
+ },
+ "checks": {
+  "fwd-copy": 8.722841471353604e-08,
+  "bwd-recompute-copy": 0.0,
+  "bwd-power-copy": 0.0
+ },
+ "rows": {
+  "fwd-prod": {
+   "median_us": 472.9343891143799,
+   "p10_us": 471.8592166900635,
+   "p90_us": 474.6854543685913
+  },
+  "fwd-copy": {
+   "median_us": 465.40799140930176,
+   "p10_us": 464.6912097930908,
+   "p90_us": 466.95422649383545
+  },
+  "bwd-recompute-prod": {
+   "median_us": 474.5215892791748,
+   "p10_us": 473.3952045440674,
+   "p90_us": 476.1190176010132
+  },
+  "bwd-recompute-copy": {
+   "median_us": 467.4560070037842,
+   "p10_us": 466.94397926330566,
+   "p90_us": 468.6336088180542
+  },
+  "bwd-power-prod": {
+   "median_us": 483.63518714904785,
+   "p10_us": 482.7136039733887,
+   "p90_us": 484.8947238922119
+  },
+  "bwd-power-copy": {
+   "median_us": 472.3711967468262,
+   "p10_us": 471.8592166900635,
+   "p90_us": 473.45664501190186
+  },
+  "fwd-k32": {
+   "median_us": 264.2944097518921,
+   "p10_us": 263.7824058532715,
+   "p90_us": 265.52319526672363
+  },
+  "bwd-recompute-k32": {
+   "median_us": 307.76320695877075,
+   "p10_us": 306.8928003311157,
+   "p90_us": 308.76671075820923
+  },
+  "bwd-power-k32": {
+   "median_us": 264.3968105316162,
+   "p10_us": 264.19200897216797,
+   "p90_us": 265.62559604644775
+  }
+ },
+ "summary": {
+  "nested_forward_k64_minus_k32_us": 201.11358165740967,
+  "nested_backward_recompute_k64_minus_k32_us": 159.69280004501343,
+  "nested_backward_power_k64_minus_k32_us": 207.97438621520996
+ }
+}

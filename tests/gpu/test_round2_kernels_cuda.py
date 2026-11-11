@@ -161,3 +161,44 @@ def test_recomputing_backward_allocates_no_value_rows(monkeypatch, power):
     block = edges * k * 4
     assert peaks[True] < block <= peaks[False], peaks
     assert all(torch.equal(a, b) for a, b in zip(results[True], results[False]))
+
+
+@pytest.mark.parametrize("power", [True, False])
+@pytest.mark.parametrize("inner", [1, 3])
+def test_nested_split_walks_match_the_full_walks(monkeypatch, inner, power):
+    """rewrites.radial.nested's split walks (``r_far``): on a table whose channels K/2.. are zero from ``r_far`` (a
+    piece start), the sums, the edge density, dL/dr and grad_y of the full walks, to rounding; the backward in the
+    power basis or by recompute (NESTED_POWER False with POWER_BACKWARD off)."""
+    monkeypatch.setattr(tos, "TABLED_FORWARD", True)
+    monkeypatch.setattr(tos, "POWER_BACKWARD", power)
+    monkeypatch.setattr(tos, "NESTED_POWER", power)
+    from fastmace.rewrites.radial import power_basis
+
+    coef, dcoef, starts, scales, bins, r_lo, bin_scale, r_max = _table()
+    first_far = 5
+    coef[:, first_far:, :, 32:64] = 0.0
+    dcoef[:, first_far:, :, 32:64] = 0.0
+    r_far = float(starts[first_far].float())
+    edges, d, k, slots = 500, 16, 64, 54
+    g = torch.Generator().manual_seed(17)
+    r = (torch.rand((edges, 1), generator=g, dtype=torch.float64) * 6.4 + 0.2).float().cuda()
+    pair = torch.randint(0, coef.shape[0], (edges,), generator=g).to(torch.int32).cuda()
+    y = torch.randn((edges, d), generator=g).cuda()
+    key = torch.sort(torch.randint(0, slots, (edges,), generator=g)).values.cuda()
+    grads = [torch.randn((slots, d * k), generator=g).cuda(),  # the op's [slots, D K] in either layout
+             torch.randn((edges, 1), generator=g).cuda()]
+    coef_c, dcoef_c, starts_c, scales_c, bins_c = (t.float().cuda() if t.is_floating_point() else t.cuda()
+                                                   for t in (coef, dcoef, starts, scales, bins))
+    pcoef_c = power_basis(coef_c)
+    results = []
+    for far in (0.0, r_far):
+        r_c, y_c = r.clone().requires_grad_(True), y.clone().requires_grad_(True)
+        summed, density = tos.tabled_outer_sum(r_c, pair, coef_c, dcoef_c, starts_c, scales_c, bins_c, r_lo,
+                                               bin_scale, r_max, k, y_c, key, slots, inner, pcoef=pcoef_c, r_far=far)
+        dr, dy = torch.autograd.grad([summed, density], (r_c, y_c), grads)
+        results.append((summed, density, dr, dy))
+    (s0, e0, r0, y0), (s1, e1, r1, y1) = results
+    assert torch.equal(e0, e1)
+    for new, ref in ((s1, s0), (r1, r0), (y1, y0)):
+        assert (new - ref).abs().max() <= 1e-5 * ref.abs().max()
+    assert (r >= r_far).float().mean() > 0.3  # both branches ran
