@@ -240,7 +240,7 @@ def variant(kernel, read, table=None, grid=None):
         raise SystemExit("spline_read_lab: STAGE_EDGES is off (set spline_forward:STAGE_EDGES=True)")
     q = len(schedule.paths) * schedule.channels
     bias = 0
-    if read == "ghoist" or read in DEFERRED_KEEP:
+    if read in ("ghoist", "ghoist-prod") or read in DEFERRED_KEEP:
         new_table = table
     elif read == "bspline":
         pairs = table.shape[0] // kernel.intervals
@@ -253,11 +253,15 @@ def variant(kernel, read, table=None, grid=None):
     k.lab_registers = []
     # ghoist / deferred keep the table read: transform the captured kernel's own sources, so PACKED8 and
     # PREFETCH_AHEAD stay as the GPU's default has them (11 Nov 2026, A100 re-screen)
-    keep_read = read == "ghoist" or read in DEFERRED_KEEP
+    keep_read = read in ("ghoist", "ghoist-prod") or read in DEFERRED_KEEP
     base_sources = kernel.sources[:len(k.sources)] if keep_read else k.sources
     for i, source in enumerate(base_sources):
         if read == "ghoist":
             new, n = ghoist(source)
+        elif read == "ghoist-prod":  # the production GHOIST transform (spline_forward.ghoist_source)
+            from fastmace.kernels.oeq_streaming.spline_forward import ghoist_source
+            new = ghoist_source(source)
+            n = new.count("s_g[gk + ")
         elif read in DEFERRED_KEEP:
             new, n = deferred(source, DEFERRED_KEEP[read])
         else:

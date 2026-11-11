@@ -188,7 +188,7 @@ def main(argv=None):
     p.add_argument("--equilibrate-steps", type=int, default=300)
     p.add_argument("--flush-l2-mb", type=int, default=256)
     p.add_argument("--output", type=Path, required=True)
-    p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8", "packed8v2", "ghoist", "deferred", "deferred-a", "deferred-b"],
+    p.add_argument("--table-reads", nargs="*", default=[], choices=["bspline", "packed8", "packed8v2", "ghoist", "ghoist-prod", "deferred", "deferred-a", "deferred-b"],
                    help="lab: the forward with another table read path (tools/spline_read_lab.py)")
     p.add_argument("--wprime-zero", nargs="*", default=[], choices=["table", "dout", "x", "all", "split"],
                    help="lab: w' with an operand's loads replaced by register values (tools/spline_read_lab.py)")
@@ -249,7 +249,7 @@ def main(argv=None):
                         (args.output / "sources" / f"{read}-{i}.cu").write_text(src)
                     variants[read] = real[:6] + [table] + real[7:]
                     kernels[read] = (k_read, {})
-                    if read in ("ghoist", "deferred"):  # the instruction part alone: every edge on one slab
+                    if read in ("ghoist", "ghoist-prod", "deferred"):  # the instruction part alone: every edge on one slab
                         variants[f"one-slab+{read}"] = slab[:6] + [table] + slab[7:]
                         kernels[f"one-slab+{read}"] = (k_read, {})
 

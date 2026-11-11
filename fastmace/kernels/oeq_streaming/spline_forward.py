@@ -241,6 +241,97 @@ def packed8_source(source, bias):
     return source
 
 
+# GHOIST (11 November 2026, results/a100-colab-ideas-20261111; "G-hoisting" of the third 9 Nov report, rejected then
+# on 5060 Ti numbers; rounding: each output's CG sum regrouped): with STAGE_EDGES every output's sum
+# w * sum_ij c x_i e_j becomes sum_i (w x_i) g_oi, with the channel-independent g_oi = sum_j c e_j computed once per
+# edge while the tile is staged (warp 1, beside warp 0's locator) into shared memory. A100-SXM4-40GB kernel lab
+# (OMAT-0 medium, SrTiO3 10x10x10, today's A100 defaults with PACKED8): the instruction shape alone 0.912 of the
+# forward. None: on for GHOIST_GPUS; True / False: an A/B side's choice.
+GHOIST = None
+GHOIST_GPUS = GPUModels(())
+
+
+def ghoist_default(device):
+    """``GHOIST`` on ``device``: the constant when set, else on for ``GHOIST_GPUS``."""
+    return _switch(GHOIST, GHOIST_GPUS, device)
+
+
+_GHOIST_TERM = r"x(\d+) \* e(\d+) \* (-?0x[0-9a-fA-F.]+p[+-]?\d+f)"
+
+
+def ghoist_supported(source):
+    """Whether ``ghoist_source`` applies: a STAGE_EDGES source with one receiver per block and room for warp 1."""
+    import re
+
+    c = re.search(r"constexpr int C = (\d+);", source)
+    tile = re.search(r"constexpr int TILE = (\d+);", source)
+    return ("s_tq[TILE]" in source and c is not None and tile is not None
+            and int(c.group(1)) >= 32 + int(tile.group(1)))
+
+
+def ghoist_source(source):
+    """A STAGE_EDGES ``spline_forward`` source with GHOIST: per output, acc_o += (w x_i) g_oi for each sender
+    component i, g_oi = sum_j c e_j read from ``s_g`` (per tile edge, GD values), which warp 1 fills from the edge's
+    harmonics at staging. Returns the new source; raises ValueError where it does not apply."""
+    import re
+
+    if not ghoist_supported(source):
+        raise ValueError("GHOIST needs a STAGE_EDGES kernel with C >= 32 + TILE")
+    lines = source.split("\n")
+    edge_index = {}      # e<j> of the current block -> its she[] index
+    g_values = []        # per g: [(she index, coefficient literal)]
+    out = []
+    declare = re.compile(r"const float e(\d+) = she\[(\d+)\];")
+    update = re.compile(r"^(\s*)acc\[(\d+)\] = fmaf\(w, (.*), acc\[\2\]\);$")
+    for line in lines:
+        m = declare.search(line)
+        if m:
+            edge_index[m.group(1)] = int(m.group(2))
+            continue  # the e<j> values are read through g only
+        m = update.match(line)
+        if m:
+            indent, o, expr = m.group(1), m.group(2), m.group(3)
+            terms = re.findall(_GHOIST_TERM, expr)
+            if len(terms) != expr.count(" * e") or len(terms) != len(expr.split(" + ")):
+                raise ValueError(f"GHOIST: cannot parse {expr!r}")
+            by_input = {}
+            for i, j, coef in terms:
+                by_input.setdefault(i, []).append((edge_index[j], coef))
+            for i in sorted(by_input, key=int):
+                out.append(f"{indent}acc[{o}] = fmaf(w * x{i}, s_g[gk + {len(g_values)}], acc[{o}]);")
+                g_values.append(by_input[i])
+            continue
+        out.append(line)
+    if not g_values:
+        raise ValueError("GHOIST: no output sums found")
+    source = "\n".join(out)
+    gd = (len(g_values) + 3) // 4 * 4
+    used = sorted({k for g in g_values for k, _ in g})
+
+    def replace(old, new):
+        nonlocal source
+        if source.count(old) != 1:
+            raise ValueError(f"GHOIST: expected one {old!r}")
+        source = source.replace(old, new)
+
+    replace("    __shared__ __align__(16) float s_sh[TILE * ED];",
+            f"    constexpr int GD = {gd};\n    __shared__ __align__(16) float s_g[TILE * GD];")
+    replace("        for (int i = ch; i < count_in * ED; i += C) s_sh[i] = __ldg(sh + base * ED + i);\n", "")
+    fill = [f"        if (ch >= 32 && ch < 32 + count_in) {{  // GHOIST: warp 1 forms the tile's g_oi = sum_j c e_j",
+            "            const float* hp = sh + (base + (ch - 32)) * ED;",
+            "            float* gp = s_g + (ch - 32) * GD;"]
+    fill += [f"            const float h{k} = __ldg(hp + {k});" for k in used]
+    for n, g in enumerate(g_values):
+        expr = " + ".join(f"h{k} * {coef}" for k, coef in g)
+        fill.append(f"            gp[{n}] = {expr};")
+    fill.append("        }")
+    replace("        if (ch < 32) {  // warp 0", "\n".join(fill) + "\n        if (ch < 32) {  // warp 0")
+    replace("            const float* she = s_sh + s_k[k] * ED;", "            const int gk = s_k[k] * GD;")
+    if "she[" in source or "s_sh" in source:
+        raise ValueError("GHOIST: harmonics still read from s_sh")
+    return source
+
+
 def stage_edges_default(device):
     """``STAGE_EDGES`` on ``device``: the constant when set, else on for ``STAGE_EDGES_GPUS``."""
     if STAGE_EDGES is not None:
@@ -720,6 +811,10 @@ class SplineForward:
         self.packed8 = packed8_bias is not None and self.stage_edges
         if self.packed8:
             self.sources = [packed8_source(s, int(packed8_bias)) for s in self.sources]
+        # GHOIST: each output's CG sum regrouped through per-edge g_oi (rounding)
+        self.ghoist = self.stage_edges and ghoist_default(device) and all(ghoist_supported(s) for s in self.sources)
+        if self.ghoist:
+            self.sources = [ghoist_source(s) for s in self.sources]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
         self.source = "\n".join(self.sources)
