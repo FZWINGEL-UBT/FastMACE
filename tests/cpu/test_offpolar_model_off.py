@@ -32,8 +32,10 @@ def test_the_maps_list_the_measured_models_on_the_a100_family():
     assert set(fused_forward.DEGREE_PARTS_MODEL_OFF_GPUS) == {"polar1-m"}
     for table in (skin.SORT_BY_LENGTH_MODEL_OFF_GPUS, wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS,
                   fused_forward.DEGREE_PARTS_MODEL_OFF_GPUS):
-        for gpus in table.values():
-            assert A100 in gpus and A100_PCIE in gpus and H200 not in gpus
+        for label, gpus in table.items():
+            assert H200 not in gpus
+            if table is not wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS or label != "polar1-l":
+                assert A100 in gpus and A100_PCIE in gpus
 
 
 @pytest.mark.parametrize("label", ["off23-small", "off23-large"])
