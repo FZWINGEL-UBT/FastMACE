@@ -76,6 +76,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                               "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B",
                                               "GENERIC_FOLD_READOUT_TAIL": "generic readout-tail fold; per GPU, A/B"},
     "fastmace/integrators/langevin.py": {"NOISE_DRAW_AHEAD": "round 6 noise batch drawn ahead on a thread; A/B"},
+    "fastmace/kernels/cutlass/tf32x3.py": {"HYBRID": "None: on for HYBRID_GPUS; True/False: an A/B side"},
     "fastmace/kernels/cutlass/segment_rows.py": {"SEGMENT_ROWS": "block linear rows read and written in place; "
                                                                  "per GPU, A/B",
                                                  "SEGMENT_GROUPED": "every block in one launch; per GPU, A/B"},
