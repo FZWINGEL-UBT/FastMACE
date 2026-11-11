@@ -446,18 +446,24 @@ def census_variants(k=64, d=16, terms=6, columns=66):
         name = "power" if power else "recompute"
         rows += [(f"backward-{name}-copy", backward, dict(bwd, POWER=power, ONE=False), tos.WARPS),
                  (f"backward-{name}-oneload", backward, dict(bwd, POWER=power, ONE=True), tos.WARPS)]
+    narrow = dict(common, K=32, J=34, BLOCK_K=32)
+    rows += [("forward-k32", forward, dict(fwd, **narrow, SLOTS=True, ONE=False), tos.FORWARD_WARPS)]
+    for power in (False, True):
+        name = "power" if power else "recompute"
+        rows += [(f"backward-{name}-k32", backward, dict(bwd, **narrow, POWER=power, ONE=False), tos.WARPS)]
     return rows
 
 
-def census(output):
+def census(output, only=None):
+    import packed_coef_lab as pcl
     import triton
     from triton.backends.compiler import GPUTarget
-
-    import packed_coef_lab as pcl
 
     rows = []
     for capability in (80, 90, 120):
         for name, kernel, constexprs, warps in census_variants():
+            if only and not re.search(only, name):
+                continue
             row = {"sm": capability, "variant": name, "warps": warps}
             try:
                 compiled = triton.compile(_source(kernel, constexprs), target=GPUTarget("cuda", capability, 32),
@@ -551,6 +557,8 @@ def main(argv=None):
                    help="calls per timed sample, back to back between two events (keeps host launch time out)")
     p.add_argument("--census", action="store_true")
     p.add_argument("--watchdog", action="store_true")
+    p.add_argument("--only", default=None,
+                   help="regex: time only the variants it matches (the prod ops always run for the checks)")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args(argv)
     args.output.mkdir(parents=True, exist_ok=True)
@@ -563,15 +571,15 @@ def main(argv=None):
         logfile.flush()
 
     if args.census:
-        census(args.output)
+        census(args.output, args.only)
         return
 
     import numpy as np
     import torch
     import triton
+    from tabled_sum_lab import edges_of
 
     from fastmace.kernels.triton import tabled_outer_sum as tos
-    from tabled_sum_lab import edges_of
 
     if args.watchdog:
         start_watchdog(log)
@@ -601,17 +609,24 @@ def main(argv=None):
     y = torch.randn((edges, d), generator=g).to(dev)
     grad = torch.randn((slots, d * k), generator=g).to(dev)
     grad_density = torch.randn((edges, 1), generator=g).to(dev).reshape(-1).contiguous()
+    # Nested radial basis bound: every edge at 32 columns (+ c + density), slot blocks [16, 32].
+    k32, j32 = 32, 34
+    coef32 = torch.randn((pairs, args.pieces, 6, j32), generator=g).to(dev)
+    pcoef32 = torch.randn((pairs, args.pieces, 6, j32), generator=g).to(dev)
+    dcoef32 = torch.randn((pairs, args.pieces, 5, j32), generator=g).to(dev)
+    grad32 = torch.randn((slots, d * k32), generator=g).to(dev)
     table = (r, pair_t, coef, starts, scales, bins, r_lo, bin_scale, r_max)
     log(f"{torch.cuda.get_device_name()}: {edges} edges, {slots} slots, {pairs} pairs, "
         f"{edges / max(1, int((slot_start[1:] > slot_start[:-1]).sum())):.1f} edges per filled slot")
     fwd_args = (n_bins, float(r_lo), float(bin_scale), float(r_max))
 
-    def fwd_copy(slots_on=True, one=False, fill=True):
-        out = (torch.zeros if fill else torch.empty)((slots, d * k), device=dev)
+    def fwd_copy(slots_on=True, one=False, fill=True, narrow=False):
+        kk, jj, cc = (k32, j32, coef32) if narrow else (k, 66, coef)
+        out = (torch.zeros if fill else torch.empty)((slots, d * kk), device=dev)
         density = r.new_empty((edges, 1))
         forward_k[(triton.cdiv(edges, tos.FORWARD_CHUNK),)](
-            y, key_t, r_flat, pair_t, coef, starts, scales, bins, out, density, edges, coef.shape[1], *fwd_args, 0,
-            K=k, D=d, INNER=1, TERMS=6, J=66, CHUNK=tos.FORWARD_CHUNK, BLOCK_K=64, BLOCK_D=16, SLOTS=slots_on,
+            y, key_t, r_flat, pair_t, cc, starts, scales, bins, out, density, edges, coef.shape[1], *fwd_args, 0,
+            K=kk, D=d, INNER=1, TERMS=6, J=jj, CHUNK=tos.FORWARD_CHUNK, BLOCK_K=kk, BLOCK_D=16, SLOTS=slots_on,
             ONE=one, num_warps=tos.FORWARD_WARPS)
         return out, density
 
@@ -638,13 +653,17 @@ def main(argv=None):
                             num_warps=tos.FORWARD_WARPS)
         return out, density
 
-    def bwd_copy(power, one=False):
+    def bwd_copy(power, one=False, narrow=False):
+        if narrow:
+            kk, jj, gg, dc, vc = k32, j32, grad32, dcoef32, (pcoef32 if power else coef32)
+        else:
+            kk, jj, gg, dc, vc = k, 66, grad, dcoef, (pcoef if power else coef)
         dr = r_flat.new_empty((edges,))
         grad_y = torch.empty_like(y)
         backward_k[(triton.cdiv(edges, tos.CHUNK),)](
-            grad, y, key_t, r_flat, pair_t, dcoef, starts, scales, bins, grad_density, dr, grad_y, edges, edges,
-            coef.shape[1], *fwd_args, K=k, D=d, INNER=1, TERMS=5, J=66, CHUNK=tos.CHUNK, BLOCK_K=64, BLOCK_D=16,
-            coef_ptr=pcoef if power else coef, VTERMS=6, POWER=power, ONE=one, num_warps=tos.WARPS)
+            gg, y, key_t, r_flat, pair_t, dc, starts, scales, bins, grad_density, dr, grad_y, edges, edges,
+            coef.shape[1], *fwd_args, K=kk, D=d, INNER=1, TERMS=5, J=jj, CHUNK=tos.CHUNK, BLOCK_K=kk, BLOCK_D=16,
+            coef_ptr=vc, VTERMS=6, POWER=power, ONE=one, num_warps=tos.WARPS)
         return dr, grad_y
 
     def bwd_prod(power):
@@ -669,7 +688,13 @@ def main(argv=None):
         "bwd-power-prod": lambda: bwd_prod(True),
         "bwd-power-copy": lambda: bwd_copy(True),
         "bwd-power-oneload": lambda: bwd_copy(True, True),
+        "fwd-k32": lambda: fwd_copy(narrow=True),
+        "bwd-recompute-k32": lambda: bwd_copy(False, narrow=True),
+        "bwd-power-k32": lambda: bwd_copy(True, narrow=True),
     }
+    if args.only:
+        keep = re.compile(args.only)
+        variants = {name: fn for name, fn in variants.items() if keep.search(name) or name.endswith("-prod")}
 
     def err(new, ref):
         return max(float((a.float() - b.float()).abs().max() / b.float().abs().max().clamp_min(1e-30))
@@ -680,10 +705,12 @@ def main(argv=None):
     ref_f = variants["fwd-prod"]()
     for name in ("fwd-copy", "fwd-byslot-w1", "fwd-byslot-w2", "fwd-byslot-w4", "fwd-aligned-w1", "fwd-aligned-w2",
                  "fwd-walk"):
-        checks[name] = err(variants[name](), ref_f)
+        if name in variants:
+            checks[name] = err(variants[name](), ref_f)
     for name in ("recompute", "power"):
         ref_b = variants[f"bwd-{name}-prod"]()
-        checks[f"bwd-{name}-copy"] = err(variants[f"bwd-{name}-copy"](), ref_b)
+        if f"bwd-{name}-copy" in variants:
+            checks[f"bwd-{name}-copy"] = err(variants[f"bwd-{name}-copy"](), ref_b)
     torch.cuda.synchronize()
     log(f"checks (max |d| / max |ref| against prod): {json.dumps(checks)}")
 
@@ -720,7 +747,15 @@ def main(argv=None):
     def m(name):
         return rows[name]["median_us"]
 
+    def saving(a, b):
+        return m(a) - m(b) if a in rows and b in rows else None
+
     summary = {
+        "nested_forward_k64_minus_k32_us": saving("fwd-copy", "fwd-k32"),
+        "nested_backward_recompute_k64_minus_k32_us": saving("bwd-recompute-copy", "bwd-recompute-k32"),
+        "nested_backward_power_k64_minus_k32_us": saving("bwd-power-copy", "bwd-power-k32"),
+    }
+    summary = summary if args.only else {**summary,
         "C1_noslot_saving_us": m("fwd-copy") - m("fwd-noslot"),
         "C1_noslot_kernel_saving_us": m("fwd-copy") - m("fwd-noslot-fill"),
         "C1_byslot_best_saving_us": m("fwd-copy") - min(m(f"fwd-byslot-w{w}") for w in (1, 2, 4)),

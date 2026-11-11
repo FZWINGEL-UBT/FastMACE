@@ -1416,6 +1416,10 @@ class TiledForceField:
             raise ValueError("TileConfig.mode='graphs' needs a CUDA device")
         if self.config.compiled_graphs is True and field.device.type != "cuda":
             raise ValueError("TileConfig.compiled_graphs needs a CUDA device")
+        # rewrites.radial.nested: the tile calls take the plain products, so the plain tables come back (one table)
+        from fastmace.rewrites.radial import nested
+
+        nested.release(model.modules())
         self.model = model
         self.device = field.device
         self.dtype = field.dtype

@@ -3610,3 +3610,12 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
   - Gate 12/12 on Alex.
 - **Step 2, overflow audit.** Tile-list sort key guarded (`KEY_LIMIT`); the overflow probe is bitwise at 1M and 750M atoms.
 - Suite on the merged tree 9f39b607 (leeloo): 5,631 passed, 204 skipped. The 397.5M go/no-go (step 3) is still pending.
+
+**Nested radial basis (11 November 2026; rev2 queue §1, worker first-interaction, conductor): REJECTED on the A100 and the Ada, kept opt-in.**
+- Certificate: far rank at most 29 at 1e-7. With exactly 32 far columns the certificate stays at 0.3011.
+- Timing bound: 303 µs on the A100. Real kernels in isolation: forward −137 µs, power backward −144 µs. sm_80 forward at 72 registers.
+- MD A/B, both orders. A100: SrTiO3 10³ 0.984 / 0.982, NbCl5 1.057 / 1.057. The A100 split runs clear the power backward: alone it ties (0.998 / 0.996), and nested with the recompute backward also loses NbCl5 (1.063 / 1.065). Ada: SrTiO3 1.026 / 1.021, NbCl5 1.119 / 1.118.
+- The loss follows edges per receiver (26 per atom on NbCl5, 74 on SrTiO3), not the far fraction (0.92 / 0.84): the split costs more per run than the skipped columns save on short runs. No size rule, because one structure sits on each side.
+- Gates pass on both GPUs. `NESTED_RADIAL_GPUS` is empty.
+- Kept: the switch (opt-in), the route fix (nested routing after the radial tables), and proof counters for A/Bs and gates (`ab_rewrites --b-expect`, `force_stress_gate --production-expect`). The H200 is not measured.
+- Suite on the merged tip 55685b55 (murphy): 5,623 passed, 204 skipped. The 18 failures there were all in `test_colab_driver.py`, from murphy's git setup; that file passes 32/32 on leeloo for the same tree.

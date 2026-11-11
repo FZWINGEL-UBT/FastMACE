@@ -107,12 +107,16 @@ def compose_skip_default(name=None) -> bool:
     return bool(on)
 
 
-def composed(right, ws, linear=None):
+def composed(right, ws, linear=None, rotation=None):
     """``right [K, c] @ linear [c, mul_in] @ ws[z] [mul_in, mul_out]`` for every species z (``linear`` None: the
     identity), as ``(C [species, K, mul_out], C transposed [species, mul_out, K])``, both contiguous, computed in
-    float64 and returned in ``right``'s dtype."""
+    float64 and returned in ``right``'s dtype. ``rotation [species, K, K]`` (float64; ``rewrites.radial.nested``):
+    ``C[z]`` is ``rotation[z] @ C[z]``, the nested radial basis's map composed in before the rounding."""
     left = right.double() if linear is None else right.double() @ linear.double()
-    c = torch.matmul(left[None], ws.double()).to(right.dtype)
+    c = torch.matmul(left[None], ws.double())
+    if rotation is not None:
+        c = torch.matmul(rotation.to(device=c.device, dtype=torch.float64), c)
+    c = c.to(right.dtype)
     return c.contiguous(), c.transpose(1, 2).contiguous()
 
 

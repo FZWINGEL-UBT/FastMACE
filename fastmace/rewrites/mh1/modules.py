@@ -171,6 +171,10 @@ class FirstInteractionReassociation(torch.nn.Module):
         self.compose_joined = False
         self.count_plan = False
         self.joined_layout = False  # compose_skip.JOINED_LAYOUT: the sums d-major, the paths read in place  # compose_skip.COUNT_PLAN: the species plan by a counting sort
+        # rewrites.radial.nested (NESTED_RADIAL), set by precision.route with compose_skip: [receiver species,
+        # slots * 64, slots * 64] float64 maps composed into the weights of the calls whose sums come from the
+        # rotated table (``summed_fn.nested``)
+        self.register_buffer("nested_rotation", None, persistent=False)
 
     def bind(self, species_feats):
         """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address).
@@ -191,11 +195,17 @@ class FirstInteractionReassociation(torch.nn.Module):
         import weakref
 
         cache = self.__dict__.setdefault("_composed_cache", {})
+        nested = self.nested_rotation is not None
+        if self.__dict__.get("_composed_nested", False) != nested:  # nested_rotation set or cleared: compose again
+            cache.clear()
+            self.__dict__["_composed_nested"] = nested
         entry = cache.get(id(table))
         if entry is not None and entry[0]() is table and entry[1] == table._version:
             return entry
         with torch.no_grad():
             weights = self._compose_weights(table, self._radial_weight())
+            if self.nested_rotation is not None:  # the rotated set after the plain one (``_composed(nested=True)``)
+                weights += self._compose_weights(table, self._radial_weight(), self.nested_rotation)
         if entry is None or entry[0]() is not table:
             # Entries of tables that are gone go first: the tiled call binds a new table per tile, and their composed
             # weights (two [3, 192, 128] float32 per path) held 64 GB of an A100 by the end of a 149M-atom call.
@@ -216,8 +226,8 @@ class FirstInteractionReassociation(torch.nn.Module):
         weight = generic.fc_last_weight(self.compose_radial)
         return torch.nn.functional.pad(weight, (0, 1)) if generic.FIRST_FULL_ROWS else weight
 
-    def _compose_weights(self, x, weight):
-        """Per path ``compose_skip.composed(right, ws, linear)`` as ``[w_0, w_t_0, w_1, w_t_1, ...]``."""
+    def _compose_weights(self, x, weight, rotation=None):
+        """Per path ``compose_skip.composed(right, ws, linear, rotation)`` as ``[w_0, w_t_0, w_1, w_t_1, ...]``."""
         from fastmace.kernels.triton import compose_skip
 
         linear, linear_products, skip, products = self.compose_skip
@@ -226,7 +236,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         for path, gamma in enumerate(self.gammas):
             right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(-1, c)
             mid = getattr(linear, f"weight_{linear_products[path]}") if linear_products else None
-            out += compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid)
+            out += compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid, rotation)
         return out
 
     def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight, rows=None, summed_fn=None,
@@ -254,7 +264,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         if joined:  # JOINED_LAYOUT: [nodes, (l, m), slots, k]; _composed reads each path's rows in place
             summed, width = summed_fn(key, nodes * slots, inner=slots)
             return self._composed(summed.view(nodes, dim, slots, width), node_attrs, x, weight, nodes, slots, width,
-                                  joined=True)
+                                  joined=True, nested=getattr(summed_fn, "nested", False))
         if summed_fn is not None:
             summed, width = summed_fn(key, nodes * slots)
             summed = summed.view(nodes, slots, dim, width)
@@ -265,8 +275,11 @@ class FirstInteractionReassociation(torch.nn.Module):
         blocks = []
         start = 0
         c = self.channels
+        nested = getattr(summed_fn, "nested", False)  # the sums of the rotated table (rewrites.radial.nested)
         if self.compose_skip is not None and rows is None:
-            return self._composed(summed, node_attrs, x, weight, nodes, slots, width)
+            return self._composed(summed, node_attrs, x, weight, nodes, slots, width, nested=nested)
+        if nested:
+            raise RuntimeError("nested radial sums need the composed products (compose_skip, every row)")
         if divided_by is not None and self.tf32x3 and self.ir_mul and rows is None:
             # idea 31 (kernels.cutlass.first_div): the blocks divided by (density + 1) in the epilogue, kept apart
             lefts, rights = [], []
@@ -300,7 +313,7 @@ class FirstInteractionReassociation(torch.nn.Module):
             start += size
         return torch.cat(blocks, dim=1)
 
-    def _composed(self, summed, node_attrs, x, weight, nodes, slots, width, joined=False):
+    def _composed(self, summed, node_attrs, x, weight, nodes, slots, width, joined=False, nested=False):
         """The message through the interaction's linear and the receivers' species skip
         (``kernels.triton.compose_skip``): per path ``species_mm(left, right L B_z)``, joined as the skip joins its
         output blocks (ir_mul, path order). ``joined`` (``JOINED_LAYOUT``): ``summed`` is [nodes, (l, m), slots,
@@ -320,8 +333,14 @@ class FirstInteractionReassociation(torch.nn.Module):
         else:
             precision = "tf32x3-cutlass" if getattr(self, "tf32x3_backend", None) == "cutlass" else "tf32x3"
         c = self.channels
+        rotation = None
+        if nested:  # rewrites.radial.nested: the rotated set, bound after the plain one
+            rotation = self.nested_rotation
+            if rotation is None or rotation.shape[1] != slots * width:
+                raise RuntimeError("nested radial sums without a matching nested_rotation")
         # the table's composed weights from ``bind`` where they match these shapes, else composed here
-        bound = [self._buffers.get(f"composed_{k}") for k in range(2 * len(self.ls))]
+        first = 2 * len(self.ls) if nested else 0
+        bound = [self._buffers.get(f"composed_{k}") for k in range(first, first + 2 * len(self.ls))]
         if any(t is None for t in bound) or bound[0].shape[1] != slots * width:
             bound = None
         lefts, ws, w_ts, start = [], [], [], 0
@@ -334,7 +353,7 @@ class FirstInteractionReassociation(torch.nn.Module):
             else:
                 right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
                 mid = getattr(linear, f"weight_{linear_products[path]}") if linear_products else None
-                w, w_t = compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid)
+                w, w_t = compose_skip.composed(right, getattr(skip, f"ws{products[path]}"), mid, rotation)
             ws.append(w)
             w_ts.append(w_t)
             start += size
