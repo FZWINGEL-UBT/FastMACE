@@ -124,6 +124,15 @@ TILE_FILTER32 = None
 # call at 975,560 SrTiO3 atoms). The gradients are the same products; the virial's and the objective's sums change
 # their order.
 TILE_EPILOGUE = None
+# TILE_LOCAL_FRAME (accuracy; idea 11, results/tiled-speed-20261111 "Idea 11"): the tiles' edge vectors from positions
+# held as an int16 bin of TILE_LOCAL_FRAME_WIDTH Angstrom plus a float32 offset within it, and each edge's shift
+# rebuilt in float64 from its unit shift (recovered exactly from the float32 shift and the cell) and split the same
+# way: v = (bin_r - bin_s + k) W + (off_r - off_s + rem). Plain float32 positions round each coordinate to its
+# float32 spacing, so a perfect crystal's edge vectors carry 1.5e-5 A at 226 A and 1.1e-4 A from 1,024 A (the
+# residual force 1.64e-4 -> 1.32e-3 eV/A from 1M to 149M atoms); in the frame they carry at most about 4e-6 A in any
+# box. 18 bytes per atom more on the device (bins and offsets beside the field's float32 positions).
+TILE_LOCAL_FRAME = False
+TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in float32
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -959,6 +968,35 @@ def _tile_vectors(pos, ei, shifts, edge_mask, far):
     import torch
 
     vectors = pos[ei[1]] - pos[ei[0]] + shifts
+    return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
+
+
+def _frame_parts(positions64, width, dtype):
+    """``TILE_LOCAL_FRAME``: float64 positions [n, 3] as int16 bins of ``width`` and offsets in ``dtype``."""
+    import torch
+
+    b = torch.floor(positions64 / width)
+    if b.numel() and float(b.abs().max()) > 32000:
+        raise ValueError(f"TILE_LOCAL_FRAME: a coordinate beyond {32000 * width:.0f} A")
+    return b.to(torch.int16), (positions64 - b * width).to(dtype)
+
+
+def _frame_vectors(frame, ei, shifts, edge_mask, far):
+    """``TILE_LOCAL_FRAME``: ``_tile_vectors`` from the positions' bins and offsets (``frame``: bins [N, 3] int16,
+    offsets [N, 3] float32, the float64 cell, its inverse and the bin width). The edge's unit shift is
+    ``round(shift @ cell^-1)`` (exact: the float32 shift is within its rounding of an integer combination of the
+    cell's rows), its float64 shift ``unit @ cell`` splits into ``k W + rem``; the bins' integer part is exact in
+    float32, and the rest is a sum of terms below 2 W."""
+    import torch
+
+    bins, offsets, cell, inverse, width = frame
+    shift = torch.round(shifts.double() @ inverse) @ cell
+    k = torch.floor(shift / width)
+    rem = (shift - k * width).to(offsets.dtype)
+    coarse = ((bins[ei[1]] - bins[ei[0]]).double() + k).mul_(width).to(offsets.dtype)
+    vectors = coarse + ((offsets[ei[1]] - offsets[ei[0]]) + rem)
+    if edge_mask is None:
+        return vectors
     return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
 
 
@@ -1907,7 +1945,9 @@ class TiledForceField:
 
         receivers = slot["sizes"][0]
         nodes, ei = slot["nodes"], slot["ei"]
-        if self._speed(TILE_EPILOGUE):
+        if g.get("frame") is not None:  # TILE_LOCAL_FRAME
+            vectors = _frame_vectors(g["frame"], ei, slot["shifts"], slot["edge_mask"], self._far)
+        elif self._speed(TILE_EPILOGUE):
             vectors = self._compiled_once("vectors", _tile_vectors)(g["pos"], ei, slot["shifts"], slot["edge_mask"],
                                                                    self._far)
         else:
@@ -2215,6 +2255,8 @@ class TiledForceField:
         bound = None
         try:
             g = self._globals(n, stress, pos, heads)
+            g["frame"] = self._local_frame(positions, n) if TILE_LOCAL_FRAME else None
+            stats["local_frame"] = g["frame"] is not None
             self.heads, self.arange = g["heads"], g["arange"]
             if padded and self.mode == "compiled" and self._captured():  # the guard: pools for every slot in use
                 self._graphs_slots_fit(len(set(keys)))
@@ -2568,6 +2610,37 @@ class TiledForceField:
             self._edge_step = None
             self._graph_key = None
 
+    def _local_frame(self, positions, n):
+        """``TILE_LOCAL_FRAME``: the call's positions as int16 bins of ``TILE_LOCAL_FRAME_WIDTH`` and offsets in the
+        field's dtype (kept between calls), from the float64 ``positions`` a chunk at a time (no whole float64 copy
+        on the device), with the float64 cell and its inverse."""
+        import torch
+
+        width = float(TILE_LOCAL_FRAME_WIDTH)
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3)
+        cell = torch.as_tensor(cell, dtype=torch.float64).reshape(3, 3)
+        if abs(float(torch.linalg.det(cell))) < 1e-9:  # no full periodic cell: the plain float32 vectors
+            return None
+        kept = getattr(self, "_frame_buffers", None)
+        if kept is None or kept[0].shape[0] != n:  # fixed addresses between calls (the CUDA graphs read them)
+            kept = (torch.empty((n, 3), dtype=torch.int16, device=self.device),
+                    torch.empty((n, 3), dtype=self.dtype, device=self.device),
+                    torch.empty((3, 3), dtype=torch.float64, device=self.device),
+                    torch.empty((3, 3), dtype=torch.float64, device=self.device))
+            self._frame_buffers = kept
+        bins, offsets, cell_kept, inverse_kept = kept
+        cell_kept.copy_(cell)
+        inverse_kept.copy_(torch.linalg.inv(cell))
+        chunk = 1 << 20
+        for start in range(0, n, chunk):
+            b, o = _frame_parts(positions[start:start + chunk].to(device=self.device, dtype=torch.float64), width,
+                                self.dtype)
+            bins[start:start + chunk] = b
+            offsets[start:start + chunk] = o
+        return bins, offsets, cell_kept, inverse_kept, width
+
     def _globals(self, n, stress, pos, heads):
         """The call's global buffers, kept between calls at fixed addresses (the graphs read them) and zeroed.
 
@@ -2838,7 +2911,10 @@ class TiledForceField:
         if sweep != 2 and self._reassociations:  # interaction 0 runs on the tile's R + H rows
             self._bind_tables(self.field.species_tables(nodes.shape[0]))
         state = g["state"]
-        vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
+        if g.get("frame") is not None:  # TILE_LOCAL_FRAME
+            vectors = _frame_vectors(g["frame"], ei, shifts, None, None)
+        else:
+            vectors = g["pos"][ei[1]] - g["pos"][ei[0]] + shifts
         tile = (nodes, local, r, vectors, None, None, None)
         receivers = nodes[:r]
         strain = True if g["stress"] else None

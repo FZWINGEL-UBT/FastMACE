@@ -1325,6 +1325,67 @@ def test_virial_from_edge_gradients_is_the_strain_leafs_gradient(mode, monkeypat
         assert relative(edges[2], field.evaluate(current, stress=True)[2]) <= 1e-11
 
 
+@pytest.mark.parametrize("length", [226.5, 1210.5, 1562.0])
+def test_local_frame_edge_vectors_keep_float32_accuracy_in_any_box(length):
+    """``TILE_LOCAL_FRAME`` (idea 11): float32 edge vectors from the positions' 32 A bins and offsets, and the shift
+    rebuilt from its unit shift, stay within about 4e-6 A of float64 in a triclinic box of any size, also 1,500 A from
+    the origin and across the periodic boundary; the plain float32 vectors carry the coordinates' float32 spacing
+    (1.5e-5 A at 226 A, 1.2e-4 A from 1,024 A: the capacity records' residual force, 8x from 1M to 149M atoms)."""
+    from fastmace.model.tiled import TILE_LOCAL_FRAME_WIDTH, _frame_parts, _frame_vectors, _tile_vectors
+
+    rng = np.random.default_rng(11)
+    cell = torch.tensor([[length, 0, 0], [0.13 * length, length, 0], [-0.07 * length, 0.05 * length, length]],
+                        dtype=torch.float64)
+    n, e = 400, 4000
+    origin = 1500.0 if length < 1000 else 0.0
+    positions = torch.tensor(rng.uniform(0, 1, (n, 3)), dtype=torch.float64) @ cell + origin
+    receiver = torch.tensor(rng.integers(0, n, e))
+    unit = torch.tensor(rng.integers(-1, 2, (e, 3)), dtype=torch.float64)
+    d = torch.tensor(rng.uniform(-3.5, 3.5, (e, 3)), dtype=torch.float64)  # the edge vectors, within the cutoff
+    shift = unit @ cell
+    # each sender a copy of its receiver's image: v = p[r] - p[s] + shift = d
+    positions = torch.cat([positions, positions[receiver] - d + shift])
+    ei = torch.stack([torch.arange(n, n + e), receiver])
+    exact = positions[ei[1]] - positions[ei[0]] + shift
+    assert float((exact - d).abs().max()) < 1e-9
+    shifts32 = shift.to(torch.float32)
+    far = torch.tensor([13.0, 0.0, 0.0], dtype=torch.float32)  # padding edges as _tile_vectors
+    plain = _tile_vectors(positions.to(torch.float32), ei, shifts32, torch.ones(e), far).double()
+    bins, offsets = _frame_parts(positions, TILE_LOCAL_FRAME_WIDTH, torch.float32)
+    assert bins.dtype == torch.int16 and float(offsets.min()) >= 0 and float(offsets.max()) < TILE_LOCAL_FRAME_WIDTH
+    frame = (bins, offsets, cell, torch.linalg.inv(cell), TILE_LOCAL_FRAME_WIDTH)
+    local = _frame_vectors(frame, ei, shifts32, torch.ones(e), far)
+    assert local.dtype == torch.float32
+    plain_error, local_error = float((plain - exact).abs().max()), float((local.double() - exact).abs().max())
+    assert local_error <= 4e-6, (plain_error, local_error)
+    assert plain_error >= 5 * local_error, (plain_error, local_error)
+    mask = torch.ones(e)
+    mask[::7] = 0
+    padded = _frame_vectors(frame, ei, shifts32, mask, far)
+    assert torch.equal(padded[::7], far.expand(len(range(0, e, 7)), 3)) and torch.equal(padded[1::7], local[1::7])
+
+
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_local_frame_call_is_the_whole_system_call_far_from_the_origin(mode, monkeypatch):
+    """``TILE_LOCAL_FRAME`` in the tiled call (float64 model): far from the origin and strained, the energy, forces and
+    stress are the whole-system call's to float64 rounding, as without the frame."""
+    from fastmace.model import tiled as tiled_module
+
+    monkeypatch.setattr(tiled_module, "TILE_LOCAL_FRAME", True)
+    calc, atoms = calculator(), structure()
+    moved = atoms.copy()
+    moved.positions = moved.positions + np.array([1500.0, -700.0, 333.0])
+    field = MACEForceField(calc, moved, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True)
+    tiled = TiledForceField(field, TileConfig(5, mode=mode))
+    for current in (moved, strained(moved)):
+        expected = field.evaluate(current, stress=True)
+        got = tiled.evaluate(current, stress=True)
+        assert tiled.last["local_frame"] is True
+        assert got[0] == pytest.approx(expected[0], rel=1e-12, abs=0)
+        assert relative(got[1], expected[1]) <= 1e-10
+        assert relative(got[2], expected[2]) <= 1e-10
+
+
 @pytest.mark.parametrize("virial", [False, True], ids=["strain-leaf", "virial"])
 @pytest.mark.parametrize("mode", ["eager", "padded"])
 def test_epilogue_is_bitwise_the_eager_epilogue_outside_compiled_mode(mode, virial, monkeypatch):
