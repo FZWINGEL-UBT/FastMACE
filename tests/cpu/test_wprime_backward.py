@@ -6,6 +6,7 @@ The chain: the streaming backward's weight gradient ``dw``, ``da = dw [W, b]``, 
 C' [W, b]^T`` per (pair, piece), plus the table's backward on the density column alone.
 """
 
+import weakref
 from types import SimpleNamespace
 
 import numpy as np
@@ -239,3 +240,69 @@ def test_planner_rules_and_resolution():
         plan_for("mh1-r2scan", rewrites=RewriteConfig(wprime_backward="on", radial_tables="off"))
     with pytest.raises(PlanRefused, match="wprime_backward='on' requires radial_tables"):
         plan_for("mh1-r2scan", rewrites=RewriteConfig(wprime_backward="on", chunked_conv_backward="off"))
+
+
+def _edge16(layout="ir_mul"):
+    """``_schedule`` with edge_sh3's 16 edge features (the paths read components 0-3 of them)."""
+    schedule = _schedule(layout)
+    schedule.edge_dim = 16
+    return schedule
+
+
+@pytest.mark.parametrize("reduction", ["plain", "butterfly", "redux"])
+def test_edge_force_source(reduction):
+    """EDGE_FORCE (idea 13): the vectors after dr, dL/dv [E, 3] written through dsh by one lane, no dsh row."""
+    options = dict(butterfly=reduction == "butterfly", redux=reduction == "redux")
+    plain = wp.render(_edge16(), "float", 10, **options)
+    source = wp.render(_edge16(), "float", 10, edge_force=True, **options)
+    assert "const scalar_t* __restrict__ vec" not in plain and "dsh[3 * e" not in plain
+    assert "scalar_t* dr,\n    const scalar_t* __restrict__ vec) {" in source
+    assert source.count("dsh[3 * e + 0] = scalar_t((gx - x * dot) / d);") == 1
+    assert "if (lane < 3) dsh[e * 3 + lane] = scalar_t(0);" in source  # a skipped edge's row
+    assert "dsh[edge_base" not in source and "dsh[e * EDGE_DIM + c]" not in source
+    assert "constexpr float C3 = 2.6457513110645907f;" in source
+
+
+def test_edge_force_needs_float32_and_sixteen_features():
+    with pytest.raises(ValueError, match="edge_force"):
+        wp.render(_schedule(), "float", 10, edge_force=True)  # 4 edge features
+    with pytest.raises(ValueError, match="edge_force"):
+        wp.render(_edge16(), "double", 10, edge_force=True)
+    assert wp.edge_force_supported(_edge16(), "float") and not wp.edge_force_supported(_schedule(), "float")
+
+
+def test_edge_force_default(monkeypatch):
+    monkeypatch.setattr(wp, "EDGE_FORCE", None)
+    assert not wp.edge_force_default(torch.device("cpu"))  # EDGE_FORCE_GPUS is empty
+    monkeypatch.setattr(wp, "EDGE_FORCE", True)
+    assert wp.edge_force_default(torch.device("cpu"))
+
+
+def test_edge_force_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    for capability in ((12, 0), (8, 9), (8, 0)):
+        for reduction in ("plain", "butterfly", "redux"):
+            options = dict(butterfly=reduction == "butterfly", redux=reduction == "redux")
+            assert compile_cubin(wp.render(_edge16(), "float", 10, edge_force=True, **options), capability)
+
+
+def test_edge_vectors_only_for_edge_sh_output():
+    """EDGE_FORCE's hand-over (rewrites.generic.modules): an interaction gets EdgeSH's vectors only for the very
+    tensor EdgeSH returned last; anything else (another tensor, no EdgeSH reference) keeps the dsh path."""
+    from fastmace.rewrites.generic import modules as gm
+
+    source = gm.EdgeSH(torch.nn.Identity())
+    interaction = torch.nn.Module()
+    assert gm.edge_vectors(interaction, torch.zeros(2, 16)) is None  # no reference
+    interaction.__dict__["edge_sh_source"] = source
+    vectors, attrs = torch.zeros(2, 3), torch.zeros(2, 16)
+    source.last = (weakref.ref(vectors), weakref.ref(attrs))
+    assert gm.edge_vectors(interaction, attrs) is vectors
+    assert gm.edge_vectors(interaction, attrs.clone()) is None
+    del vectors, attrs  # weak: a finished forward's tensors (and their autograd graph) are not kept alive
+    assert gm.edge_vectors(interaction, torch.zeros(2, 16)) is None and source.last[0]() is None
+    assert "edge_sh_source" not in dict(interaction.named_modules())  # a reference, not a submodule
