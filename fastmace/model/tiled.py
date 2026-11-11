@@ -2329,7 +2329,7 @@ class TiledForceField:
             fallback = None
             try:
                 out = self._call(positions)
-                if self._probe:
+                if getattr(self, "_probe", 0):
                     self._probe = 0
                     if "probe" in self.last:  # its tiles measured, the mode and cap chosen: the call again
                         del out
