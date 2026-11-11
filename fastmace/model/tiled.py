@@ -146,6 +146,9 @@ TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in floa
 # tiles' form: each padded slot gets its float64 rows gathered on the host and copied in (``_fill``; an eager tile
 # gathers its own), the values ``positions64[nodes]`` reads on the device. False: the bins and offsets as before.
 TILE_HOST_ROWS = True
+# TILE_WHOLE_BLOCK_ORDER (A/B only; billion-atom step 1): True binds the whole-system BLOCK_ORDER receiver order in the
+# tiled call as before (int32 [N], 4 B/atom; its per-tile kernels never read it). False (default): not built.
+TILE_WHOLE_BLOCK_ORDER = False
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -2251,7 +2254,7 @@ class TiledForceField:
         field = self.field
         # species tables; then every tile edge is a real edge. No whole-system BLOCK_ORDER order: a tile has
         # fewer rows than N, so its kernels never read it (they launch with their rows' identity)
-        field._bind_streaming_count(block_order=False)
+        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER))
         saved = []
         for module in field._streaming:
             saved.append((module, module._buffers.get("streaming_count")))
