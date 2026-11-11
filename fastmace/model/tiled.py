@@ -159,8 +159,9 @@ TILE_WHOLE_BLOCK_ORDER = False
 # TILE_LARGE_CAPS (B3, 11 November 2026, results/tiled-caps-20261111): a host-state call whose budget_receivers were
 # left at their default may also take receiver caps of TILE_LARGE_CAP_RECEIVERS where the memory budget fits them
 # (``_choose_receivers``: the first call's measured workspace per receiver, times the cap, plus 10 %, within the
-# memory left; at the capacity limit it keeps the smaller cap). A100 58^3 against R 16,384: host state 0.549 /
-# 0.549 and wavefront 0.410 / 0.409 at R 65,536; 160^3 wavefront 0.722 / 0.723 at R 32,768. None: on for
+# memory left; at the capacity limit it keeps the smaller cap). A100 against R 16,384 (Alex 4984555), b/a both
+# orders: 58^3 host state 0.886 / 0.893 at 32,768 and 0.549 / 0.549 at 65,536, wavefront 0.675 / 0.671 and 0.410 /
+# 0.409; 160^3 host state 0.732 / 0.724 and 0.597 / 0.599, wavefront 0.722 / 0.723 and 0.573 / 0.583. None: on for
 # TILE_LARGE_CAP_GPUS (decision 66, per family); True / False force it.
 TILE_LARGE_CAPS = None
 TILE_LARGE_CAP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
