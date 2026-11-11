@@ -222,6 +222,7 @@ class GraphEngine(Engine):
         self.neighbour_config = neighbours
         self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
                                             segments=torch.cuda.memory_snapshot() if self.cuda else None)
+        self._process_record = process.PROCESS if constraints is None else constraints
         _record_production_engine(type(self).__name__)
 
         # Initial compaction and forces (GPULangevin._init_runtime; BAOAB sets the cell first).
@@ -239,6 +240,9 @@ class GraphEngine(Engine):
         self._pool = None
         self._pool_captures = 0
         self._captured_kinds = set()
+        self._arena = None  # EngineConfig.capture_arena: the built arena (pool, plan), sealed after prepare()
+        self._arena_building = False
+        self.capture_arena_info = {}
         self._side_stream = None
         self._rebuild_stream = None  # EngineConfig.overlap_rebuild (OPT2-T04)
         self.rebuilds_beside = 0
@@ -380,6 +384,8 @@ class GraphEngine(Engine):
             keys = ["ACP", ("B", self._pipe_edges)]
         else:
             keys = ["AC", ("B", self._padded(self.initial_edges))]
+        if self.config.capture_arena and self.cuda and not self._graphs:
+            self._prepare_arena(keys)
         for key in keys:
             if key in self._graphs:
                 continue
@@ -560,6 +566,8 @@ class GraphEngine(Engine):
             self._pool = None
             self._pool_captures = 0
             self._captured_kinds.clear()
+            if self._arena is not None and not self._arena_building:
+                self._release_arena(reason)
         else:
             dropped = [key for key in keys if key in self._graphs]
             for key in dropped:
@@ -702,6 +710,7 @@ class GraphEngine(Engine):
             "edge_sizes_used": sorted(self.edge_sizes_used), "neighbour_rebuilds": self.rebuilds,
             "graphs": [str(key) for key in self._graphs], "pool_resets": self.pool_resets,
             "capture_memory": list(self.capture_memory), "speculative_launches": self.speculative_launches,
+            **({"capture_arena": dict(self.capture_arena_info)} if self.config.capture_arena else {}),
             "speculative_rollbacks": self.speculative_rollbacks,
             "speculative_rebuild_rollbacks": self.speculative_rebuild_rollbacks,
             "speculative_bucket_rollbacks": self.speculative_bucket_rollbacks, "pipelined_redos": self.pipelined_redos,
@@ -1331,6 +1340,12 @@ class GraphEngine(Engine):
 
         if not self.cuda:
             raise RuntimeError("CUDA graphs need a CUDA device")
+        if self._arena is not None and not self._arena_building:
+            # The arena's segments share bytes on the build's plan only; a new capture in its pool could place
+            # blocks where another segment's are live. Retire it: every graph is recaptured in a caching pool.
+            torch.cuda.synchronize()
+            self.invalidate_graphs(f"capture arena sealed: capturing {key!r} after the build retires it")
+            self.capture_arena_info["retired_by"] = str(key)
         _patches.set_capture_safe_mask_head(True)
         stage = self._stage(key)
         saved = self.registry.snapshot(offload_bytes=CAPTURE_SNAPSHOT_OFFLOAD_BYTES)
@@ -1346,7 +1361,7 @@ class GraphEngine(Engine):
         end_pool = (getattr(torch._C, "_cuda_endAllocateToPool", None)
                     or getattr(torch._C, "_cuda_endAllocateCurrentStreamToPool", None))
         in_pool = (self.config.warmup_in_graph_pool and kind in self._captured_kinds and self._pool is not None
-                   and begin_pool is not None and end_pool is not None)
+                   and begin_pool is not None and end_pool is not None and not self._arena_building)
         device = torch.cuda.current_device()
         torch.cuda.synchronize()
         self._capture_clock = _clock()  # the step's queued work is done: the capture's time starts here
@@ -1395,6 +1410,227 @@ class GraphEngine(Engine):
         self._graphs[key] = graph
         self._pool_captures += 1
         self._captured_kinds.add(kind)
+
+    # ------------------------------------------------------------------ capture arena (EngineConfig.capture_arena)
+
+    ARENA_STATE = ("positions", "velocities", "forces", "energy", "stress", "cell")
+
+    def _prepare_arena(self, keys) -> None:
+        """Capture ``keys`` (the first step's stages) into the capture arena, or leave nothing captured and say
+        why in ``capture_arena_info`` (``prepare`` then captures them in the caching pool).
+
+        1. A recording capture of ``keys`` in a pool on the arena allocator, on virtual addresses (no device memory;
+           its graphs are dropped unreplayed; device memory if the virtual capture fails), with the allocator's
+           block-level history.
+        2. ``arena.plan_segments`` on that trace; the plan's own overlap invariant.
+        3. The planned capture: the same keys in a new pool served at the plan's offsets, re-recorded;
+           ``arena.check_plan`` and the allocator's counters (no request off the plan, none refused) must agree.
+        4. The stages replayed in order against two eager runs from the same state: the replay must not differ from
+           the first eager run by more than the two eager runs differ from each other (bitwise when the plan is
+           deterministic); the state is restored afterwards.
+        """
+        from . import arena, arena_cuda
+
+        info = self.capture_arena_info
+        info.clear()
+        info.update(status="building", keys=[str(key) for key in keys])
+        try:
+            arena_cuda.claim(id(self))
+            shim = arena_cuda.shim()
+        except arena_cuda.ArenaUnavailable as error:
+            info.update(status="unavailable", reason=str(error))
+            arena_cuda.unclaim(id(self))
+            logger.info("graph engine: capture arena unavailable (%s); caching pool", error)
+            return
+        self._arena_building = True
+        held = None
+        try:
+            started = _clock()
+            events, mode = self._arena_record(shim, keys)
+            del self.capture_memory[:]  # the recording capture's records; the planned capture writes its own
+            info.update(record_mode=mode, record_events=len(events))
+            plan = arena.plan_segments(events)
+            info.update(segments=len(plan.sizes), reserved_MiB=plan.reserved / 2**20, arena_MiB=plan.total / 2**20)
+            if not plan.sizes:
+                raise _ArenaFallback("the recording capture requested no segments")
+            if not arena.overlaps_are_safe(plan):
+                raise _ArenaFallback("the plan's overlaps are not safe (planner bug)")
+            held = self._arena_planned(shim, keys, plan)
+            check = held["check"]
+            counters = shim.counters()
+            info.update(allocator=counters, plan_check=check.reason or "ok")
+            if not check.ok:
+                raise _ArenaFallback(f"the planned capture differs from the plan: {check.reason}")
+            if counters["mismatches"] or counters["refusals"]:
+                raise _ArenaFallback(f"the allocator served {counters['mismatches']} request(s) off the plan and "
+                                     f"refused {counters['refusals']}")
+            verdict = self._arena_verify(keys)
+            info.update(verify=verdict)
+            if not verdict["ok"]:
+                raise _ArenaFallback(f"the arena replay differs from the eager runs: {verdict['replay']} "
+                                     f"(eager noise {verdict['eager_noise']})")
+            info.update(status="active", build_s=_clock() - started)
+            self._arena = held
+            logger.info("graph engine: capture arena active, %d segments, %.0f MiB reserved -> %.0f MiB",
+                        len(plan.sizes), plan.reserved / 2**20, plan.total / 2**20)
+        except (arena_cuda.ArenaUnavailable, ValueError, RuntimeError) as error:
+            # RuntimeError covers _ArenaFallback, CUDA errors of a virtual-address capture and refused requests.
+            info.update(status="fallback", reason=f"{type(error).__name__}: {error}"[:1000])
+            logger.warning("graph engine: capture arena not used (%s); caching pool", error)
+            self._arena_drop(held)
+        finally:
+            self._arena_building = False
+            shim.mode(arena_cuda.RECORD)
+            if self._arena is None:
+                arena_cuda.unclaim(id(self))
+
+    def _arena_capture_keys(self, keys) -> None:
+        for key in keys:
+            edges = self._key_edges(key)
+            if edges is not None:
+                self.force_field.use_edges(edges)
+            self._capture(key)
+
+    def _arena_reset_capture_state(self) -> None:
+        self._graphs.clear()
+        self._pool = None
+        self._pool_captures = 0
+        self._captured_kinds.clear()
+
+    def _arena_pool(self, shim):
+        pool = torch.cuda.MemPool(shim.allocator.allocator())
+        self._process_record.arena_pools.add(tuple(pool.id))
+        return pool
+
+    def _arena_free_pool(self, pool) -> bool:
+        """Drop the pool's graphs and the pool; True when none of its segments is left."""
+        import gc
+
+        from . import arena_cuda
+
+        pool_id = tuple(pool.id)
+        self._arena_reset_capture_state()
+        torch.cuda.synchronize()
+        del pool
+        gc.collect()
+        torch.cuda.empty_cache()
+        left = arena_cuda.pool_segment_bytes(pool_id)
+        if not left:
+            self._process_record.arena_pools.discard(pool_id)
+        return not left
+
+    def _arena_record(self, shim, keys):
+        """Step 1: the recording capture; returns the pool's trace and the mode used ("virtual" or "device")."""
+        from . import arena_cuda
+
+        for mode, name in ((arena_cuda.VIRTUAL, "virtual"), (arena_cuda.RECORD, "device")):
+            pool = self._arena_pool(shim)
+            shim.mode(mode)
+            shim.clear_log()
+            arena_cuda.start_history()
+            try:
+                self._pool = pool.id
+                self._arena_capture_keys(keys)
+                events = arena_cuda.stop_history(pool.id)
+            except RuntimeError as error:
+                torch.cuda.memory._record_memory_history(enabled=None)
+                self.capture_arena_info[f"record_{name}_error"] = f"{type(error).__name__}: {error}"[:500]
+                shim.mode(arena_cuda.RECORD)
+                if not self._arena_free_pool(pool):
+                    raise _ArenaFallback("a failed recording capture left segments in its pool") from error
+                if mode == arena_cuda.RECORD:
+                    raise
+                continue
+            shim.mode(arena_cuda.RECORD)
+            if not self._arena_free_pool(pool):
+                raise _ArenaFallback("the recording pool kept segments after its graphs were dropped")
+            if shim.counters()["virtual_live"]:
+                raise _ArenaFallback("virtual ranges of the recording capture were not returned")
+            return events, name
+        raise _ArenaFallback("no recording capture")  # pragma: no cover - the loop raises or returns
+
+    def _arena_planned(self, shim, keys, plan):
+        """Step 3: the planned capture into a new pool, re-recorded; returns the held arena with its check."""
+        from . import arena, arena_cuda
+
+        shim.set_plan(plan.sizes, plan.offsets, plan.total)
+        pool = self._arena_pool(shim)
+        held = {"pool": pool, "pool_id": tuple(pool.id), "plan": plan, "shim": shim}
+        shim.mode(arena_cuda.PLANNED)
+        shim.clear_log()
+        arena_cuda.start_history()
+        try:
+            self._pool = pool.id
+            self._arena_capture_keys(keys)
+            events = arena_cuda.stop_history(pool.id)
+        except RuntimeError as error:
+            torch.cuda.memory._record_memory_history(enabled=None)
+            shim.mode(arena_cuda.RECORD)
+            self._arena_drop(held)
+            raise _ArenaFallback(f"the planned capture failed: {type(error).__name__}: {error}") from error
+        shim.mode(arena_cuda.RECORD)
+        held["check"] = arena.check_plan(plan, events)
+        return held
+
+    def _arena_state(self) -> dict[str, torch.Tensor]:
+        out = {}
+        for name in self.ARENA_STATE:
+            tensor = getattr(self.state, name, None)
+            if isinstance(tensor, torch.Tensor):
+                out[name] = tensor.detach().clone()
+        return out
+
+    def _arena_verify(self, keys) -> dict[str, Any]:
+        """Step 4: the arena's graphs replayed in order against two eager runs of the same stages."""
+        from . import arena_cuda
+
+        def run(replay: bool) -> dict[str, torch.Tensor]:
+            saved = self.registry.snapshot(offload_bytes=CAPTURE_SNAPSHOT_OFFLOAD_BYTES)
+            for key in keys:
+                edges = self._key_edges(key)
+                if edges is not None:
+                    self.force_field.use_edges(edges)
+                if replay:
+                    self._graphs[key].replay()
+                else:
+                    self._stage(key)()
+            torch.cuda.synchronize()
+            result = self._arena_state()
+            self.registry.restore(saved)
+            return result
+
+        first, second, replayed = run(False), run(False), run(True)
+        noise = arena_cuda.max_difference(first, second)
+        replay = arena_cuda.max_difference(replayed, first)
+        ok = all(replay[name] <= noise[name] for name in replay)
+        return {"ok": ok, "bitwise": all(value == 0.0 for value in replay.values()), "replay": replay,
+                "eager_noise": noise}
+
+    def _arena_drop(self, held) -> None:
+        """Leave no arena: drop the build's graphs and pool and return the arena's memory."""
+        self._arena_reset_capture_state()
+        if held is None or "pool" not in held:
+            return
+        pool, shim = held.pop("pool"), held["shim"]
+        if self._arena_free_pool(pool):
+            shim.release()
+        else:
+            self.capture_arena_info["leak"] = "the arena pool kept segments; its memory stays reserved"
+
+    def _release_arena(self, reason: str) -> None:
+        """The graphs were dropped (``invalidate_graphs``): return the arena's memory."""
+        from . import arena_cuda
+
+        held, self._arena = self._arena, None
+        torch.cuda.synchronize()
+        self._arena_drop(held)
+        self.capture_arena_info.update(status="retired", retired=reason)
+        arena_cuda.unclaim(id(self))
+        logger.info("graph engine: capture arena retired (%s)", reason)
+
+
+class _ArenaFallback(RuntimeError):
+    """A capture-arena build step failed; the engine captures in the caching pool instead."""
 
 
 __all__ = ["CAPTURE_STAGE", "SPECULATIVE_SLOTS", "WARMUP_RUNS", "GraphEngine"]

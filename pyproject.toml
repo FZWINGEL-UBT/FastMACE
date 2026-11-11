@@ -83,6 +83,8 @@ include = ["fastmace*"]
 # The vendored OEq streaming kernels: the CUDA template and their BSD-3 licence and notice (SPEC §14).
 "fastmace.kernels.oeq_streaming" = ["*.cuh", "LICENSE", "NOTICE.md"]
 "fastmace.protocols" = ["data/*.toml", "data/*.cif", "data/*.md"]
+# The capture arena's allocator, compiled on first use (EngineConfig.capture_arena).
+"fastmace.engine" = ["arena_shim.c"]
 # The prebuilt CUTLASS 3xTF32 kernels for the A100 (tools/build_cutlass_tf32x3.sh): the cubin, its source and build
 # record, and CUTLASS's BSD-3 licence and notice (SPEC §14).
 "fastmace.kernels.cutlass" = ["*.cubin", "*.cu", "*.build.txt", "LICENSE", "NOTICE.md"]

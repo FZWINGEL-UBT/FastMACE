@@ -305,6 +305,13 @@ class EngineConfig:
     empty_cache_before_capture: bool = True
     # Eager warm-ups after the first capture run inside the graph pool.
     warmup_in_graph_pool: bool = True
+    # Capture arena (results/capture-arena-20261110, option A): the graph pool on fastmace.engine.arena_shim.c,
+    # whose segments share bytes where a recording capture shows they are never busy together. Built in prepare():
+    # a recording capture (virtual addresses), the offset plan, the planned capture re-recorded and checked against
+    # the plan, then the first step's stages replayed against eager runs; any failure falls back to the caching
+    # pool. Sealed after the build: a later capture retires the arena. Off until the A/B, the bitwise check and the
+    # new limits on the A100 and the Ada are in.
+    capture_arena: bool = False
     # The edge dimension is dynamic from the first compiled call, so a changed edge count does not compile
     # again. Evaluation and compiled-tier plans always set it (2-T13, 3-T06). On graph-tier MD plans the edges
     # stay padded, and the padded first capture reuses the first call's graph instead of compiling again
