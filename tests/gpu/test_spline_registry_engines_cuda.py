@@ -1,14 +1,17 @@
 """Several graph engines of different sizes in one process share the SPLINE_W forward (``spline_forward.shared``).
 
 The custom ops launch the registered ``SplineForward`` of their content id. Equal builds (one per force field) used to
-replace the entry, so earlier engines' captured graphs read a later object's BLOCK_ORDER order, and once that object
-was replaced again and freed, a replay read freed memory (CUDA illegal address in a five-engine A/B process, RTX 4000
-Ada, 10 November 2026). Here three MD simulations of MACE-OMAT-0 medium (SrTiO3 2x2x2, 4x4x4 and 3x3x3, rattled and
-strained) are built one after another, each capturing its graphs before the next is built; the second is closed and
-dropped mid-way; the first and third then keep replaying, interleaved. Each simulation's committed positions and forces
-must match the same simulation run alone in a fresh process (float32 atomics: to rounding, not bitwise), and every
-engine must launch the same registered forward. SPLINE_W and BLOCK_ORDER forced on; skips where the w' path is off.
-Needs ``FASTMACE_MODELS`` (the checkpoint) and the hybrid backend's kernels.
+replace the entry, so an engine that captured after a later equal build launched through that build's object (its
+BLOCK_ORDER order, or the identity order it cached for this engine's row count); once that build's simulation was
+closed, the object and its tensors were freed and the next replay read freed memory (CUDA illegal address in a
+five-engine A/B process, RTX 4000 Ada, 10 November 2026). Here, with MACE-OMAT-0 medium on SrTiO3 2x2x2, 4x4x4 and
+3x3x3 (rattled and strained): "small" is built, then "large" is built and run; "small" captures only now (before the
+fix: through large's object); "middle" is built and run; "large" is closed, the allocator's cache emptied and the
+freed blocks refilled with out-of-range indices; "small" and "middle" then keep replaying, interleaved. Each
+simulation's committed positions and forces must match the same simulation run alone in a fresh process (float32
+atomics: to rounding, not bitwise), and every engine must launch the first registered forward. SPLINE_W and
+BLOCK_ORDER forced on; skips where the w' path is off. Needs ``FASTMACE_MODELS`` (the checkpoint) and the hybrid
+backend's kernels.
 """
 
 import json
@@ -45,8 +48,7 @@ import tiled_capacity
 
 spline_forward.SPLINE_W, spline_forward.BLOCK_ORDER = True, True
 SIZES = {"small": (2, 2, 2), "large": (4, 4, 4), "middle": (3, 3, 3)}
-# Each simulation's runs (steps per call); "large" is closed after its runs.
-RUNS = {"small": [10, 10, 10, 10], "large": [10, 10], "middle": [10, 10, 10]}
+RUNS = {"small": [10, 10, 10, 10], "large": [10], "middle": [10, 10, 10]}
 ONLY = sys.argv[1] if len(sys.argv) > 1 else None
 
 
@@ -65,6 +67,13 @@ def kernels(sim):
 report, sims, done = {}, {}, {}
 
 
+def build(name):
+    sims[name], done[name] = simulation(name), 0
+    if not kernels(sims[name]):
+        print(json.dumps({"skip": "no BLOCK_ORDER spline forward on this GPU (w' path off)"}))
+        raise SystemExit(0)
+
+
 def run(name):
     sims[name].run(steps=RUNS[name][done[name]])
     done[name] += 1
@@ -76,27 +85,25 @@ def finish(name):
 
 
 if ONLY is not None:  # the single-engine reference
-    sims[ONLY], done[ONLY] = simulation(ONLY), 0
-    if not kernels(sims[ONLY]):
-        print(json.dumps({"skip": "no BLOCK_ORDER spline forward on this GPU (w' path off)"}))
-        raise SystemExit(0)
+    build(ONLY)
     while done[ONLY] < len(RUNS[ONLY]):
         run(ONLY)
     finish(ONLY)
 else:
-    for name in SIZES:  # built one after another, each capturing before the next is built
-        sims[name], done[name] = simulation(name), 0
-        if not kernels(sims[name]):
-            print(json.dumps({"skip": "no BLOCK_ORDER spline forward on this GPU (w' path off)"}))
-            raise SystemExit(0)
-        run(name)
+    build("small")
+    build("large")
+    run("large")
+    run("small")  # captured while a later equal build ("large") exists
+    build("middle")
+    run("middle")
     report["shared"] = all(a is b for a, b in zip(kernels(sims["small"]), kernels(sims["middle"])))
     report["registered"] = all(spline_forward._REGISTRY[k.id] is k for k in kernels(sims["small"]))
-    run("large")
     finish("large")
     sims.pop("large").close()
     gc.collect()
     torch.cuda.synchronize()
+    torch.cuda.empty_cache()
+    spray = [torch.full((n,), 2 ** 30, dtype=torch.int32, device="cuda") for n in (40, 135, 320) for _ in range(200)]
     while done["small"] < len(RUNS["small"]) or done["middle"] < len(RUNS["middle"]):
         for name in ("small", "middle"):
             if done[name] < len(RUNS[name]):
@@ -104,6 +111,7 @@ else:
     finish("small")
     finish("middle")
     torch.cuda.synchronize()
+    del spray
 print(json.dumps(report))
 """
 
