@@ -2130,7 +2130,8 @@ def test_first_call_probe_runs_the_largest_tiles_then_the_whole_call_bitwise(mon
 
     monkeypatch.setattr(tiled_module, "TILE_PROBE_TILES", 2)
     calc, atoms = calculator(), big_structure().repeat((4, 1, 1))
-    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
     results, probes = [], []
     for probe in (False, True):
         monkeypatch.setattr(tiled_module, "TILE_FIRST_CALL_PROBE", probe)

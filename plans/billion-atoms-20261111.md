@@ -159,7 +159,8 @@ job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
 | first call, eager (mode auto measures its memory) | 11,468 s | 28.8 us/atom | about 8 h |
 | second call, compiled | 3,913 s | 9.84 us/atom | about 2.7 h |
 
-1. **Our own supercell builder** (the ASE step). `Atoms.repeat` loops in Python over every unit-cell copy (about 200M
+1. **Our own supercell builder** (the ASE step; built on branch `fastmace/fast-setup`: `tiled_capacity.supercell`
+   chunked, `supercell_ase` the reference, bitwise at small sizes in `tests/cpu/test_tiled_supercell.py`). `Atoms.repeat` loops in Python over every unit-cell copy (about 200M
    passes at 585^3, a slice write each), and `wrap` makes whole-system fractional temporaries (several 24 GB float64
    arrays at 10^9); the 519M segmentation fault came out of this step (ASE `cell.py` `__array__`). Replacement, about
    50 lines in `tools/bench/tiled_capacity.py` (or `fastmace.io` if it is to serve users): allocate the float64
@@ -169,11 +170,17 @@ job had one CPU, `nproc 1`, where Alex now gives 16 per A100):
    numbers and cell at small and medium sizes; then a CPU-only dry run of this step at 520^3 and 585^3 (no GPU), which
    also answers the 519M fault.
 2. **The eager first call** is the largest cost (about 8 of the run's 11 h at 10^9). Mode auto runs a whole call
-   eager to measure the tile workspace before compiling. The workspace is not size-independent (R 16,384: 1.8 GiB
-   above the call's start at 20.48M, Alex 4985398; 3.4 GB at 397.5M), so a small run's number cannot simply be
-   handed in; a measurement on a few of the run's own largest tiles (eager, then compile for the rest of the call)
-   would give the same decision in minutes. Also: re-measure the eager call with 16 CPUs (the record had one; the
-   host-state writes and gathers are host work).
+   eager to measure the tile workspace before compiling. Correction (11 November 2026, from the records' own
+   numbers): the tiles' workspace (``tiles_peak - loop_base``, what ``_choose_mode`` and ``_choose_receivers`` read)
+   is set by the largest tile, not by the atom count: eager at R 8,192, 526,080,512 bytes at 149M, 320M and 397.5M
+   (Alex 4973640), 503,742,464 at 20.48M with a smaller largest tile (Alex 4985398); compiled at R 16,384, 1.074 GB
+   at 397.5M and 1.055 GB at 20.48M. (The earlier "1.8 GiB / 3.4 GB" were peaks above the call's start, which
+   include the call's per-atom buffers.) So the decision can come from the run's own largest tiles:
+   ``TILE_FIRST_CALL_PROBE`` (branch `fastmace/fast-setup`, opt-in) runs the measuring call's eager sweeps on the 8
+   largest tiles only, decides the mode and the cap from them, and runs the call again in the chosen mode. A/B on
+   Alex: the probe's decision and workspace against the whole call's at 58^3 and 160^3
+   (`results/billion-atoms-20261111/jobs/alex_setup.sh`). Also: the go/no-go (Alex 4985889) has 16 CPUs where the
+   record had one, so it re-measures the eager call's host share for free.
 3. **The force-field build** (660 s, host peak 111 GB, about 279 B/atom at its peak): profile it at 20M (cProfile and
    the host peak by step) before changing anything; the one-hot and species tables built on the host at construction
    are the first suspects.

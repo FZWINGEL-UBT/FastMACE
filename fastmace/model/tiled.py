@@ -2380,7 +2380,7 @@ class TiledForceField:
 
     def _probe_wanted(self):
         """``TILE_FIRST_CALL_PROBE`` for this call: mode "auto"'s measuring first call (a compiled force field's)."""
-        if not self._auto or TILE_FIRST_CALL_PROBE is False:
+        if not getattr(self, "_auto", False) or TILE_FIRST_CALL_PROBE is False:
             return False
         if TILE_FIRST_CALL_PROBE:
             return True

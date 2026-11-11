@@ -114,6 +114,9 @@ def parse_args(argv=None):
     p.add_argument("--host-positions", action="store_true",
                    help="keep the call's float64 positions on the host (--tile-list; TILE_HOST_ROWS: 24 bytes per "
                         "atom off the device)")
+    p.add_argument("--first-call-probe", choices=("default", "on", "off"), default="default",
+                   help="tiled.TILE_FIRST_CALL_PROBE: mode auto's measuring first call on its largest tiles only "
+                        "(the probe's report in the first call's record, 'probe')")
     p.add_argument("--call-history", type=int, default=None, metavar="CALL",
                    help="record the CUDA allocator's trace during tiled call CALL (0-based) and keep the allocations "
                         "made in it that are live at its peak, by source line (call_peak in the record; the peak "
@@ -443,6 +446,11 @@ def main(argv=None):
         record["rewrites"] = list(getattr(field, "applied", ()))
         record["plan_memory"] = list(plan.decision("memory")) if any(d[0] == "memory" for d in plan.decisions) else None
         record["mode"] = args.mode
+        if args.first_call_probe != "default":
+            from fastmace.model import tiled as tiled_module
+
+            tiled_module.TILE_FIRST_CALL_PROBE = args.first_call_probe == "on"
+        record["first_call_probe"] = args.first_call_probe
         tiled = TiledForceField(field, TileConfig(args.receivers, args.edges, mode=args.mode,
                                                   neighbours="tiles" if args.tile_list else "global",
                                                   budget_receivers=() if args.no_budget else
