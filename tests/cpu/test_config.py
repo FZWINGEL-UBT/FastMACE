@@ -54,6 +54,7 @@ AUTO_RULES = {
     "NeighbourConfig.skin": "rule_11_skin_from_workload",
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
     "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
+    "NeighbourConfig.edge_index_int32": "on_for_decision_66_gpus",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",

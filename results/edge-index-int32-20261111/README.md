@@ -20,8 +20,14 @@ through `tools/ci/local_gpu.py`).
 | Production plan | off/off differs by the plan's atomics (about 3e-6 eV/Å single point, 1e-4 after MD), off/on the same: no visible difference |
 | 3× float32 gate (`tools/force_stress_gate.py`, Ada, `--production-constant ...EDGE_INDEX_INT32=True`) | **passed**: SrTiO3 3×3×3 forces 0.79, stress 0.47, energy 1.3e-3 (floor 0.01); NaCl forces 0.91, stress 1.00, energy 1.3e-4 |
 
-Decision 66: a rounding change needs the gate, and it passed; the A/B is not slower on either GPU. The A100 has no
-A/B yet. Adoption (default on, or kept opt-in for 1 % of memory that moves no limit) is the conductor's call.
+Decision 66: a rounding change needs the gate, and it passed; the A/B is not slower on either GPU. Adopted (conductor,
+11 November 2026): `NeighbourConfig.edge_index_int32` "auto" is on on the RTX 4000 Ada and the RTX 5060 Ti
+(`planner.fixed.DECISION_66_EDGE_INDEX_INT32_GPUS`), off elsewhere; the A100 joins after one Alex A/B and gate.
+
+The tiled and wavefront paths keep no int64 edge_index on the host: the kept lists and the per-call list cache store
+an int32 sender dictionary, int16 codes, narrow per-receiver counts and uint8 unit-shift codes (about 3 B per edge),
+and the device graph cache already keeps int32 tile-local pairs. Only per-tile device transients (`ei`, `local`,
+int64 [2, E]) are wide; int32 would not change the tiled host state.
 
 ## Files
 

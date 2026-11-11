@@ -34,10 +34,11 @@ BUILD_CHUNK = 1 << 18
 # and image. At SrTiO3 233,280 atoms on the RTX 4000 Ada the old sort's temporaries were 1.0 GiB (4.5 kB/atom), the
 # steady phase's peak beside the captured force graph.
 SORT_KEYS_ONLY = True
-# The compacted ``edge_index`` the model reads (capacity bounds, 10 November 2026): True stores it as int32, like the
-# candidates it is copied from; False keeps int64. 8 B per edge less at the limit (0.37 GiB, 0.8 kB/atom at SrTiO3
-# 233,280 atoms). Read when a list allocates its buffers.
-EDGE_INDEX_INT32 = False
+# The compacted ``edge_index`` the model reads (capacity bounds, 10 November 2026): int32, like the candidates it is
+# copied from, instead of int64; 8 B per edge less (0.37 GiB, 0.8 kB/atom at SrTiO3 233,280 atoms). The plan decides
+# it (``NeighbourConfig.edge_index_int32``, on by default on the measured GPUs); True or False here overrides the
+# config for an A/B side. Read when a list allocates its buffers.
+EDGE_INDEX_INT32 = None
 # Candidate pairs per chunk of ``compact``: its float64 shifts, vectors and masks exist for one chunk at a time
 # (about 150 B per candidate at once otherwise: 11 GiB of candidates' temporaries at 2.3M NbCl5 atoms). Lists up
 # to this many candidates (about 150k MH-1 atoms) compact in one chunk, as before; the result is the same for any
@@ -263,7 +264,8 @@ class SkinNeighbourList:
         self.candidate_index = new(2, capacity, dtype=torch.int32)
         self.candidate_unit_shifts = new(capacity, 3, dtype=self.float_dtype)
         # ... and the same pairs reordered by compact(); this is what the model reads.
-        self.edge_index = new(2, capacity, dtype=torch.int32 if EDGE_INDEX_INT32 else torch.int64)
+        int32 = self.config.edge_index_int32 == "on" if EDGE_INDEX_INT32 is None else bool(EDGE_INDEX_INT32)
+        self.edge_index = new(2, capacity, dtype=torch.int32 if int32 else torch.int64)
         self.unit_shifts = new(capacity, 3, dtype=self.float_dtype)
         self.shifts = new(capacity, 3, dtype=self.float_dtype)
 
