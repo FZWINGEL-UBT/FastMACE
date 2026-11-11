@@ -61,7 +61,7 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducib
                                                  cell_mode="full"))):
         atoms = start.copy()
         field = fm.ForceField(model, atoms, precision="float32")
-        extra = dict(workload=fm.Workload(reproducible=True)) if reproducible else {}
+        extra = dict(workload=fm.Workload(max_temperature_K=300.0, reproducible=True)) if reproducible else {}
         sim = fm.Simulation(atoms, field, seed=20261110, integrator=integrator, **extra)
         torch.cuda.reset_peak_memory_stats()
         sim.run(steps=steps)
