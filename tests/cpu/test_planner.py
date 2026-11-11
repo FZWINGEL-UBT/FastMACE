@@ -761,7 +761,7 @@ def test_plans_equal_the_research_engine(label, capsys):
                 assert label not in APPLIES[name], (label, argv)
                 assert got_off[name].startswith("not a qualified POLAR-1 checkpoint, decision 58"), (label, argv)
             elif name == "fold_product_linear" and got_off.get(name, "").startswith("generic fold not measured"):
-                # generic_fold_product_linear: decision 66, this file's GPU (RTX 5060 Ti) is not measured
+                # generic_fold_product_linear: decision 66, off on a GPU outside DECISION_66_GENERIC_FOLD_PRODUCT_GPUS
                 assert label not in APPLIES[name] and capabilities.rewrite_support(model)[stage2[name]][0], (label,
                                                                                                              argv)
             elif name == "tf32x3_gemms" and name in got_off:  # this file's GPU is not a decision-66 tf32x3 GPU

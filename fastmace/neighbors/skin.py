@@ -54,8 +54,11 @@ SORT_BY_LENGTH = None
 # RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
 # SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9794 / 0.9815, 0.9890 / 0.9908; left out of the
 # adopted set 1.0161 / 1.0164, 1.0045 / 1.0062.
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9860 / 0.9868, 0.9967 / 0.9887;
+# left out of the adopted set 1.0095 / 1.0100, 0.9988 / 1.0036.
 SORT_BY_LENGTH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe",  # H200, A100, Ada
-                                 "NVIDIA RTX 4000 Ada Generation"))
+                                 "NVIDIA RTX 4000 Ada Generation", "NVIDIA GeForce RTX 5060 Ti"))
 # GPUs where a model label keeps SORT_BY_LENGTH off (the label reaches the list as SkinNeighbourList's model_label).
 # MACE-OFF has no spline tables, so the sort's locality buys nothing and its build costs. A100 family (9 November
 # 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970847, water_216, against the A100

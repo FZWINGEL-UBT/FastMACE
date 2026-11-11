@@ -220,12 +220,19 @@ STAGE_DOUT = None
 # RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
 # SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9699 / 0.9694, 0.9848 / 0.9806; STAGE_DOUT,
 # STAGE_SH and STAGE_EDGES left out of the adopted set together 1.0228 / 1.0200, 1.0261 / 1.0232.
-STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): w' STAGE_EDGES + STAGE_DOUT + STAGE_SH left out
+# of the candidate set together 1.0529 / 1.0503, 1.0334 / 1.0341.
+STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                             "NVIDIA GeForce RTX 5060 Ti"))
 # GPUs where a model label keeps STAGE_DOUT off (WPrime's model_label). POLAR-1-M on the A100 family (9 November
 # 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970848, against the A100 defaults of
-# 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911.
+# 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911. RTX 4000 Ada (ada-5060-screen, 11 November
+# 2026, results/ada-5060-screen-20261110, murphy): the Ada set slowed POLAR-1-M NaCl (1.0061 / 1.0077 against the Ada
+# defaults); leave-one-out from the set, b = STAGE_DOUT off: NaCl 0.9868 / 0.9858 (switches that do not run for
+# POLAR read 0.994-1.002).
 STAGE_DOUT_MODEL_OFF_GPUS = MappingProxyType({
-    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA RTX 4000 Ada Generation")),
 })
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # STAGE_DOUT's row as quartets of output-gradient components (Codex H200 follow-up, 7 November 2026, item 2): with
@@ -251,7 +258,10 @@ STAGE_SH = None
 # RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
 # SrTiO3 10x10x10 / NbCl5, ab / ba): with STAGE_EDGES left out of the adopted set 1.0035 / 1.0028,
 # 1.0078 / 1.0056.
-STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with STAGE_DOUT and w' STAGE_EDGES (see STAGE_DOUT_GPUS).
+STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                           "NVIDIA GeForce RTX 5060 Ti"))
 # STAGE_EDGES (w'; Codex H200 round-6 report, 8 November 2026; bitwise): with STAGE_DOUT, STAGE_SH and SPLINE_W,
 # the block's chunk of edges is staged once at block entry: the features of all its edges (one coalesced float4 copy
 # by the whole block), and per edge (warp 0, a lane per edge) sender, receiver, spline interval, t, 1 / h and the
@@ -266,7 +276,9 @@ STAGE_EDGES = None
 # RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
 # SrTiO3 10x10x10 / NbCl5, ab / ba): w' STAGE_EDGES + STAGE_DOUT + STAGE_SH alone 0.9639 / 0.9643,
 # 0.9779 / 0.9758; left out of the adopted set alone 1.0032 / 0.9981, 1.0043 / 1.0064 (with STAGE_SH: see there).
-STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with STAGE_DOUT and STAGE_SH (see STAGE_DOUT_GPUS).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation", "NVIDIA GeForce RTX 5060 Ti"))
 # A model label's own extra GPUs for STAGE_EDGES, on top of STAGE_EDGES_GPUS (the label reaches the kernel through the
 # rewrites' context: WPrime's model_label). OMAT-0 small on the H200 (9 November 2026, results/h200-omat0-small-20261108,
 # Benchmark_loup, ab / ba): alone on small's defaults 0.9857 / 0.9825 (b = on); with JOINED_LAYOUT, removing it from the

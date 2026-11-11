@@ -163,9 +163,10 @@ def test_the_planner_keeps_the_generic_fold_to_measured_gpus(monkeypatch):
 
     # Decision 66 (5 November 2026): "auto" on for the generic family on the measured GPUs only.
     assert fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS == ("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
-                                                     "NVIDIA H200")
+                                                     "NVIDIA H200", "NVIDIA GeForce RTX 5060 Ti")
     assert "NVIDIA A100 80GB PCIe" in fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS  # every A100 model
-    assert GPU.name not in fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS
+    assert GPU.name in fixed.DECISION_66_GENERIC_FOLD_PRODUCT_GPUS  # RTX 5060 Ti: ada-5060-screen, 11 November 2026
+    monkeypatch.setattr(fixed, "DECISION_66_GENERIC_FOLD_PRODUCT_GPUS", ("NVIDIA H200",))  # an unmeasured GPU
     unmeasured = plan_for("omat0-medium")
     _, choice, why = unmeasured.decision("RewriteConfig.fold_product_linear")
     assert choice == "off" and "generic fold not measured" in str(why) and GPU.name in str(why)
