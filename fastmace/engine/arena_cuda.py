@@ -187,6 +187,17 @@ def pool_segment_bytes(pool_id) -> int:
                if tuple(segment.get("segment_pool_id") or ()) == pool)
 
 
+def pool_blocks(pool_id) -> dict[str, Any]:
+    """What keeps a pool's segments: their bytes, the bytes of live blocks in them, and the largest live blocks."""
+    pool = tuple(pool_id)
+    segments = [segment for segment in torch.cuda.memory_snapshot()
+                if tuple(segment.get("segment_pool_id") or ()) == pool]
+    live = sorted((block["size"] for segment in segments for block in segment.get("blocks", ())
+                   if block.get("state") == "active_allocated"), reverse=True)
+    return {"segments": len(segments), "segment_bytes": sum(segment["total_size"] for segment in segments),
+            "live_bytes": sum(live), "live_blocks": len(live), "largest_live": live[:8]}
+
+
 def max_difference(a: dict[str, torch.Tensor], b: dict[str, torch.Tensor]) -> dict[str, float]:
     """Per-tensor maximum absolute difference (0.0: bitwise equal; NaN-aware: unequal NaN patterns are inf)."""
     out = {}
@@ -204,4 +215,4 @@ def max_difference(a: dict[str, torch.Tensor], b: dict[str, torch.Tensor]) -> di
 
 
 __all__ = ["ArenaUnavailable", "PLANNED", "RECORD", "Shim", "VIRTUAL", "build", "claim", "max_difference",
-           "pool_segment_bytes", "shim", "start_history", "stop_history", "unclaim"]
+           "pool_blocks", "pool_segment_bytes", "shim", "start_history", "stop_history", "unclaim"]

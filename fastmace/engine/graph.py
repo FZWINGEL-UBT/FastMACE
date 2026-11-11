@@ -76,6 +76,7 @@ from __future__ import annotations
 
 import logging
 import math
+import traceback
 import warnings
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
@@ -1477,6 +1478,7 @@ class GraphEngine(Engine):
             # _ArenaFallback, CUDA errors, refused requests, and launcher checks (Triton raises ValueError).
             info.update(status="fallback", reason=f"{type(error).__name__}: {error}"[:1000])
             logger.warning("graph engine: capture arena not used (%s); caching pool", error)
+            traceback.clear_frames(error.__traceback__)  # their locals may hold tensors of the arena's pool
             self._arena_drop(held)
         finally:
             self._arena_building = False
@@ -1502,12 +1504,15 @@ class GraphEngine(Engine):
         self._process_record.arena_pools.add(tuple(pool.id))
         return pool
 
-    def _arena_free_pool(self, pool) -> bool:
-        """Drop the pool's graphs and the pool; True when none of its segments is left."""
+    def _arena_free_pool(self, holder: dict) -> bool:
+        """Drop the pool's graphs and the pool (``holder["pool"]``, removed from the holder: the MemPool must have no
+        other reference, or its private pool stays in use and keeps every segment); True when none is left. When
+        some are, ``capture_arena_info["pool_left"]`` says what holds them."""
         import gc
 
         from . import arena_cuda
 
+        pool = holder.pop("pool")
         pool_id = tuple(pool.id)
         self._arena_reset_capture_state()
         torch.cuda.synchronize()
@@ -1515,7 +1520,9 @@ class GraphEngine(Engine):
         gc.collect()
         torch.cuda.empty_cache()
         left = arena_cuda.pool_segment_bytes(pool_id)
-        if not left:
+        if left:
+            self.capture_arena_info["pool_left"] = arena_cuda.pool_blocks(pool_id)
+        else:
             self._process_record.arena_pools.discard(pool_id)
         return not left
 
@@ -1524,16 +1531,17 @@ class GraphEngine(Engine):
         from . import arena_cuda
 
         for mode, name in ((arena_cuda.VIRTUAL, "virtual"), (arena_cuda.RECORD, "device")):
-            pool = self._arena_pool(shim)
+            slot = {"pool": self._arena_pool(shim)}
+            pool_id = slot["pool"].id
             shim.clear_log()
             try:
                 if mode == arena_cuda.VIRTUAL:
                     shim.alias_fill(torch.cuda.current_device())
                 shim.mode(mode)
                 arena_cuda.start_history()
-                self._pool = pool.id
+                self._pool = pool_id
                 self._arena_capture_keys(keys)
-                events = arena_cuda.stop_history(pool.id)
+                events = arena_cuda.stop_history(pool_id)
                 if mode == arena_cuda.VIRTUAL:
                     # Every buffer of the virtual pool is one aliased granule: nothing may run on it. The shim
                     # refuses requests from a stream that is not capturing (warm-ups and autotuning run eagerly
@@ -1546,14 +1554,16 @@ class GraphEngine(Engine):
                 torch.cuda.memory._record_memory_history(enabled=None)
                 self.capture_arena_info[f"record_{name}_error"] = f"{type(error).__name__}: {error}"[:500]
                 shim.mode(arena_cuda.RECORD)
-                if not self._arena_free_pool(pool):
+                traceback.clear_frames(error.__traceback__)  # their locals may hold tensors of the pool
+                if not self._arena_free_pool(slot):
                     raise _ArenaFallback("a failed recording capture left segments in its pool") from error
                 if mode == arena_cuda.RECORD:
                     raise
                 continue
             shim.mode(arena_cuda.RECORD)
-            if not self._arena_free_pool(pool):
-                raise _ArenaFallback("the recording pool kept segments after its graphs were dropped")
+            if not self._arena_free_pool(slot):
+                raise _ArenaFallback(f"the recording pool kept segments after its graphs were dropped: "
+                                     f"{self.capture_arena_info.get('pool_left')}")
             if shim.counters()["virtual_live"]:
                 raise _ArenaFallback("virtual ranges of the recording capture were not returned")
             return events, name
@@ -1564,18 +1574,19 @@ class GraphEngine(Engine):
         from . import arena, arena_cuda
 
         shim.set_plan(plan.sizes, plan.offsets, plan.total)
-        pool = self._arena_pool(shim)
-        held = {"pool": pool, "pool_id": tuple(pool.id), "plan": plan, "shim": shim}
+        held = {"pool": self._arena_pool(shim), "plan": plan, "shim": shim}
+        held["pool_id"] = pool_id = tuple(held["pool"].id)
         shim.mode(arena_cuda.PLANNED)
         shim.clear_log()
         arena_cuda.start_history()
         try:
-            self._pool = pool.id
+            self._pool = pool_id
             self._arena_capture_keys(keys)
-            events = arena_cuda.stop_history(pool.id)
+            events = arena_cuda.stop_history(pool_id)
         except Exception as error:  # noqa: BLE001 - the build falls back
             torch.cuda.memory._record_memory_history(enabled=None)
             shim.mode(arena_cuda.RECORD)
+            traceback.clear_frames(error.__traceback__)
             self._arena_drop(held)
             raise _ArenaFallback(f"the planned capture failed: {type(error).__name__}: {error}") from error
         shim.mode(arena_cuda.RECORD)
@@ -1621,9 +1632,8 @@ class GraphEngine(Engine):
         self._arena_reset_capture_state()
         if held is None or "pool" not in held:
             return
-        pool, shim = held.pop("pool"), held["shim"]
-        if self._arena_free_pool(pool):
-            shim.release()
+        if self._arena_free_pool(held):
+            held["shim"].release()
         else:
             self.capture_arena_info["leak"] = "the arena pool kept segments; its memory stays reserved"
 
