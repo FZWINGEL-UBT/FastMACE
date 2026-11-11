@@ -170,7 +170,10 @@ def prefetch_ahead_default(device, model_label=None):
 # 0.9549, 1500 K 0.9587 / 0.9558, gate passes (source 10e23d17). None: on for PACKED8_GPUS; True / False: an A/B
 # side's choice.
 PACKED8 = None
-PACKED8_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9036 / 0.9030, 0.9346 / 0.9357; left out of the
+# adopted set 1.1071 / 1.1028, 1.0721 / 1.0722 (also removes the forward's sm_89 spill); gate with the set.
+PACKED8_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 PACKED8_BITS = (22, 20, 16)  # a0, a1, a2
 
 

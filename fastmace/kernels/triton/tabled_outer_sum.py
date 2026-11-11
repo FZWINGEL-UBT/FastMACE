@@ -47,7 +47,10 @@ POWER_BACKWARD = None
 # NVIDIA H200 (6 November 2026, results/ideas-queue-20261106): MD step b/a 0.9954 / 0.9957 (OMAT-0 medium, SrTiO3
 # 10x10x10, abab / abba); force/stress gate as the default's (worst max-error ratio 1.016, forces).
 # NVIDIA A100-SXM4-80GB: 1.0020 / 0.9977, a tie, off.
-POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200",))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9935 / 0.9929, 0.9935 / 0.9933; left out of the
+# adopted set (after the SplineForward registry fix) 1.0125 / 1.0052, 1.0087 / 1.0074.
+POWER_BACKWARD_GPUS = GPUModels(("NVIDIA H200", "NVIDIA RTX 4000 Ada Generation"))
 FORWARD_CHUNK = 32  # edges per program of the tabled forward (edge_outer_sum.FORWARD_CHUNK)
 FORWARD_WARPS = 1
 # The tabled forward's register cap (Triton's maxnreg; None: Triton's choice). step_limiters (9 November 2026):

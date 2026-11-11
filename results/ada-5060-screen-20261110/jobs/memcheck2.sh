@@ -11,7 +11,6 @@ QUIET=2 bash $B/jobs/queue.sh true
 mkdir $B/runs/memcheck 2>/dev/null || { echo "claimed elsewhere"; exit 0; }
 hostname > $B/runs/memcheck/host
 FM=$B/src-7d18028d
-source $B/jobs/common.sh 2>/dev/null || true
 CS="$B/compute-sanitizer/compute-sanitizer --tool memcheck --leak-check no --report-api-errors no --print-limit 50 --error-exitcode 99"
 P=fastmace.kernels.triton.tabled_outer_sum:POWER_BACKWARD R=fastmace.kernels.triton.receiver_sum:RECEIVER_SUM
 s=fastmace.kernels.oeq_streaming.spline_forward w=fastmace.kernels.oeq_streaming.wprime_backward

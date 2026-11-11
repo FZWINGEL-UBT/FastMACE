@@ -418,7 +418,8 @@ def test_stage_edges_source_compiles_with_nvrtc():
 
 
 def test_stage_sh_reads_the_edge_features_from_shared_memory():
-    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB"]
+    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB",
+                                                             "NVIDIA RTX 4000 Ada Generation"]
     blocks = [(1, [0]), (3, [64])]
     kwargs = dict(vector=4, table_w=True, factored=True, scale=True, horner=True, blocks=blocks, spline=GRID)
     plain = wp.render(_schedule(), "float", 4, **kwargs)
@@ -438,7 +439,7 @@ def test_stage_sh_reads_the_edge_features_from_shared_memory():
 
 def test_wprime_stage_edges_is_off_without_a_listed_gpu():
     # on for the A100 family (Alex pack6, 8 November 2026: 0.9643 / 0.9853), off on the H200 (0.9969 / 1.0010)
-    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == ["NVIDIA A100-SXM4-80GB"]
+    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == ["NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"]
     assert "NVIDIA A100 80GB PCIe" in wp.STAGE_EDGES_GPUS and "NVIDIA H200" not in wp.STAGE_EDGES_GPUS
     assert wp.stage_edges_default("cpu") is False
 

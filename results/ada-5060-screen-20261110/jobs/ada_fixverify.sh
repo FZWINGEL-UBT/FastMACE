@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # The SplineForward registry fix (2a62a9e0) on whichever Ada is quiet first (claim on the shared home):
-# 1. compute-sanitizer memcheck around the X4 pack (ab order, SrTiO3 4x4x4 + NbCl5), as memcheck2.sh step 1;
 # 2. X4 (leave one out from set C) in both orders, full Benchmark_loup cells (the ab order crashed before the fix);
 # 3. X2 again in both orders (its ba NbCl5 cells were INVALID: another user's process on leto's GPU).
 B=/mnt/homes/zwingel/fm-ada5060
@@ -18,9 +17,5 @@ export AC_X2="--a-constant $C --b-constant $C" AC_X4="--a-constant $C --b-consta
 CS="$B/compute-sanitizer/compute-sanitizer --tool memcheck --leak-check no --report-api-errors no --print-limit 50 --error-exitcode 99"
 cd $FM && export PYTHONPATH=$FM
 note "fixverify start fastmace=$(cat .source_commit)"
-# shellcheck disable=SC2086
-$CS python tools/ab_rewrites.py --output $ROOT/pack-cs --checkpoint "$CK" --model omat0-medium \
-  --structures "$ST@4x4x4" NbCl5 --warmup 20 --block 16 --blocks 2 --order ab --pattern abab --timestep-fs 1 \
-  --a-neighbours skin=0.5 --b-neighbours skin=0.5 $AC_X4 --pack "$PACK_X4" > $ROOT/pack-cs.log 2>&1 < /dev/null
-note "end pack-cs exit=$? $(grep -m5 -hE 'Invalid|ERROR SUMMARY|illegal|by thread' $ROOT/pack-cs.log | tr '\n' ' ' | cut -c1-600)"
+# (the compute-sanitizer step is gone: 2026.2 aborts this stack on the host, runs/cs-probe)
 bash $B/jobs/ab2.sh $FM X4 X2
