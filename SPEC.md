@@ -3579,3 +3579,10 @@ CPU suite on murphy (tests/cpu) at f8ea447e with main b951e804 merged in: 5,610 
 - **Closed with records in the same merge:** half-precision far edges (`HALF_FAR`) fail NaCl's symmetric shell at every radius (F 7.1×, S 13×). Two half-systems out of phase measured 1.016.
 
 CPU suite on murphy at the merged tip 1a80d2e9 (tests/cpu): 5,613 passed, 203 skipped, 0 failed. The range-check commit after it adds one test file: 36 passed, 1 skipped, with test_layering.
+
+**Offline census of C3, C4 and C5 (11 November 2026; worker a100-colab-ideas, conductor; records only):** NVRTC builds for sm_80 and sm_90 of the production w′ and forward sources. All three stop at their bars without GPU time:
+- **C3, one spline decode for two edges:** spills on sm_90, and saves 17.9 / 7.7 / −10.4 instructions per edge and channel at the note's pairing rates, against a bar of 27.
+- **C4, staging-only joint rescaling:** about 16 instructions per edge and channel, about 97 µs on the A100 and 37 µs on the H200, against bars of 130 and 68.
+- **C5, w′ accumulators from the first product:** no drop on sm_90 (477 → 477).
+
+See `results/census-c345-20261111/`.
