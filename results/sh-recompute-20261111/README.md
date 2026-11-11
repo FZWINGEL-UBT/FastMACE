@@ -66,7 +66,15 @@ Idea 13 is in `plans/ideas-20261111-tiled-round2.md`. The conductor's stop rule 
 - **GPU test:** forces with EDGE_FORCE on match it off within 1e-4 of max |F| for the plain shuffle-down, BUTTERFLY and REDUX epilogues.
 - **Gate:** passes on every source.
 - **Time per step at 36³:** 320.0 ms off, 329.4 ms on (8dd5f605).
-- **Capacity scans (from 233,280 atoms, 40-minute budget):** both sides ended "more", so there is no limit change to report.
+- **Capacity scans (from 233,280 atoms, 40-minute budget; `step2/edgeforce-4985845/scan-*`):** both sides pass 49³ (588,245 atoms), and on both sides the 57³ and 53³ points ran into the scan's per-point timeout, so both limits lie between 49³ and 53³ and no limit change can be reported.
+
+  | Steady reserved | Off | On | Change |
+  |---|---|---|---|
+  | 36³ | 14.42 GiB | 16.12 GiB | +12 % |
+  | 42³ | 22.49 GiB | 25.20 GiB | +12 % |
+  | 49³ | 35.31 GiB | 39.69 GiB | +12 % |
+
+  At 49³ the step is 881 ms off against 1,057 ms on.
 
 ### Why memory goes up
 
