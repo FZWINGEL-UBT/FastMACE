@@ -162,10 +162,12 @@ class TileConfig:
     ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pageable host memory; each
     tile copies its rows to the device and its results back, so the device holds no per-atom state of the
     sweeps; not with ``mode="graphs"``, whose captured bodies read the state themselves).
-    ``alias_state`` (with ``state="host"``): dE/dsc takes sc's rows (a receiver's sc is read and its dE/dsc
+    ``alias_state``: dE/dsc takes sc's rows (a receiver's sc is read and its dE/dsc
     written by the same tile) and dE/dx takes x's rows atom by atom (an atom's last tile in sweep 2 is the last to
     read its x and the last to add to its dE/dx; until then the sum lives in a window of the open atoms, added in
-    the same order): bitwise the same call with two of the four state tensors.
+    the same order): bitwise the same call with two of the four state tensors. With ``state="device"`` (and the
+    wavefront: its row pool on the device) the window's rows are planned on the host after sweep 1, so the tiles
+    index the state without syncs; not in CUDA graphs, not with lanes.
     ``species``: the tiles' one-hot species rows from the field's ``node_attrs`` (``"one_hot"``) or built from
     its species index (``"index"``, bitwise the same rows): the field's device one-hot is then released to the
     host (``MACEForceField.release_node_attrs``; its own whole-system call refuses afterwards).
@@ -272,12 +274,16 @@ class TileConfig:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
         if self.species not in ("one_hot", "index"):
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
-        if self.alias_state and self.state != "host":
-            raise ValueError("TileConfig.alias_state needs state='host'")
+        if self.alias_state and self.state == "device" and (self.mode == "graphs" or self.compiled_graphs):
+            raise ValueError("TileConfig.alias_state with state='device' cannot run in CUDA graphs: the window and the "
+                             "pooled rows are indexed outside the captured bodies")
+        if self.alias_state and self.state == "device" and self.lanes == "on":
+            raise ValueError("TileConfig.alias_state with state='device' cannot run lanes='on': a tile's closing "
+                             "atoms read the window on the call's stream")
         if self.state_dtype not in (None, "auto", "bfloat16", "float16"):
             raise ValueError(f"TileConfig.state_dtype must be None, 'auto', 'bfloat16' or 'float16', got "
                              f"{self.state_dtype!r}")
-        if self.state_dtype not in (None, "auto") and not self.alias_state:
+        if self.state_dtype not in (None, "auto") and not (self.alias_state and self.state == "host"):
             raise ValueError("TileConfig.state_dtype needs alias_state=True (state='host'): every stored value is then "
                              "written once, never summed in the stored dtype")
         if self.state not in ("device", "host"):
@@ -295,7 +301,7 @@ class TileConfig:
         if self.wavefront not in ("auto", "on", "off"):
             raise ValueError(f"TileConfig.wavefront must be 'auto', 'on' or 'off', got {self.wavefront!r}")
         if self.wavefront == "on" and not self.alias_state:
-            raise ValueError("TileConfig.wavefront='on' needs alias_state=True (state='host')")
+            raise ValueError("TileConfig.wavefront='on' needs alias_state=True")
         if self.backward_chunk_scale is not None and int(self.backward_chunk_scale) < 1:
             raise ValueError(f"TileConfig.backward_chunk_scale must be positive, got {self.backward_chunk_scale!r}")
         if int(self.wavefront_group) < 1:
@@ -348,17 +354,18 @@ class _State:
         if size is not None and (pooled != self.pooled or (pooled and size < rows) or (not pooled and size != n)):
             self.tensors = {}  # allocated again at the right size from sweep 1's first outputs
         self.pooled = pooled
-        if pooled:
+        if pooled:  # the row map and free rows beside the state (the device's: no host round trip per tile)
+            where = "cpu" if self.host else self.device
             self._pool_rows = max(rows, size or 0) if self.tensors else rows
-            self._row_of = torch.full((n,), -1, dtype=torch.int32)
-            self._free_rows = torch.arange(self._pool_rows, dtype=torch.int32)
+            self._row_of = torch.full((n,), -1, dtype=torch.int32, device=where)
+            self._free_rows = torch.arange(self._pool_rows, dtype=torch.int32, device=where)
             self._rows_top = self._pool_rows
         else:
             self._row_of = None
 
     def assign(self, atoms):
         """Pooled rows for ``atoms`` (none of which has one)."""
-        atoms = atoms.cpu()
+        atoms = self._here(atoms)
         top = self._rows_top - atoms.shape[0]
         if top < 0:
             raise RuntimeError("the wavefront's row pool is exhausted (its schedule's band was underestimated)")
@@ -367,7 +374,7 @@ class _State:
 
     def release(self, atoms):
         """Return ``atoms``' pooled rows (after their sweep 3 has read them)."""
-        atoms = atoms.cpu()
+        atoms = self._here(atoms)
         rows = self._row_of[atoms]
         self._free_rows[self._rows_top:self._rows_top + rows.shape[0]] = rows
         self._rows_top += rows.shape[0]
@@ -379,8 +386,12 @@ class _State:
         reach no real output (tiled tests: padded equals eager bitwise), and a pooled row holds finite values."""
         if not self.pooled or self._storage.get(name, name) not in ("x", "sc"):
             return index
-        rows = self._row_of[index.cpu()].long()
+        rows = self._row_of[self._here(index)].long()
         return rows.clamp_(min=0) if read else rows
+
+    def _here(self, index):
+        """``index`` where the state is (an atom index from the host or the device)."""
+        return index.cpu() if self.host else index.to(self.device, non_blocking=True)
 
     def touched(self, first, last):
         """The wavefront's search pass recorded each atom's first and last tile (``touch`` of sweep 1 without it)."""
@@ -452,7 +463,7 @@ class _State:
             return fetched
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
-            return tensor[index]
+            return tensor[self._rows_of(name, index, read=True)]
         self.settle()
         index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
@@ -478,14 +489,16 @@ class _State:
     def put(self, name, index, values):
         """``state[name][index] = values``."""
         if not self.host:
-            self.tensors[self._storage.get(name, name)][index] = values
+            self.tensors[self._storage.get(name, name)][self._rows_of(name, index)] = values
         else:
             self._defer("put", name, self._rows_of(name, index), values.detach().to(self.store))
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
-        if not self.host:
-            self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
+        if not self.host and self.alias and name == "gx":  # the window rows planned for the call (``plan``)
+            self._window.index_add_(0, self._slot_of[self._here(index)], values)
+        elif not self.host:
+            self.tensors[self._storage.get(name, name)].index_add_(0, self._rows_of(name, index), values)
         else:
             stored = name != "gx" or not self.alias  # aliased dE/dx: summed in the window, in the call's dtype
             self._defer("add", name, self._rows_of(name, index) if name != "gx" else index,
@@ -621,11 +634,38 @@ class _State:
         # During tile t: the atoms open after it plus those it closes.
         size = int((torch.cumsum(opened - closed, 0) + closed).max().item())
         del last, order, opened, closed
+        if not self.host:  # the state on the device: every atom's window row planned here, read without syncs
+            self._plan_slots(tiles, size)
         # Read no more this call (8 bytes per atom on the host); the next call's touches start new ones.
         self._first = self._last = None
-        self._window = torch.zeros((size, self._width), dtype=self.dtype)
+        self._window = torch.zeros((size, self._width), dtype=self.dtype, device="cpu" if self.host else self.device)
         self._free = torch.arange(size, dtype=torch.int32)
         self._top = size
+
+    def _plan_slots(self, tiles, size):
+        """The aliased state on the device: each atom's window row, taken at its first tile of sweep 2 and returned
+        after its last (sweep 2 visits the tiles in their order, as ``plan``'s window size assumes), planned on the
+        host once; the rows and the closing atoms then on the device. (The host state takes them as writes arrive.)"""
+        import torch
+
+        first = self._first.long()
+        opening = torch.split(torch.sort(first, stable=True).indices.to(torch.int32),
+                              torch.bincount(first, minlength=tiles).tolist())
+        slots = torch.full((first.shape[0],), -1, dtype=torch.int32)
+        free, top = torch.arange(size, dtype=torch.int32), size
+        for tile in range(tiles):
+            atoms = opening[tile]
+            if atoms.numel():
+                slots[atoms] = free[top - atoms.numel():top]
+                top -= atoms.numel()
+            atoms = self._closing[tile]
+            if atoms.numel():
+                free[top:top + atoms.numel()] = slots[atoms]
+                top += atoms.numel()
+        del first, opening, free
+        counts = [int(atoms.numel()) for atoms in self._closing]
+        self._slot_of = slots.to(self.device)
+        self._closing = torch.split(torch.cat(list(self._closing)).to(self.device), counts)
 
     def close(self, tile):
         """After tile ``tile`` of sweep 2: its closing atoms' dE/dx is final; it takes their rows of x (after the
@@ -637,7 +677,11 @@ class _State:
 
     def _close_now(self, tile):
         atoms = self._closing[tile]
-        if atoms.numel():
+        if atoms.numel() and not self.host:  # the planned rows: zeroed for the atoms that take them next
+            slots = self._slot_of[atoms]
+            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots]
+            self._window[slots] = 0
+        elif atoms.numel():
             slots = self._slot_of[atoms]
             self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots].to(self.store)
             self._free[self._top:self._top + slots.numel()] = slots
@@ -2309,6 +2353,9 @@ class TiledForceField:
         if config == "off":
             self.lanes_state = "off"
             return False
+        if self.config.alias_state and self.config.state == "device" and self.device.type == "cuda":
+            self.lanes_state = "off: the aliased device state reads its window on the call's stream"
+            return False
         if not padded or self._captured():
             self.lanes_state = f"off: {self.mode} tiles" + (" in CUDA graphs" if self.mode == "compiled" else "")
             return False
@@ -2543,6 +2590,8 @@ class TiledForceField:
             return False
         if config.wavefront == "on":
             return True
+        if config.state == "device":  # "auto" decides on the host's memory; the device pool runs with "on"
+            return False
         # "auto": only where the plain state (x and sc, and the alias window, about a quarter more) would leave the
         # host below the floor: the schedule costs about 3 % of a call (its search pass; 5M SrTiO3, both Ada GPUs).
         # Decided on the first call at an atom count, then kept.

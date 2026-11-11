@@ -573,9 +573,34 @@ def test_aliased_host_state_is_bitwise_the_host_state(names, mode):
         assert np.array_equal(plain[1], aliased[1]) and np.array_equal(plain[2], aliased[2])
 
 
-def test_aliased_state_needs_the_host_state():
-    with pytest.raises(ValueError, match="alias_state"):
-        TileConfig(5, alias_state=True)
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_aliased_device_state_is_bitwise_the_device_state(mode):
+    """``alias_state`` with ``state="device"``: the window's rows planned after sweep 1 (``_plan_slots``) hold the
+    same sums as dE/dx's own rows, so the call is bitwise the plain device state's, with two of the four tensors."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    results, sizes = [], []
+    for alias in (False, True):
+        tiled = TiledForceField(field, TileConfig(5, mode=mode, state="device", alias_state=alias))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        for current in (strained(atoms), atoms):
+            results.append(tiled.evaluate(current, stress=True))
+        sizes.append(sorted(tiled._g["state"].tensors))
+    assert sizes == [["gsc", "gx", "sc", "x"], ["sc", "x"]]
+    for plain, aliased in zip(results[:2], results[2:]):
+        assert plain[0] == aliased[0]
+        assert np.array_equal(plain[1], aliased[1]) and np.array_equal(plain[2], aliased[2])
+
+
+def test_aliased_device_state_refuses_graphs_and_lanes():
+    with pytest.raises(ValueError, match="CUDA graphs"):
+        TileConfig(5, mode="graphs", alias_state=True)
+    with pytest.raises(ValueError, match="CUDA graphs"):
+        TileConfig(5, mode="compiled", alias_state=True, compiled_graphs=True)
+    with pytest.raises(ValueError, match="lanes"):
+        TileConfig(5, mode="padded", alias_state=True, lanes="on")
+    TileConfig(5, mode="padded", alias_state=True, wavefront="on")
 
 
 # ---------------------------------------------------------------- the tile lists built once per call
@@ -860,8 +885,9 @@ def test_wavefront_schedule_runs_every_sweep_once_after_what_it_reads(group):
 
 
 @pytest.mark.parametrize("mode, group", [("eager", 1), ("padded", 1), ("padded", 3)])
-@pytest.mark.parametrize("overlap", [False, True], ids=["immediate", "deferred"])
-def test_wavefront_call_equals_the_three_sweep_call(mode, group, overlap):
+@pytest.mark.parametrize("overlap, state", [(False, "host"), (True, "host"), (False, "device")],
+                         ids=["immediate", "deferred", "device"])
+def test_wavefront_call_equals_the_three_sweep_call(mode, group, overlap, state):
     """``TileConfig.wavefront``: the pooled rows hold bitwise the state of the three plain sweeps, so the node
     energies (and the energy) are bitwise; the forces and the stress are the same sums in another order. The pool
     holds fewer rows than atoms, and the lists of a tile are dropped after its sweep 3."""
@@ -870,7 +896,7 @@ def test_wavefront_call_equals_the_three_sweep_call(mode, group, overlap):
                            rewrites=only(*MH1_PACKAGE))
     results = []
     for wave in ("off", "on"):
-        tiled = TiledForceField(field, TileConfig(12, mode=mode, neighbours="tiles", state="host", alias_state=True,
+        tiled = TiledForceField(field, TileConfig(12, mode=mode, neighbours="tiles", state=state, alias_state=True,
                                                   overlap=overlap, wavefront=wave, wavefront_group=group,
                                                   list_reuse=False, boundary_skin=False))
         tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
@@ -1652,6 +1678,8 @@ def test_state_dtype_needs_the_aliased_host_state():
     with pytest.raises(ValueError, match="alias_state"):
         TileConfig(5, state="host", state_dtype="bfloat16")
     TileConfig(5, state="host", alias_state=True, state_dtype="float16")
+    with pytest.raises(ValueError, match="state_dtype"):
+        TileConfig(5, alias_state=True, state_dtype="float16")  # the device state is never stored in 16 bits
 
 
 def test_graph_cache_budget_leaves_the_tiles_workspace_and_stays_out_of_a_measured_call(monkeypatch):
