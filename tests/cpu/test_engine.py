@@ -474,6 +474,43 @@ def test_allocator_must_be_set_before_the_first_allocation():
                                        torch_version="2.14.1") == "default"
 
 
+def test_allocator_check_skips_arena_pools():
+    """A capture arena's pool (a pluggable allocator) never has expandable segments; only its own segments are
+    exempt, and an exempt pool does not hide a late setting elsewhere."""
+    on = EngineConfig(expandable_segments="on")
+    environ = {"PYTORCH_CUDA_ALLOC_CONF": constraints.EXPANDABLE}
+    expandable = {"is_expandable": True, "segment_pool_id": (0, 0)}
+    arena = {"is_expandable": False, "segment_pool_id": (1, 7)}
+    other = {"is_expandable": False, "segment_pool_id": (1, 8)}
+    assert constraints.check_allocator(on, [expandable, arena], environ,
+                                       exempt_pools=[(1, 7)]) == constraints.EXPANDABLE
+    assert constraints.check_allocator(on, [expandable, arena], environ,
+                                       exempt_pools={(1, 7)}) == constraints.EXPANDABLE
+    with pytest.raises(constraints.ProcessConstraintError, match="1 of 3 allocator segments"):
+        constraints.check_allocator(on, [expandable, arena, other], environ, exempt_pools=[(1, 7)])
+    with pytest.raises(constraints.ProcessConstraintError, match="after the first CUDA allocation"):
+        constraints.check_allocator(on, [expandable, arena], environ)  # not registered: refused as before
+
+
+def test_check_engine_passes_the_records_arena_pools(monkeypatch):
+    seen = {}
+
+    def check(config, segments, environ=None, torch_version=None, exempt_pools=()):
+        seen["exempt"] = set(exempt_pools)
+        return "checked"
+
+    monkeypatch.setattr(constraints, "check_allocator", check)
+    monkeypatch.setattr(constraints, "check_polar_reset", lambda field: None)
+    monkeypatch.setattr(constraints, "check_receiver_sorting", lambda field: None)
+    monkeypatch.setattr(constraints, "compile_family", lambda field: None)
+    record = constraints.ProcessRecord()
+    assert record.arena_pools == set()
+    record.arena_pools.add((1, 7))
+    facts = constraints.check_engine(EngineConfig(), object(), record=record, segments=[],
+                                     dynamo_config=SimpleNamespace(cache_size_limit=8))
+    assert facts["allocator"] == "checked" and seen["exempt"] == {(1, 7)}
+
+
 class _SortedField:
     def __init__(self, receivers, streaming=2, sort=True):
         self.receivers = torch.tensor(receivers)

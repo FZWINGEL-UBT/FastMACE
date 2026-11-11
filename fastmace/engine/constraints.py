@@ -64,6 +64,9 @@ class ProcessRecord:
     # Reproducible or not (SPEC §8.7, owner decision 14): None until the first engine is built.
     reproducible: bool | None = None
     reproducible_owner: str | None = None
+    # Graph pools served by a pluggable allocator (the capture arena): their segments are never expandable, so the
+    # allocator check skips them. Ids as ``torch.cuda.MemPool.id`` (tuples).
+    arena_pools: set = field(default_factory=set)
 
     def claim_reproducible(self, reproducible: bool, owner: str) -> None:
         """Record whether this process is reproducible; refuse the other kind once one is recorded."""
@@ -120,12 +123,13 @@ def wants_expandable_segments(config, environ: Mapping[str, str] | None = None,
 
 
 def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
-                    torch_version: str | None = None) -> str:
+                    torch_version: str | None = None, exempt_pools=()) -> str:
     """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
 
     ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
     segment of an allocator with expandable segments is expandable; one that is not means the
-    variable was set after the first CUDA allocation (or not at all).
+    variable was set after the first CUDA allocation (or not at all). Segments of the pools in
+    ``exempt_pools`` (a capture arena's pluggable-allocator pool, never expandable) are skipped.
     """
     if segments is None:
         return "cpu"
@@ -137,7 +141,9 @@ def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: M
             f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
             f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
             "(fastmace.model.compile.configure_allocator), and it is not set")
-    fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+    exempt = {tuple(pool) for pool in exempt_pools}
+    fixed = [segment for segment in segments if not segment.get("is_expandable", False)
+             and tuple(segment.get("segment_pool_id") or ()) not in exempt]
     if fixed:
         raise ProcessConstraintError(
             f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
@@ -195,7 +201,7 @@ def check_engine(config, force_field, *, record: ProcessRecord | None = None, ow
     claimed last, after every other check has passed.
     """
     record = PROCESS if record is None else record
-    facts = {"allocator": check_allocator(config, segments),
+    facts = {"allocator": check_allocator(config, segments, exempt_pools=record.arena_pools),
              "dynamo_cache_size_limit": ensure_dynamo_cache_limit(config, dynamo_config)}
     check_polar_reset(force_field)
     check_receiver_sorting(force_field)
