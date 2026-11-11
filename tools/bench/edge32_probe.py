@@ -45,11 +45,12 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducib
     start.set_pbc(True)
     thermalize(start, 300.0, 20261110)
     model = fm.load(model_label)
-    saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), gpu=torch.cuda.get_device_name(),
-                             reproducible=reproducible, model=model_label)
+    # Nothing touches CUDA before the first Simulation: a reproducible plan then runs in this process (the planner
+    # moves it to a child once CUDA is initialised, and a child would not see this process's module constants).
+    saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), reproducible=reproducible, model=model_label)
     # One-off evaluations at the start positions, twice in this process: no trajectory in between, so off/on and
     # off/off2 compare the force field's own reproducibility (the MD end states also carry the trajectories' drift).
-    single = fm.ForceField(model, start.copy(), precision="float32")
+    single = None if reproducible else fm.ForceField(model, start.copy(), precision="float32")
     for k in range(0 if reproducible else 2):
         energy, forces, stress = single.evaluate(start, stress=True)
         saved[f"single{k}.energy"] = torch.tensor([energy], dtype=torch.float64)
@@ -64,10 +65,15 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducib
         field = fm.ForceField(model, atoms, precision="float32")
         extra = dict(workload=fm.Workload(max_temperature_K=300.0, reproducible=True)) if reproducible else {}
         sim = fm.Simulation(atoms, field, seed=20261110, integrator=integrator, **extra)
+        record[f"{label}_runner"] = sim.plan.runner
         torch.cuda.reset_peak_memory_stats()
         sim.run(steps=steps)
         torch.cuda.synchronize()
-        state = sim._engine.state
+        committed = sim.committed()  # public: also in a reproducible plan, whose engine runs in a child process
+        for key in ("positions", "forces", "energy", "stress", "cell"):
+            value = getattr(committed, key, None)
+            if value is not None:
+                saved[f"{label}.{key}"] = torch.as_tensor(value).clone()
         import gc
 
         dtype = set()
@@ -78,14 +84,11 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducib
             except ReferenceError:
                 continue
         dtype = sorted(dtype)
-        for key in ("positions", "forces", "energy", "stress", "cell"):
-            value = getattr(state, key, None)
-            if value is not None:
-                saved[f"{label}.{key}"] = value.detach().cpu().clone()
         record[label] = dict(peak_reserved_gib=torch.cuda.max_memory_reserved() / 2**30, edge_index_dtype=dtype,
                              plan=sim.plan.describe().splitlines()[2:4])
         del sim, field
         torch.cuda.empty_cache()
+    record["gpu"] = torch.cuda.get_device_name()
     torch.save(saved, out / f"edge32-{side}{tag}.pt")
     print(json.dumps(record))
 
