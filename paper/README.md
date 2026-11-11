@@ -33,7 +33,9 @@ build outputs are ignored by `paper/.gitignore`.
   float32 call, step times for other models, table sizes and test ratios, setup times, software versions.
 - **Presentation.** A contributions list, an algorithm listing for the reverse kernel, three new figures (MD step,
   wavefront, stage breakdown), an expanded related-work section, an appendix of records.
-- **Bibliography.** 36 entries, each marked VERIFIED, SECONDARY or UNVERIFIED in `references.bib`.
+- **Bibliography.** 36 entries, each marked VERIFIED, SECONDARY or UNVERIFIED in `references.bib`. Copies of the
+  references were added afterwards in `references/` (owner request of 11 November 2026), and TorchSim and the
+  ALCHEMI Toolkit got the citations their projects ask for.
 
 ## Where the numbers come from
 
@@ -72,10 +74,16 @@ measured for the paper. Appendix A of the paper has the same list with source re
 - **A consolidated benchmark** of one revision on all four GPUs.
 - **Author list, affiliation, acknowledgements, release plan.** Marked `TODO (owner)` in `main.tex`. The author
   and affiliation there are taken from the commit identity and need confirming.
-- **Bibliography.** Seven entries are still UNVERIFIED (PyTorch 2, Triton, the Trefethen book, the SC '23 paper,
-  TorchSim, ALCHEMI) or SECONDARY (LAMMPS); the publisher pages could not be read. Three more have verified
-  arXiv data and journal fields from secondary sources only (MACE-MP-0 in J. Chem. Phys., MACE-OFF in JACS, the
-  NequIP infrastructure paper in Digital Discovery).
+- **Bibliography.** Titles and authors of all 36 entries are now confirmed, most of them from the downloaded
+  copies in `references/`. What is still unconfirmed are publication details whose publisher pages could not be
+  read: the proceedings names and DOIs of PyTorch 2, Triton and the SC '23 paper, the publisher and year of the
+  Trefethen book, the LAMMPS entry (secondary source), and the journal fields of MACE-MP-0 (J. Chem. Phys.),
+  MACE-OFF (JACS) and the NequIP infrastructure paper (Digital Discovery).
+- **Reference copies.** `references/` holds a copy of 28 of the 29 papers that could be had free and legally,
+  plus README and citation snapshots of the software references; `references/README.md` lists the source and
+  checksum of each. Three decisions are open there: the 84 MB PDF of the MACE foundation-model paper is
+  downloaded but not committed; the LAMMPS paper (open access) has to be fetched in a browser; Drautz's Phys. Rev.
+  B paper is paywalled. Check the licences before the repository becomes public.
 - **Provenance.** `docs/current/omat0-a100.md` stops at 8 November and lists eight parts with no recorded origin
   (its §7). Table 12 marks three of them "not recorded". The LLM research reports are credited generically; decide
   how to name them.

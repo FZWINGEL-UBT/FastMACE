@@ -6,6 +6,8 @@
 %   SECONDARY   fields agree between two independent secondary sources (for example another paper's reference
 %               list and a project README), but the publisher page could not be read.
 %   UNVERIFIED  from memory or from one secondary source only. Check before submission.
+%
+% Copies of the references are in paper/references/ (see its README.md for the source of each file).
 
 @inproceedings{batatia2022mace,
   title     = {{MACE}: Higher Order Equivariant Message Passing Neural Networks for Fast and Accurate Force Fields},
@@ -66,7 +68,8 @@
   number  = {1},
   pages   = {2453},
   year    = {2022},
-  doi     = {10.1038/s41467-022-29939-5}
+  doi     = {10.1038/s41467-022-29939-5},
+  note    = {arXiv:2101.03164}
 }
 % VERIFIED (the NequIP repository's CITATION.bib; DOI and authors match arXiv:2101.03164)
 
@@ -75,10 +78,11 @@
   author    = {Musaelian, Albert and Johansson, Anders and Batzner, Simon and Kozinsky, Boris},
   booktitle = {Proceedings of the International Conference for High Performance Computing, Networking, Storage and Analysis (SC '23)},
   year      = {2023},
-  doi       = {10.1145/3581784.3627041}
+  doi       = {10.1145/3581784.3627041},
+  note      = {arXiv:2304.10061}
 }
-% UNVERIFIED: the ACM page could not be read. DOI and author order are from the NequIP README; the same
-% repository's CITATION.bib lists the authors in a different order.
+% Title and author order: VERIFIED (first page of arXiv:2304.10061, saved in references/).
+% DOI: from the NequIP README; the ACM page could not be read.
 
 @inproceedings{bharadwaj2025oeq,
   title     = {An Efficient Sparse Kernel Generator for {O(3)}-Equivariant Deep Networks},
@@ -112,10 +116,12 @@
 @misc{cudagraphs,
   title        = {{CUDA} {C++} Programming Guide: {CUDA} Graphs},
   author       = {{NVIDIA}},
-  howpublished = {Documentation, \url{https://docs.nvidia.com/cuda/cuda-c-programming-guide/}},
+  howpublished = {Documentation, \url{https://docs.nvidia.com/cuda/cuda-programming-guide/}},
   year         = {2026}
 }
-% VERIFIED (table of contents of the guide; the subsection itself was not read)
+% VERIFIED (the section is at .../cuda-programming-guide/04-special-topics/cuda-graphs.html, which answers; the
+% older cuda-c-programming-guide address redirects to this guide).
+% Not downloaded: vendor documentation, link only.
 
 @article{ootomo2022tf32,
   title   = {Recovering single precision accuracy from Tensor Cores while surpassing the {FP32} theoretical peak performance},
@@ -125,7 +131,8 @@
   number  = {4},
   pages   = {475--491},
   year    = {2022},
-  doi     = {10.1177/10943420221090256}
+  doi     = {10.1177/10943420221090256},
+  note    = {arXiv:2203.03341}
 }
 % VERIFIED (Crossref record)
 
@@ -148,7 +155,8 @@
   number  = {9},
   pages   = {5559--5567},
   year    = {2022},
-  doi     = {10.1021/acs.jctc.2c00102}
+  doi     = {10.1021/acs.jctc.2c00102},
+  note    = {arXiv:2107.02103}
 }
 % VERIFIED (Crossref record)
 
@@ -156,17 +164,21 @@
   title     = {{PyTorch} 2: Faster Machine Learning Through Dynamic {Python} Bytecode Transformation and Graph Compilation},
   author    = {Ansel, Jason and others},
   booktitle = {Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS '24)},
-  year      = {2024}
+  year      = {2024},
+  doi       = {10.1145/3620665.3640366}
 }
-% UNVERIFIED: the ACM page could not be read.
+% Title and first author: VERIFIED (first page of the copy hosted by the PyTorch project, saved in references/).
+% Proceedings name and DOI: UNVERIFIED (the ACM page could not be read).
 
 @inproceedings{tillet2019triton,
   title     = {Triton: an intermediate language and compiler for tiled neural network computations},
   author    = {Tillet, Philippe and Kung, H. T. and Cox, David},
   booktitle = {Proceedings of the 3rd ACM SIGPLAN International Workshop on Machine Learning and Programming Languages (MAPL)},
-  year      = {2019}
+  year      = {2019},
+  doi       = {10.1145/3315508.3329973}
 }
-% UNVERIFIED: the ACM page could not be read.
+% Title and authors: VERIFIED (first page of the author-hosted copy, saved in references/).
+% Proceedings name and DOI: UNVERIFIED (the ACM page could not be read).
 
 @article{larsen2017ase,
   title   = {The atomic simulation environment---a {Python} library for working with atoms},
@@ -210,7 +222,8 @@
   publisher = {SIAM},
   year      = {2013}
 }
-% UNVERIFIED: the SIAM page could not be read.
+% Title and author: VERIFIED (the author's free excerpt of the first six chapters, saved in references/).
+% Publisher and year: UNVERIFIED (the SIAM page could not be read).
 
 @article{chorosajev2026sobek,
   title   = {Sobek: Streaming Equivariant Tensor Product Convolutions},
@@ -226,8 +239,8 @@
   howpublished = {OpenEquivariance pull request 223, \url{https://github.com/PASSIONLab/OpenEquivariance/pull/223}},
   year         = {2026}
 }
-% VERIFIED (pull-request page: title, year, state open). The page shows the GitHub user name pl-fuchs, not the
-% full name.
+% VERIFIED (GitHub API on 11 November 2026: title, opened 15 September 2026, state open, author pl-fuchs with the
+% public name Paul Fuchs). The patch is saved in references/.
 
 @article{fu2026symmetrixxl,
   title   = {Train for Accuracy, Execute at Scale: Architecture-Preserving Inference for Equivariant Atomistic Foundation Models},
@@ -245,21 +258,27 @@
 }
 % VERIFIED (repository page)
 
-@misc{torchsim,
-  title        = {{TorchSim}: an atomistic simulation engine in {PyTorch}},
-  author       = {{Radical AI}},
-  howpublished = {Software, package \texttt{torch-sim-atomistic}, version 0.6.2},
-  year         = {2026}
+@article{torchsim,
+  title   = {{TorchSim}: An efficient atomistic simulation engine in {PyTorch}},
+  author  = {Cohen, Orion and Riebesell, Janosh and Goodall, Rhys and Kolluru, Adeesh and Falletta, Stefano and Krause, Joseph and Colindres, Jorge and Ceder, Gerbrand and Gangan, Abhijeet S.},
+  journal = {AI for Science},
+  volume  = {1},
+  number  = {2},
+  pages   = {025003},
+  year    = {2025},
+  doi     = {10.1088/3050-287X/ae1799},
+  note    = {arXiv:2508.06628. Software version 0.6.2 used here}
 }
-% UNVERIFIED: no primary page was reached. Add the project's preferred citation.
+% VERIFIED (the citation the project's README asks for; title and authors match the first page of
+% arXiv:2508.06628v1; README, citation file and preprint saved in references/). The publisher page was not read.
 
 @misc{alchemi,
   title        = {{ALCHEMI} Toolkit},
   author       = {{NVIDIA}},
-  howpublished = {Software, version 0.2.0},
+  howpublished = {Software, version 0.2.0 used here. \url{https://github.com/NVIDIA/nvalchemi-toolkit}},
   year         = {2026}
 }
-% UNVERIFIED: no primary page was reached. Add the project's preferred citation.
+% VERIFIED (repository page and PyPI record of nvalchemi-toolkit; the project names no paper to cite).
 
 @inproceedings{lee2025flashtp,
   title     = {{FlashTP}: Fused, Sparsity-Aware Tensor Product for Machine Learning Interatomic Potentials},
@@ -307,7 +326,8 @@
   number  = {11},
   pages   = {4857--4868},
   year    = {2024},
-  doi     = {10.1021/acs.jctc.4c00190}
+  doi     = {10.1021/acs.jctc.4c00190},
+  note    = {arXiv:2402.03789}
 }
 % VERIFIED (Crossref record)
 
@@ -358,6 +378,7 @@
   number  = {11},
   pages   = {114801},
   year    = {2022},
-  doi     = {10.1063/5.0106617}
+  doi     = {10.1063/5.0106617},
+  note    = {arXiv:2205.10046}
 }
 % VERIFIED (Crossref record; 20 authors, first ten listed)
