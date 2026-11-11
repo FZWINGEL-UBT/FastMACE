@@ -2079,3 +2079,22 @@ def test_released_species_maps_are_uint8_with_the_same_values():
         assert torch.equal(field._species_index.long(), species)
         assert torch.equal(field._sender_groups.long(), groups)
         assert torch.equal(field.node_e0(), e0)
+
+
+def test_large_caps_join_a_default_budget_of_host_state_calls_only(monkeypatch):
+    """``TILE_LARGE_CAPS`` (B3): a host-state call with the default budget may take caps 32,768 and 65,536 (where the
+    budget fits them); an explicit budget, the device state and the switch off leave the budget as it was."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", True)
+    large = (8192, 16384, 32768, 65536)
+    assert TiledForceField(field, TileConfig(5, mode="auto", state="host")).config.budget_receivers == large
+    assert TiledForceField(field, TileConfig(5, mode="auto")).config.budget_receivers == (8192, 16384)
+    explicit = TileConfig(5, mode="auto", state="host", budget_receivers=(8192,))
+    assert TiledForceField(field, explicit).config.budget_receivers == (8192,)
+    assert TiledForceField(field, TileConfig(5, mode="padded", state="host")).config.budget_receivers == ()
+    monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", None)  # on the CPU: not an A100
+    assert TiledForceField(field, TileConfig(5, mode="auto", state="host")).config.budget_receivers == (
+        8192, 16384)
