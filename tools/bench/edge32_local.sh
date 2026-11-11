@@ -23,9 +23,9 @@ cd "$OUT"
   "$PY" "$S" compare "$OUT/edge32-off.pt" "$OUT/edge32-on.pt"; echo "compare exit=$?"
   "$PY" "$S" compare "$OUT/edge32-off.pt" "$OUT/edge32-off2.pt"; echo "control exit=$?"
   fi
-  "$PY" "$S" run "$OUT" --side off --repeat "$REPEAT" --reproducible --tag r; echo "off r exit=$?"
-  "$PY" "$S" run "$OUT" --side on --repeat "$REPEAT" --reproducible --tag r; echo "on r exit=$?"
-  "$PY" "$S" run "$OUT" --side off --repeat "$REPEAT" --reproducible --tag r2; echo "off r2 exit=$?"
+  "$PY" "$S" run "$OUT" --side off --repeat "$REPEAT" --reproducible --model mh1 --tag r; echo "off r exit=$?"
+  "$PY" "$S" run "$OUT" --side on --repeat "$REPEAT" --reproducible --model mh1 --tag r; echo "on r exit=$?"
+  "$PY" "$S" run "$OUT" --side off --repeat "$REPEAT" --reproducible --model mh1 --tag r2; echo "off r2 exit=$?"
   "$PY" "$S" compare "$OUT/edge32-offr.pt" "$OUT/edge32-onr.pt"; echo "reproducible compare exit=$?"
   "$PY" "$S" compare "$OUT/edge32-offr.pt" "$OUT/edge32-offr2.pt"; echo "reproducible control exit=$?"
 } > "$OUT/edge32.log" 2>&1

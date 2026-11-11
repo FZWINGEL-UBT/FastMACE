@@ -24,7 +24,8 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parent.parent
 
 
-def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducible: bool = False) -> None:
+def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducible: bool = False,
+        model_label: str = "omat0-medium") -> None:
     from fastmace.model.compile import configure_allocator
 
     configure_allocator(enabled=True)
@@ -43,9 +44,9 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducib
     start = cell.repeat(tuple(int(n) for n in repeat.lower().split("x")))
     start.set_pbc(True)
     thermalize(start, 300.0, 20261110)
-    model = fm.load("omat0-medium")
+    model = fm.load(model_label)
     saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), gpu=torch.cuda.get_device_name(),
-                             reproducible=reproducible)
+                             reproducible=reproducible, model=model_label)
     # One-off evaluations at the start positions, twice in this process: no trajectory in between, so off/on and
     # off/off2 compare the force field's own reproducibility (the MD end states also carry the trajectories' drift).
     single = fm.ForceField(model, start.copy(), precision="float32")
@@ -113,6 +114,7 @@ def main(argv=None):
     r.add_argument("--side", choices=("off", "on"), required=True)
     r.add_argument("--repeat", default="10x10x10")
     r.add_argument("--steps", type=int, default=20)
+    r.add_argument("--model", default="omat0-medium", help="label; reproducible plans qualify for MH-1 only")
     r.add_argument("--reproducible", action="store_true",
                    help="plan with fm.Workload(reproducible=True): bitwise across processes, so off/on is exact")
     r.add_argument("--tag", default="", help="file suffix (a repeat of one side: the run-to-run control)")
@@ -122,7 +124,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     if args.cmd == "run":
         args.out.mkdir(parents=True, exist_ok=True)
-        run(args.out, args.side, args.repeat, args.steps, args.tag, args.reproducible)
+        run(args.out, args.side, args.repeat, args.steps, args.tag, args.reproducible, args.model)
     else:
         compare(args.a, args.b)
 
