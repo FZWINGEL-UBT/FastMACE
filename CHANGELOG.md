@@ -20,6 +20,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   the generic family (OMAT-0) on these GPUs and every A100 (owner, 4 November 2026).
 
 ### Changed
+- Idea 11 (11 November 2026, conductor): float32 calls far from the origin keep float64 edge vectors, by size. On a
+  float32 model whose extent (largest |coordinate| of positions and cell corners) reaches 64 A,
+  `forces.WHOLE_SYSTEM_FLOAT64_EDGES` corrects the whole-system edge vectors to the float64 ones (the stress strains
+  the edges) and `tiled.TILE_LOCAL_FRAME` builds each tile's edge vectors in tile-local coordinates (float32 high and
+  low halves, exact differences). The perfect crystal's largest force at +1,500 A falls from 1.33e-3 to 2-5e-6 eV/A
+  (the 149M/320M capacity records' 1.32e-3). Smaller structures and float64 models are unchanged. Cost where on:
+  whole system 1.5 % with stress; tiles about 1 % (RTX 5060 Ti), A100PENDING (A100). Gate 3x passed.
 - Decision-66 GPU lists (`kernels/gpu_models.GPUModels`): an A100 entry stands for every A100 model, so the
   A100-SXM4-40GB and A100-PCIE-40GB take the A100 defaults (owner, 4 November 2026).
 

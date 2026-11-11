@@ -1,0 +1,94 @@
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                                  Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+         autograd::engine::evaluate_function: CompiledFunctionBackward         0.01%      11.461us         2.94%       5.464ms       5.464ms       0.000us         0.00%      90.498ms      90.498ms             1  
+                                              CompiledFunctionBackward         0.07%     129.166us         2.93%       5.452ms       5.452ms       0.000us         0.00%      90.498ms      90.498ms             1  
+## Call CompiledFxGraph fm22zburqyguagilzyfbgf5j6qloe4awgd26x6dlopu...         0.96%       1.789ms         2.83%       5.254ms       5.254ms     641.086us         0.35%      90.441ms      90.441ms             1  
+                                            Torch-Compiled Region: 6/1         0.06%     119.191us         4.51%       8.380ms       8.380ms       0.000us         0.00%      90.188ms      90.188ms             1  
+                                                      CompiledFunction         0.09%     158.956us         4.41%       8.195ms       8.195ms       0.000us         0.00%      90.188ms      90.188ms             1  
+## Call CompiledFxGraph f6xv2ghos4arsdaxmiuajzozd7v6fd6uhatvyartxtl...         1.66%       3.084ms         4.32%       8.036ms       8.036ms     592.164us         0.33%      90.188ms      90.188ms             1  
+                                 fastmace::fused_folded_message_blocks         0.06%     103.605us         0.09%     176.394us     176.394us      48.501ms        26.84%      48.501ms      48.501ms             1  
+                                                  fused_folded_forward         0.00%       0.000us         0.00%       0.000us       0.000us      48.501ms        26.84%      48.501ms      48.501ms             1  
+                       fastmace::streaming_conv_wprime_backward_blocks         0.07%     135.682us         0.10%     178.068us     178.068us      44.137ms        24.42%      44.366ms      44.366ms             1  
+                                         oeq_projected_backward_wprime         0.00%       0.000us         0.00%       0.000us       0.000us      44.137ms        24.42%      44.137ms      44.137ms             1  
+                                                              aten::mm         0.33%     608.031us         0.47%     868.544us      20.199us      19.657ms        10.88%      19.657ms     457.144us            43  
+void cutlass::Kernel2<cutlass_80_simt_sgemm_128x64_8x5_nn_align1>(c...         0.00%       0.000us         0.00%       0.000us       0.000us      15.079ms         8.34%      15.079ms     502.642us            30  
+                                                                kernel         0.00%       0.000us         0.00%       0.000us       0.000us       9.330ms         5.16%       9.330ms       4.665ms             2  
+                                            cuequivariance::uniform_1d         2.00%       3.723ms         2.08%       3.863ms     965.712us       5.811ms         3.22%       5.811ms       1.453ms             4  
+                                                  fastmace::species_mm         0.43%     804.955us         0.50%     934.967us      93.497us       5.751ms         3.18%       5.751ms     575.100us            10  
+                                                                  gemm         0.00%       0.000us         0.00%       0.000us       0.000us       5.751ms         3.18%       5.751ms     575.100us            10  
+                                   fastmace::tabled_outer_sum_backward         0.06%     116.059us         0.08%     148.616us     148.616us       5.638ms         3.12%       5.638ms       5.638ms             1  
+                                    fastmace::tabled_outer_sum_forward         0.06%     116.150us         0.10%     179.320us     179.320us       3.692ms         2.04%       4.845ms       4.845ms             1  
+                                      segmented_polynomial_bwd_algo1_4         0.00%       0.000us         0.00%       0.000us       0.000us       3.864ms         2.14%       3.864ms       1.932ms             2  
+void magma_sgemmEx_kernel<float, float, float, true, false, 6, 4, 6...         0.00%       0.000us         0.00%       0.000us       0.000us       3.087ms         1.71%       3.087ms     771.849us             4  
+           triton_red_fused_add_div_mul_neg_slice_backward_sum_view_15         0.01%      12.816us         0.01%      20.135us      20.135us       2.697ms         1.49%       2.697ms       2.697ms             1  
+           triton_red_fused_add_div_mul_neg_slice_backward_sum_view_15         0.00%       0.000us         0.00%       0.000us       0.000us       2.697ms         1.49%       2.697ms       2.697ms             1  
+triton_poi_fused_add_expand_gather_slice_backward_tabled_outer_sum_...         0.00%       6.079us         0.01%      10.804us      10.804us       2.650ms         1.47%       2.650ms       2.650ms             1  
+triton_poi_fused_add_expand_gather_slice_backward_tabled_outer_sum_...         0.00%       0.000us         0.00%       0.000us       0.000us       2.650ms         1.47%       2.650ms       2.650ms             1  
+      triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_3         0.01%      13.944us         0.01%      21.267us      21.267us       2.604ms         1.44%       2.604ms       2.604ms             1  
+      triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_3         0.00%       0.000us         0.00%       0.000us       0.000us       2.604ms         1.44%       2.604ms       2.604ms             1  
+                                        fastmace::radial_table_forward         0.04%      79.650us         0.05%     100.617us     100.617us       2.524ms         1.40%       2.524ms       2.524ms             1  
+                                                               forward         0.00%       0.000us         0.00%       0.000us       0.000us       2.524ms         1.40%       2.524ms       2.524ms             1  
+                                          triton_poi_fused_cat_view_26         0.01%      12.956us         0.02%      33.183us      11.061us       2.282ms         1.26%       2.282ms     760.765us             3  
+                                          triton_poi_fused_cat_view_26         0.00%       0.000us         0.00%       0.000us       0.000us       2.282ms         1.26%       2.282ms     760.765us             3  
+                           triton_poi_fused_add_slice_backward_view_23         0.00%       4.513us         0.01%       9.411us       9.411us       1.944ms         1.08%       1.944ms       1.944ms             1  
+                           triton_poi_fused_add_slice_backward_view_23         0.00%       0.000us         0.00%       0.000us       0.000us       1.944ms         1.08%       1.944ms       1.944ms             1  
+                            triton_poi_fused_add_cat_div_slice_view_38         0.00%       5.913us         0.01%      11.543us      11.543us       1.905ms         1.05%       1.905ms       1.905ms             1  
+                            triton_poi_fused_add_cat_div_slice_view_38         0.00%       0.000us         0.00%       0.000us       0.000us       1.905ms         1.05%       1.905ms       1.905ms             1  
+                                    triton_poi_fused_cat_slice_view_34         0.00%       8.794us         0.01%      14.751us      14.751us       1.905ms         1.05%       1.905ms       1.905ms             1  
+                                    triton_poi_fused_cat_slice_view_34         0.00%       0.000us         0.00%       0.000us       0.000us       1.905ms         1.05%       1.905ms       1.905ms             1  
+                                          triton_poi_fused_cat_view_25         0.01%      14.570us         0.02%      28.722us       9.574us       1.638ms         0.91%       1.638ms     545.928us             3  
+                                          triton_poi_fused_cat_view_25         0.00%       0.000us         0.00%       0.000us       0.000us       1.638ms         0.91%       1.638ms     545.928us             3  
+                             triton_poi_fused_add_edge_sh3_backward_26         0.00%       5.304us         0.01%      10.782us      10.782us       1.485ms         0.82%       1.485ms       1.485ms             1  
+                             triton_poi_fused_add_edge_sh3_backward_26         0.00%       0.000us         0.00%       0.000us       0.000us       1.485ms         0.82%       1.485ms       1.485ms             1  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 185.812ms
+Self CUDA time total: 180.721ms
+
+
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                                  Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                 cudaDeviceSynchronize        90.60%     168.341ms        90.60%     168.341ms      84.170ms       0.000us         0.00%       0.000us       0.000us             2  
+                                            Torch-Compiled Region: 6/1         0.06%     119.191us         4.51%       8.380ms       8.380ms       0.000us         0.00%      90.188ms      90.188ms             1  
+                                                      CompiledFunction         0.09%     158.956us         4.41%       8.195ms       8.195ms       0.000us         0.00%      90.188ms      90.188ms             1  
+## Call CompiledFxGraph f6xv2ghos4arsdaxmiuajzozd7v6fd6uhatvyartxtl...         1.66%       3.084ms         4.32%       8.036ms       8.036ms     592.164us         0.33%      90.188ms      90.188ms             1  
+         autograd::engine::evaluate_function: CompiledFunctionBackward         0.01%      11.461us         2.94%       5.464ms       5.464ms       0.000us         0.00%      90.498ms      90.498ms             1  
+                                              CompiledFunctionBackward         0.07%     129.166us         2.93%       5.452ms       5.452ms       0.000us         0.00%      90.498ms      90.498ms             1  
+## Call CompiledFxGraph fm22zburqyguagilzyfbgf5j6qloe4awgd26x6dlopu...         0.96%       1.789ms         2.83%       5.254ms       5.254ms     641.086us         0.35%      90.441ms      90.441ms             1  
+                                            cuequivariance::uniform_1d         2.00%       3.723ms         2.08%       3.863ms     965.712us       5.811ms         3.22%       5.811ms       1.453ms             4  
+                                              TorchDynamo Cache Lookup         1.30%       2.414ms         1.30%       2.414ms       2.414ms       0.000us         0.00%       0.000us       0.000us             1  
+                                                  fastmace::species_mm         0.43%     804.955us         0.50%     934.967us      93.497us       5.751ms         3.18%       5.751ms     575.100us            10  
+                                                        cuLaunchKernel         0.50%     927.153us         0.50%     927.153us       6.817us       0.000us         0.00%       0.000us       0.000us           136  
+                                                              aten::mm         0.33%     608.031us         0.47%     868.544us      20.199us      19.657ms        10.88%      19.657ms     457.144us            43  
+                                                           aten::copy_         0.06%     105.321us         0.33%     614.196us     102.366us      10.271us         0.01%      10.271us       1.712us             6  
+                                                      cudaLaunchKernel         0.27%     501.444us         0.27%     501.444us       7.598us       0.000us         0.00%       0.000us       0.000us            66  
+                                                      aten::linalg_det         0.00%       3.627us         0.25%     469.132us     469.132us       0.000us         0.00%      19.002us      19.002us             1  
+                                                     aten::_linalg_det         0.02%      33.188us         0.25%     465.505us     465.505us       0.000us         0.00%      19.002us      19.002us             1  
+                                               Activity Buffer Request         0.20%     370.034us         0.20%     370.034us     370.034us       0.000us         0.00%       0.000us       0.000us             1  
+                                                            aten::sort         0.06%     104.343us         0.19%     360.775us     180.388us     103.193us         0.06%     105.400us      52.700us             2  
+                                    fastmace::tabled_outer_sum_forward         0.06%     116.150us         0.10%     179.320us     179.320us       3.692ms         2.04%       4.845ms       4.845ms             1  
+                       fastmace::streaming_conv_wprime_backward_blocks         0.07%     135.682us         0.10%     178.068us     178.068us      44.137ms        24.42%      44.366ms      44.366ms             1  
+                                 fastmace::fused_folded_message_blocks         0.06%     103.605us         0.09%     176.394us     176.394us      48.501ms        26.84%      48.501ms      48.501ms             1  
+                                                           aten::empty         0.09%     171.140us         0.09%     171.140us       4.279us       0.000us         0.00%       0.000us       0.000us            40  
+                                                           aten::zero_         0.01%      17.691us         0.08%     156.032us      15.603us       0.000us         0.00%       1.441ms     144.081us            10  
+                                                           aten::fill_         0.03%      59.175us         0.08%     155.237us      14.112us       1.442ms         0.80%       1.442ms     131.050us            11  
+                                                           aten::zeros         0.01%      14.958us         0.08%     152.883us      21.840us       0.000us         0.00%       1.210ms     172.851us             7  
+                                                       cudaMemsetAsync         0.08%     150.125us         0.08%     150.125us       6.824us       0.000us         0.00%       0.000us       0.000us            22  
+                                   fastmace::tabled_outer_sum_backward         0.06%     116.059us         0.08%     148.616us     148.616us       5.638ms         3.12%       5.638ms       5.638ms             1  
+                                                             aten::sum         0.05%      90.498us         0.07%     123.890us     123.890us       1.568us         0.00%       2.752us       2.752us             1  
+                                                      cuLaunchKernelEx         0.07%     122.115us         0.07%     122.115us       7.632us       0.000us         0.00%       0.000us       0.000us            16  
+                                             aten::linalg_lu_factor_ex         0.02%      34.387us         0.07%     121.006us     121.006us       7.774us         0.00%       8.542us       8.542us             1  
+                                                       aten::new_empty         0.01%      20.577us         0.06%     120.265us       5.011us       0.000us         0.00%       0.000us       0.000us            24  
+                                        fastmace::radial_table_forward         0.04%      79.650us         0.05%     100.617us     100.617us       2.524ms         1.40%       2.524ms       2.524ms             1  
+                                       fastmace::radial_table_backward         0.04%      73.834us         0.05%      90.868us      90.868us     321.279us         0.18%     321.279us     321.279us             1  
+                                                             aten::mul         0.02%      40.677us         0.04%      74.110us      18.528us       5.215us         0.00%       5.215us       1.304us             4  
+                                                      aten::zeros_like         0.00%       6.108us         0.03%      64.707us      21.569us       0.000us         0.00%     230.856us      76.952us             3  
+                                                         aten::reshape         0.01%      17.971us         0.03%      60.758us       2.642us       0.000us         0.00%       0.000us       0.000us            23  
+                                                       cudaMemcpyAsync         0.03%      60.117us         0.03%      60.117us      15.029us       0.000us         0.00%       0.000us       0.000us             4  
+                          triton_poi_fused_div_mul_slice_t_unsqueeze_5         0.03%      46.799us         0.03%      54.702us      54.702us       1.248us         0.00%       1.248us       1.248us             1  
+                      triton_red_fused_add_expand_mul_sum_unsqueeze_29         0.01%       9.742us         0.03%      53.557us      53.557us      16.287us         0.01%      16.287us      16.287us             1  
+                                                             aten::abs         0.01%      15.872us         0.03%      53.242us      13.310us       2.113us         0.00%       4.226us       1.057us             4  
+----------------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 185.812ms
+Self CUDA time total: 180.721ms
