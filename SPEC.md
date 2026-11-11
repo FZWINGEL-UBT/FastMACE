@@ -3489,3 +3489,27 @@ Tools: `tools/bench/cu_census.py`, `tools/bench/half_system_streams.py`, `tools/
 | A100-SXM4-80GB (Alex 4981362) | 0.93 / 0.65 | 0.83 / 0.88 |
 
 MD step b/a, SrTiO3 10×10×10 (b = int32), ab / ba: Ada 1.0001 / 0.9987, RTX 5060 Ti 1.0022 / 0.9959, A100 0.9960 / 0.9951. Memory at Ada SrTiO3 34³: neighbour list 1.37 → 1.21 GiB (0.8 kB/atom), peak reserved 13.40 → 12.95 GiB; the cube-step capacity limits do not move. The tiled kept lists are already about 3 B per edge, so they gain nothing. CPU suite on leto at the merged tip 20352f78: 5,580 passed, 203 skipped, 2 failed. Both failures were the new test, fixed in efc24fe0; the changed test files were rerun (77 + 204 passed). See `results/edge-index-int32-20261111/`.
+
+**Tiled speed round (11 November 2026; worker tiled-speed, conductor, decision 66):**
+- **Speed switches widened.** `TILED_SPEED_GPUS` now covers the RTX 4000 Ada and every A100 model, as well as the RTX 5060 Ti. It was measured with everything off against everything on at 975,560 SrTiO3 atoms, in both orders:
+
+  | GPU | device state | wavefront |
+  |---|---|---|
+  | RTX 4000 Ada | 0.868 / 0.868 | 0.772 / 0.769 |
+  | A100-SXM4-80GB | 0.792 / 0.789 | 0.782 / 0.785 |
+
+  The gates pass on the Ada (murphy) and the A100 (Alex 4977013, and 4981048 on the merged code).
+- **`TILE_COPY_STREAM` (exact).** The host state's deferred device-to-host writes now copy on a side stream from device clones. Wavefront 0.962 / 0.964, host state 0.960 / 0.959. On for `TILED_SPEED_GPUS`.
+- **`TILE_HEAP_TRIM` (memory only, default True).** Dropped kept lists and the list cache call `malloc_trim(0)`. A forced drop of 7.0 GiB of lists at 20.1M atoms left 2.77 GiB in glibc's free heap, and the trim returned all of it.
+- **Pinned kept lists.** They are counted by the pinned allocator's power-of-two blocks and returned to the system when dropped (`_release_kept`). Without this, the Ada's host peak at 179.7M atoms grew by 7 GB.
+- **Idea 3.**
+  - The aliased state and the wavefront's row pool on the device (`alias_state` with `state="device"`) are opt-in, not in CUDA graphs and not with lanes.
+  - The device row pool as a default is rejected.
+  - Receiver caps above 16,384 are rejected on the 5060 Ti.
+- **Two `TileConfig.compiled_graphs` correctness fixes** for the opt-in option:
+  - 35bcd4ab: a new capture pool once no graph holds the old one. Before, capturing into a private pool PyTorch had released failed an allocator assertion; an MD key change could trigger it.
+  - d7d9e7ce: captured outputs live in the slot's `graph_out`, apart from uncaptured calls.
+
+  GPU test 3e37bf5a. The A100 A/B of compiled_graphs (Alex 4981483: 0.569 / 0.571, 3.68 → 2.09 µs/atom) is recorded only; making it a default is a later merge, after its gate and a memory guard.
+
+Records: Ada tiled capacity 179.7M SrTiO3 atoms; the A100's 52 % GPU-idle share by Nsight Systems (host-bound in the compiled bodies' Python and autograd). The 397.5M A100 rerun with the heap trim (Alex 4981047) is still pending; its row follows. CPU suite on murphy at the merged tip ddaaed9c: 5,589 passed, 203 skipped, 0 failed (717b9f92 adds only a README note). See `results/tiled-speed-20261111/README.md`.

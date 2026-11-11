@@ -1,0 +1,320 @@
+{
+ "atoms": 975560,
+ "times": [
+  14.003373752000698,
+  63.81470704499952,
+  6.0935706090003805,
+  6.145248509001249
+ ],
+ "wall_plain": 6.181352416000664,
+ "wall_profiled": 6.20410800999889,
+ "kernel_span_s": 6.890738826000001,
+ "gpu_busy_s": 6.890738826000001,
+ "idle_s": 0.0,
+ "host_plain": {
+  "_first": [
+   1.7438,
+   136
+  ],
+  "autograd.grad": [
+   1.7365,
+   136
+  ],
+  "_fill": [
+   1.0845,
+   204
+  ],
+  "_call": [
+   0.5071,
+   1
+  ],
+  "_tile_graph": [
+   0.295,
+   68
+  ],
+  "_second": [
+   0.2661,
+   68
+  ],
+  "_attrs": [
+   0.119,
+   204
+  ],
+  "_edges": [
+   0.0883,
+   204
+  ],
+  "_body": [
+   0.0608,
+   204
+  ],
+  "_keep_lists": [
+   0.0517,
+   1
+  ],
+  "_piece": [
+   0.0309,
+   272
+  ],
+  "_scatter": [
+   0.0302,
+   204
+  ],
+  "_speed": [
+   0.0094,
+   819
+  ],
+  "_source": [
+   0.0065,
+   1
+  ],
+  "_captured": [
+   0.0049,
+   409
+  ],
+  "_compiled_once": [
+   0.0046,
+   544
+  ],
+  "_run_slot": [
+   0.0039,
+   204
+  ],
+  "_forward": [
+   0.0022,
+   204
+  ],
+  "_epilogue": [
+   0.0022,
+   136
+  ],
+  "_bind_tables": [
+   0.0021,
+   90
+  ],
+  "_state": [
+   0.0012,
+   68
+  ],
+  "_kept_form": [
+   0.0011,
+   68
+  ],
+  "_free_bytes": [
+   0.0007,
+   1
+  ],
+  "_slot_keys": [
+   0.0005,
+   1
+  ],
+  "_globals": [
+   0.0001,
+   1
+  ],
+  "_bind": [
+   0.0001,
+   1
+  ],
+  "_graph_budget": [
+   0.0001,
+   1
+  ],
+  "_lanes_on": [
+   0.0,
+   1
+  ]
+ },
+ "gaps": {},
+ "runtime": {
+  "cudaLaunchKernel < _fill": {
+   "count": 2856,
+   "seconds": 1.0115
+  },
+  "cuLaunchKernel < _first": {
+   "count": 7212,
+   "seconds": 0.5855
+  },
+  "cudaMemcpyAsync < _call": {
+   "count": 272,
+   "seconds": 0.5801
+  },
+  "cudaLaunchKernel < (none)": {
+   "count": 1385,
+   "seconds": 0.5091
+  },
+  "cuLaunchKernel < (none)": {
+   "count": 3100,
+   "seconds": 0.4399
+  },
+  "cuLaunchKernelEx < (none)": {
+   "count": 700,
+   "seconds": 0.3956
+  },
+  "cudaLaunchKernel < _first": {
+   "count": 3836,
+   "seconds": 0.3331
+  },
+  "cudaStreamSynchronize < _tile_graph": {
+   "count": 612,
+   "seconds": 0.209
+  },
+  "cuequivariance::uniform_1d < _first": {
+   "count": 136,
+   "seconds": 0.1864
+  },
+  "cudaMemsetAsync < _first": {
+   "count": 2576,
+   "seconds": 0.1631
+  },
+  "cudaDeviceSynchronize < (none)": {
+   "count": 2,
+   "seconds": 0.143
+  },
+  "cuequivariance::uniform_1d < (none)": {
+   "count": 136,
+   "seconds": 0.1348
+  },
+  "cudaLaunchKernel < _attrs": {
+   "count": 1020,
+   "seconds": 0.1044
+  },
+  "cuLaunchKernel < _second": {
+   "count": 1956,
+   "seconds": 0.1023
+  },
+  "cudaMemcpyAsync < _fill": {
+   "count": 612,
+   "seconds": 0.0867
+  },
+  "cuLaunchKernelEx < _first": {
+   "count": 840,
+   "seconds": 0.0375
+  },
+  "cudaLaunchKernel < _tile_graph": {
+   "count": 5966,
+   "seconds": 0.0352
+  },
+  "cuequivariance::uniform_1d < _second": {
+   "count": 68,
+   "seconds": 0.0309
+  },
+  "cuLaunchKernel < _body": {
+   "count": 204,
+   "seconds": 0.0279
+  },
+  "cudaStreamSynchronize < _call": {
+   "count": 271,
+   "seconds": 0.0179
+  },
+  "cudaMemcpyAsync < _keep_lists": {
+   "count": 2,
+   "seconds": 0.0163
+  },
+  "cudaMemcpyAsync < _first": {
+   "count": 304,
+   "seconds": 0.0161
+  },
+  "cudaLaunchKernel < _second": {
+   "count": 464,
+   "seconds": 0.0122
+  },
+  "cudaLaunchKernel < _piece": {
+   "count": 1088,
+   "seconds": 0.0114
+  },
+  "cudaLaunchKernel < _scatter": {
+   "count": 952,
+   "seconds": 0.0105
+  },
+  "cudaMemcpyAsync < _tile_graph": {
+   "count": 884,
+   "seconds": 0.0086
+  },
+  "cudaLaunchKernel < _call": {
+   "count": 28,
+   "seconds": 0.006
+  },
+  "cudaEventQuery < _first": {
+   "count": 9291,
+   "seconds": 0.0051
+  },
+  "cudaStreamSynchronize < _source": {
+   "count": 22,
+   "seconds": 0.0048
+  },
+  "cudaMemsetAsync < _tile_graph": {
+   "count": 680,
+   "seconds": 0.0042
+  },
+  "cuLaunchKernelEx < _edges": {
+   "count": 204,
+   "seconds": 0.0041
+  },
+  "cudaLaunchKernel < _edges": {
+   "count": 204,
+   "seconds": 0.0038
+  },
+  "cudaEventQuery < (none)": {
+   "count": 3828,
+   "seconds": 0.0026
+  },
+  "cudaLaunchKernel < autograd.grad": {
+   "count": 136,
+   "seconds": 0.0025
+  },
+  "cudaMemcpyAsync < _second": {
+   "count": 68,
+   "seconds": 0.0022
+  },
+  "cudaEventQuery < _source": {
+   "count": 10,
+   "seconds": 0.0019
+  },
+  "cudaEventQuery < _second": {
+   "count": 2922,
+   "seconds": 0.0018
+  },
+  "cuLaunchKernelEx < _second": {
+   "count": 76,
+   "seconds": 0.0014
+  },
+  "cudaMemsetAsync < _call": {
+   "count": 2,
+   "seconds": 0.0011
+  },
+  "cudaLaunchKernel < _source": {
+   "count": 106,
+   "seconds": 0.0009
+  }
+ },
+ "last": {
+  "tiles": 68,
+  "edge_cap": 4611686018427387904,
+  "max_receivers": 16384,
+  "max_halo": 8920,
+  "max_edges": 1215116,
+  "list_reused": true,
+  "list_rebuilds": 1,
+  "list_reuse": "on",
+  "receivers": 16384,
+  "edges": 72191440,
+  "mode": "compiled",
+  "mode_reason": "8.59 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+  "neighbours": "tiles",
+  "species": "index",
+  "search_s": 0.3123583130000043,
+  "lanes": "off: not measured faster on NVIDIA GeForce RTX 5060 Ti",
+  "slot_changes": 3,
+  "copy_stream": false,
+  "host_worker": false,
+  "tiles_s": 5.668180508999285,
+  "global_bytes": 4994867200,
+  "list_cache_bytes": 0,
+  "list_kept_bytes": 303814192,
+  "list_kept_pinned_bytes": 412353216,
+  "list_cache_hits": 0,
+  "list_cache": "on",
+  "host_bytes": 0
+ }
+}

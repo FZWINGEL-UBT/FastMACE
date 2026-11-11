@@ -61,7 +61,10 @@ TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Genera
 # Tiled speed (results/tiled-speed-20261108). None: on for TILED_SPEED_GPUS (decision 66: each keeps more memory
 # alive or replaces a kernel, so it is on where same-process A/Bs at 975,560 SrTiO3 atoms measured it faster in both
 # orders); True / False (TILE_GRAPH_CACHE: a fraction) are the A/B sides' choice on every device.
-TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+# 10 November 2026 (results/tiled-speed-20261110): all of them off against all on at 975,560 SrTiO3 atoms, both orders:
+# RTX 4000 Ada device state 0.868 / 0.868, wavefront 0.772 / 0.769; A100-SXM4-80GB 0.792 / 0.789 and 0.782 / 0.785
+# (every A100 model: GPUModels matches the family).
+TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 # TILE_PREFETCH_DEVICE (exact): TileConfig.prefetch also with the state on the device, where it builds the next tile's
 # graph on the side stream while the current tile runs (its rows are read in the body, as before). Without it a
 # device-state call built each graph after the previous body had drained the GPU (torch.unique and the edge counts
@@ -116,9 +119,24 @@ TILE_FILL_SKIP = True
 # they total at most TILE_PINNED_SUPERSET_BYTES, so each call's copy to the device runs at the link's pinned rate and
 # without a sync (pageable copies: about 70 ns per atom per call at 975,560 SrTiO3 atoms on the RTX 5060 Ti); past
 # the cap, pageable as before. None: on for TILED_SPEED_GPUS (wavefront: 1.012 / 1.028 host-bound, 0.989 / 0.990
-# since the host worker).
+# since the host worker). The cap counts the pinned allocator's power-of-two blocks, and lists dropped or replaced
+# return them to the system (``_release_kept``; the allocator would keep them resident, uncounted by the host budget).
 TILE_PINNED_SUPERSET = None
 TILE_PINNED_SUPERSET_BYTES = 4 * 2**30
+# TILE_COPY_STREAM (exact): host state with overlap copies each tile's deferred writes (values and device indices) to
+# pinned host memory on a side stream instead of the compute stream: the compute stream only clones them on the
+# device (at the device's bandwidth; the slot's outputs and index buffers are overwritten by the next tile), and the
+# next tile's kernels no longer queue behind the link. The host applies the same values in the same order after the
+# copy's event. The wavefront at 975,560 SrTiO3 atoms on the RTX 5060 Ti had 0.44 s of device-to-host copies on the
+# compute stream in a 7.7 s call. None: on for TILED_SPEED_GPUS.
+TILE_COPY_STREAM = None
+# TILE_HEAP_TRIM (memory only): kept lists or the list cache dropped hand glibc's free heap back to the system
+# (``malloc_trim(0)``, ``_trim_heap``). The lists are many tensors of a few MB, which glibc serves from its heap once
+# its mmap threshold has risen, and keeps resident when they are freed; the host budget (MemAvailable, the cgroup)
+# counted them as used. At 20.1M SrTiO3 atoms on the RTX 5060 Ti a forced drop of 7.0 GiB of lists left 2.77 GiB in
+# glibc's free heap, all returned by a trim; the A100's 397.5M record (lists all pageable) kept about 110 GiB and
+# fell to float16 state (plans/ideas-20261111-tiled.md, idea 1).
+TILE_HEAP_TRIM = True
 
 
 @dataclasses.dataclass(frozen=True)
@@ -144,10 +162,12 @@ class TileConfig:
     ``state``: where x, sc and their adjoints live, ``"device"`` or ``"host"`` (pageable host memory; each
     tile copies its rows to the device and its results back, so the device holds no per-atom state of the
     sweeps; not with ``mode="graphs"``, whose captured bodies read the state themselves).
-    ``alias_state`` (with ``state="host"``): dE/dsc takes sc's rows (a receiver's sc is read and its dE/dsc
+    ``alias_state``: dE/dsc takes sc's rows (a receiver's sc is read and its dE/dsc
     written by the same tile) and dE/dx takes x's rows atom by atom (an atom's last tile in sweep 2 is the last to
     read its x and the last to add to its dE/dx; until then the sum lives in a window of the open atoms, added in
-    the same order): bitwise the same call with two of the four state tensors.
+    the same order): bitwise the same call with two of the four state tensors. With ``state="device"`` (and the
+    wavefront: its row pool on the device) the window's rows are planned on the host after sweep 1, so the tiles
+    index the state without syncs; not in CUDA graphs, not with lanes.
     ``species``: the tiles' one-hot species rows from the field's ``node_attrs`` (``"one_hot"``) or built from
     its species index (``"index"``, bitwise the same rows): the field's device one-hot is then released to the
     host (``MACEForceField.release_node_attrs``; its own whole-system call refuses afterwards).
@@ -254,12 +274,16 @@ class TileConfig:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
         if self.species not in ("one_hot", "index"):
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
-        if self.alias_state and self.state != "host":
-            raise ValueError("TileConfig.alias_state needs state='host'")
+        if self.alias_state and self.state == "device" and (self.mode == "graphs" or self.compiled_graphs):
+            raise ValueError("TileConfig.alias_state with state='device' cannot run in CUDA graphs: the window and the "
+                             "pooled rows are indexed outside the captured bodies")
+        if self.alias_state and self.state == "device" and self.lanes == "on":
+            raise ValueError("TileConfig.alias_state with state='device' cannot run lanes='on': a tile's closing "
+                             "atoms read the window on the call's stream")
         if self.state_dtype not in (None, "auto", "bfloat16", "float16"):
             raise ValueError(f"TileConfig.state_dtype must be None, 'auto', 'bfloat16' or 'float16', got "
                              f"{self.state_dtype!r}")
-        if self.state_dtype not in (None, "auto") and not self.alias_state:
+        if self.state_dtype not in (None, "auto") and not (self.alias_state and self.state == "host"):
             raise ValueError("TileConfig.state_dtype needs alias_state=True (state='host'): every stored value is then "
                              "written once, never summed in the stored dtype")
         if self.state not in ("device", "host"):
@@ -277,7 +301,7 @@ class TileConfig:
         if self.wavefront not in ("auto", "on", "off"):
             raise ValueError(f"TileConfig.wavefront must be 'auto', 'on' or 'off', got {self.wavefront!r}")
         if self.wavefront == "on" and not self.alias_state:
-            raise ValueError("TileConfig.wavefront='on' needs alias_state=True (state='host')")
+            raise ValueError("TileConfig.wavefront='on' needs alias_state=True")
         if self.backward_chunk_scale is not None and int(self.backward_chunk_scale) < 1:
             raise ValueError(f"TileConfig.backward_chunk_scale must be positive, got {self.backward_chunk_scale!r}")
         if int(self.wavefront_group) < 1:
@@ -309,6 +333,8 @@ class _State:
         self._pending, self._fresh = [], False  # overlap: the host writes not applied yet
         # TILE_HOST_WORKER: the batches of writes handed to the worker thread (set per call by the tiled call)
         self.worker, self._executor, self._handed = False, None, []
+        # TILE_COPY_STREAM: the deferred writes' device-to-host copies on this side stream (set per call)
+        self.copy_stream = None
         self.tensors = {}
         # alias: dE/dsc in sc's rows, dE/dx in x's rows once an atom is closed (``touch``, ``plan``, ``close``)
         self._storage = {"gx": "x", "gsc": "sc"} if alias else {}
@@ -328,17 +354,18 @@ class _State:
         if size is not None and (pooled != self.pooled or (pooled and size < rows) or (not pooled and size != n)):
             self.tensors = {}  # allocated again at the right size from sweep 1's first outputs
         self.pooled = pooled
-        if pooled:
+        if pooled:  # the row map and free rows beside the state (the device's: no host round trip per tile)
+            where = "cpu" if self.host else self.device
             self._pool_rows = max(rows, size or 0) if self.tensors else rows
-            self._row_of = torch.full((n,), -1, dtype=torch.int32)
-            self._free_rows = torch.arange(self._pool_rows, dtype=torch.int32)
+            self._row_of = torch.full((n,), -1, dtype=torch.int32, device=where)
+            self._free_rows = torch.arange(self._pool_rows, dtype=torch.int32, device=where)
             self._rows_top = self._pool_rows
         else:
             self._row_of = None
 
     def assign(self, atoms):
         """Pooled rows for ``atoms`` (none of which has one)."""
-        atoms = atoms.cpu()
+        atoms = self._here(atoms)
         top = self._rows_top - atoms.shape[0]
         if top < 0:
             raise RuntimeError("the wavefront's row pool is exhausted (its schedule's band was underestimated)")
@@ -347,7 +374,7 @@ class _State:
 
     def release(self, atoms):
         """Return ``atoms``' pooled rows (after their sweep 3 has read them)."""
-        atoms = atoms.cpu()
+        atoms = self._here(atoms)
         rows = self._row_of[atoms]
         self._free_rows[self._rows_top:self._rows_top + rows.shape[0]] = rows
         self._rows_top += rows.shape[0]
@@ -359,8 +386,12 @@ class _State:
         reach no real output (tiled tests: padded equals eager bitwise), and a pooled row holds finite values."""
         if not self.pooled or self._storage.get(name, name) not in ("x", "sc"):
             return index
-        rows = self._row_of[index.cpu()].long()
+        rows = self._row_of[self._here(index)].long()
         return rows.clamp_(min=0) if read else rows
+
+    def _here(self, index):
+        """``index`` where the state is (an atom index from the host or the device)."""
+        return index.cpu() if self.host else index.to(self.device, non_blocking=True)
 
     def touched(self, first, last):
         """The wavefront's search pass recorded each atom's first and last tile (``touch`` of sweep 1 without it)."""
@@ -432,7 +463,7 @@ class _State:
             return fetched
         tensor = self.tensors[self._storage.get(name, name)]
         if not self.host:
-            return tensor[index]
+            return tensor[self._rows_of(name, index, read=True)]
         self.settle()
         index = self._rows_of(name, index.cpu(), read=True)
         if not (self.overlap and self.device.type == "cuda"):
@@ -458,14 +489,16 @@ class _State:
     def put(self, name, index, values):
         """``state[name][index] = values``."""
         if not self.host:
-            self.tensors[self._storage.get(name, name)][index] = values
+            self.tensors[self._storage.get(name, name)][self._rows_of(name, index)] = values
         else:
             self._defer("put", name, self._rows_of(name, index), values.detach().to(self.store))
 
     def add(self, name, index, values):
         """``state[name].index_add_(0, index, values)``; aliased dE/dx: into the open atoms' window rows."""
-        if not self.host:
-            self.tensors[self._storage.get(name, name)].index_add_(0, index, values)
+        if not self.host and self.alias and name == "gx":  # the window rows planned for the call (``plan``)
+            self._window.index_add_(0, self._slot_of[self._here(index)], values)
+        elif not self.host:
+            self.tensors[self._storage.get(name, name)].index_add_(0, self._rows_of(name, index), values)
         else:
             stored = name != "gx" or not self.alias  # aliased dE/dx: summed in the window, in the call's dtype
             self._defer("add", name, self._rows_of(name, index) if name != "gx" else index,
@@ -525,13 +558,36 @@ class _State:
                 self.flush()
             self._fresh = False
         event = None
-        if self.device.type == "cuda":
+        if self.device.type == "cuda" and self.copy_stream is not None:
+            index, values, event = self._to_host_aside(index, values.detach())
+        elif self.device.type == "cuda":
             index, values = self._to_host(index), self._to_host(values.detach())
             event = torch.cuda.Event()
             event.record()
         else:  # copies: a padded slot's buffers hold the next tile before these writes are applied
             index, values = index.to("cpu", copy=True), values.detach().to("cpu", copy=True)
         self._pending.append((kind, name, index, values, event))
+
+    def _to_host_aside(self, index, values):
+        """``TILE_COPY_STREAM``: pinned host copies of ``index`` (device or host) and ``values`` made on the copy
+        stream from device clones (the slot's buffers hold the next tile before the copy runs): ``(index, values,
+        event)``, the event recorded after the copies."""
+        import torch
+
+        current = torch.cuda.current_stream(self.device)
+        clones = [t.clone() for t in (index, values)]  # a host index too, as _to_host copies it
+        stream = self.copy_stream
+        stream.wait_stream(current)
+        out = []
+        with torch.cuda.stream(stream):
+            for tensor in clones:
+                if tensor.is_cuda:
+                    tensor.record_stream(stream)
+                    tensor = self._to_host(tensor)
+                out.append(tensor)
+            event = torch.cuda.Event()
+            event.record(stream)
+        return out[0], out[1], event
 
     @staticmethod
     def _to_host(tensor):
@@ -578,11 +634,38 @@ class _State:
         # During tile t: the atoms open after it plus those it closes.
         size = int((torch.cumsum(opened - closed, 0) + closed).max().item())
         del last, order, opened, closed
+        if not self.host:  # the state on the device: every atom's window row planned here, read without syncs
+            self._plan_slots(tiles, size)
         # Read no more this call (8 bytes per atom on the host); the next call's touches start new ones.
         self._first = self._last = None
-        self._window = torch.zeros((size, self._width), dtype=self.dtype)
+        self._window = torch.zeros((size, self._width), dtype=self.dtype, device="cpu" if self.host else self.device)
         self._free = torch.arange(size, dtype=torch.int32)
         self._top = size
+
+    def _plan_slots(self, tiles, size):
+        """The aliased state on the device: each atom's window row, taken at its first tile of sweep 2 and returned
+        after its last (sweep 2 visits the tiles in their order, as ``plan``'s window size assumes), planned on the
+        host once; the rows and the closing atoms then on the device. (The host state takes them as writes arrive.)"""
+        import torch
+
+        first = self._first.long()
+        opening = torch.split(torch.sort(first, stable=True).indices.to(torch.int32),
+                              torch.bincount(first, minlength=tiles).tolist())
+        slots = torch.full((first.shape[0],), -1, dtype=torch.int32)
+        free, top = torch.arange(size, dtype=torch.int32), size
+        for tile in range(tiles):
+            atoms = opening[tile]
+            if atoms.numel():
+                slots[atoms] = free[top - atoms.numel():top]
+                top -= atoms.numel()
+            atoms = self._closing[tile]
+            if atoms.numel():
+                free[top:top + atoms.numel()] = slots[atoms]
+                top += atoms.numel()
+        del first, opening, free
+        counts = [int(atoms.numel()) for atoms in self._closing]
+        self._slot_of = slots.to(self.device)
+        self._closing = torch.split(torch.cat(list(self._closing)).to(self.device), counts)
 
     def close(self, tile):
         """After tile ``tile`` of sweep 2: its closing atoms' dE/dx is final; it takes their rows of x (after the
@@ -594,7 +677,11 @@ class _State:
 
     def _close_now(self, tile):
         atoms = self._closing[tile]
-        if atoms.numel():
+        if atoms.numel() and not self.host:  # the planned rows: zeroed for the atoms that take them next
+            slots = self._slot_of[atoms]
+            self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots]
+            self._window[slots] = 0
+        elif atoms.numel():
             slots = self._slot_of[atoms]
             self.tensors["x"][self._rows_of("x", atoms)] = self._window[slots].to(self.store)
             self._free[self._top:self._top + slots.numel()] = slots
@@ -977,6 +1064,65 @@ def moved_within(positions, reference, limit, chunk=None):
     return True
 
 
+def _pinned_block(nbytes):
+    """The bytes PyTorch's pinned host allocator holds for a pinned tensor of ``nbytes``: its block, ``nbytes``
+    rounded up to a power of two (CachingHostAllocator)."""
+    return 1 << max(int(nbytes) - 1, 0).bit_length() if nbytes > 0 else 0
+
+
+def _kept_bytes(kept):
+    """The host bytes a kept-lists dict holds: its reference positions and its tiles' lists (and their A/B mirrors),
+    a pinned tensor by its allocator block (``_pinned_block``)."""
+    def held(t):
+        nbytes = t.numel() * t.element_size()
+        return _pinned_block(nbytes) if t.is_pinned() else nbytes
+
+    entries = list(kept["superset"].values()) + list(kept.get("mirrors", {}).values())
+    return int(sum(held(t) for entry in entries for t in entry) + kept["reference"].numel() * 8)
+
+
+HEAP_TRIMS = [0, 0.0]  # the process's malloc_trim calls and their seconds (the call's stats: heap_trims, heap_trim_s)
+
+
+def _trim_heap():
+    """``malloc_trim(0)``: glibc's free heap (every arena) back to the system (``TILE_HEAP_TRIM``). True if glibc
+    returned memory; False where it did not, or without glibc."""
+    if not TILE_HEAP_TRIM:
+        return False
+    import ctypes
+
+    try:
+        trim = ctypes.CDLL(None).malloc_trim
+    except (OSError, AttributeError):  # not glibc (macOS, Windows, musl)
+        return False
+    trim.argtypes, trim.restype = [ctypes.c_size_t], ctypes.c_int
+    started = time.perf_counter()
+    returned = bool(trim(0))
+    HEAP_TRIMS[0] += 1
+    HEAP_TRIMS[1] += time.perf_counter() - started
+    return returned
+
+
+def _release_kept(kept):
+    """Kept lists dropped or replaced: their tensors go, and pinned ones (``TILE_PINNED_SUPERSET``) back to the
+    operating system. PyTorch's pinned allocator keeps a freed block for reuse, resident, so without this the bytes
+    the host budget counts as freed (``_auto_store``, ``list_reuse_floor``) stayed in the process: at 179.7M SrTiO3
+    atoms on the RTX 4000 Ada the host peak grew by 7 GB (two list builds, each 4 GiB of pinned lists, the blocks
+    rounded up to powers of two)."""
+    if kept is None:
+        return
+    kept["superset"].clear()
+    kept.get("mirrors", {}).clear()
+    kept["complete"] = False
+    _trim_heap()  # the pageable lists' heap pages (TILE_HEAP_TRIM)
+    if kept.get("pinned_bytes"):
+        kept["pinned_bytes"] = 0
+        import torch
+
+        if hasattr(torch._C, "_host_emptyCache"):
+            torch._C._host_emptyCache()  # the free pinned blocks (also staging buffers no longer in use)
+
+
 def _host_available():
     """The host's available memory in bytes: ``MemAvailable``, or less where the process's memory cgroup leaves less
     (``_cgroup_room``: a batch job's limit, e.g. 231.5 GB for one A100-80 on an Alex node, which /proc/meminfo does not
@@ -1169,6 +1315,7 @@ class TiledForceField:
         self._lane_slots, self._lane_streams, self._lanes_fit = {}, None, None
         self._plan_skin = 0.0  # TileConfig.boundary_skin: the reach the current plan split at (0: none)
         self._prep_stream = None  # TileConfig.prefetch's side stream
+        self._copy_stream = None  # TILE_COPY_STREAM's side stream
         self._pieces, self._piece_bytes, self._piece_budget, self._piece_count = None, 0, 0, 0  # TILE_GRAPH_CACHE
         self._list_cache = None  # TileConfig.list_cache (neighbours "tiles"; set per call by tiles())
         self._per_receiver = None  # the last measured tile workspace per receiver (bytes; _memory)
@@ -1237,8 +1384,9 @@ class TiledForceField:
 
     def _kept_on_host(self, kept, tensors):
         """A tile's kept lists on the host: pinned (``TILE_PINNED_SUPERSET``) while the pinned ones total at most
-        ``TILE_PINNED_SUPERSET_BYTES``, else pageable."""
-        size = sum(t.numel() * t.element_size() for t in tensors)
+        ``TILE_PINNED_SUPERSET_BYTES`` (counted by the pinned allocator's blocks, ``_pinned_block``), else
+        pageable."""
+        size = sum(_pinned_block(t.numel() * t.element_size()) for t in tensors)
         pinned = kept.get("pinned_bytes", 0)
         if (self.device.type == "cuda" and self._speed(TILE_PINNED_SUPERSET)
                 and pinned + size <= TILE_PINNED_SUPERSET_BYTES):
@@ -1444,6 +1592,7 @@ class TiledForceField:
         available = _host_available()
         if available is None or available >= int(self.config.list_reuse_floor):
             return True
+        _release_kept(self._kept)
         self._reuse_ok, self._kept = False, None
         self.list_reuse_state = (f"off: {available / 2**30:.1f} GiB available on the host when {what}, below the "
                                  f"floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
@@ -1457,6 +1606,7 @@ class TiledForceField:
         if available is None or available >= int(self.config.list_reuse_floor):
             return True
         cache.clear()
+        _trim_heap()
         self.list_cache_state = (f"off: {available / 2**30:.1f} GiB available on the host while the list cache "
                                  f"filled, below the floor of {int(self.config.list_reuse_floor) / 2**30:.1f} GiB")
         return False
@@ -1472,7 +1622,8 @@ class TiledForceField:
                  and torch.equal(kept["cell"], cell.cpu())
                  and moved_within(positions, kept["reference"], skin / 2))
         if not reuse:
-            self._kept = kept = None  # the old reference and lists go before the new reference is copied
+            _release_kept(kept)  # the old reference and lists go before the new reference is copied
+            self._kept = kept = None
             if not self._host_allows("keeping the reference positions"):
                 return None
             here = positions.detach().to("cpu", torch.float64)
@@ -1756,11 +1907,13 @@ class TiledForceField:
         if not self._captured():  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
             slot["out"] = {sweep: dict(zip(names, values))}  # no copy, and no other sweep's kept beside them
             return
-        out = slot["out"].setdefault(sweep, {})
+        # the graphs' outputs apart from an uncaptured call's (which replaces ``slot["out"]``): their addresses stay
+        out = slot.setdefault("graph_out", {}).setdefault(sweep, {})
         for name, value in zip(names, values):
             if name not in out:
                 out[name] = torch.empty_like(value)
             out[name].copy_(value)
+        slot["out"] = {sweep: out}
 
     def _scatter(self, sweep, slot, g, piece, host_nodes=None):
         """Add the slot's outputs into the global buffers (outside the graphs: warm-ups and captures have no side
@@ -1825,13 +1978,16 @@ class TiledForceField:
                 for _ in range(2):  # library workspaces and the allocator, outside the capture
                     self._body(sweep, slot, g)
             torch.cuda.current_stream().wait_stream(self._stream)
-            if self._pool is None:
+            if self._pool is None or not any(s["graphs"] for s in self._slots.values()):
+                # a new pool once no graph holds the old one (PyTorch releases a private pool with its last graph,
+                # and a capture into the released handle fails an allocator assertion)
                 self._pool = torch.cuda.graph_pool_handle()
             graph = torch.cuda.CUDAGraph()
             with torch.cuda.graph(graph, pool=self._pool, stream=self._stream):
                 self._body(sweep, slot, g)
             slot["graphs"][sweep] = graph
         graph.replay()
+        slot["out"] = {sweep: slot["graph_out"][sweep]}
 
     # ------------------------------------------------------------------ the call
 
@@ -1967,7 +2123,7 @@ class TiledForceField:
         try:
             g = self._globals(n, stress, pos, heads)
             self.heads, self.arange = g["heads"], g["arange"]
-            if padded:
+            if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
                 key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
                 if key != self._graph_key:  # the graphs read these addresses
@@ -1977,6 +2133,11 @@ class TiledForceField:
             forces, node_es, strain_grad, state = g["forces"], g["node_es"], g["strain_grad"], g["state"]
             aliased = self.config.alias_state
             state.worker = state.overlap and bool(self._speed(TILE_HOST_WORKER))
+            aside = state.overlap and self.device.type == "cuda" and bool(self._speed(TILE_COPY_STREAM))
+            if aside and self._copy_stream is None:
+                self._copy_stream = torch.cuda.Stream(self.device)
+            state.copy_stream = self._copy_stream if aside else None
+            stats["copy_stream"] = aside
             stats["host_worker"] = state.worker
             if aliased:
                 state.pool(pool_rows, n)
@@ -2137,6 +2298,7 @@ class TiledForceField:
                 stats["tiles_peak"] = int(torch.cuda.max_memory_allocated(self.device))
             source = None  # the tile lists' cell bins (per-atom device arrays) before the energy's transients
             stats["global_bytes"] = state.bytes()
+            stats["heap_trims"], stats["heap_trim_s"] = HEAP_TRIMS[0], round(HEAP_TRIMS[1], 3)
             list_cache = getattr(self, "_list_cache", None)
             stats["list_cache_bytes"] = int(sum(t.numel() * t.element_size() for entry in (list_cache or {}).values()
                                                 for t in entry))
@@ -2144,6 +2306,8 @@ class TiledForceField:
             stats["list_kept_bytes"] = 0 if kept is None else int(
                 sum(t.numel() * t.element_size() for entry in kept["superset"].values() for t in entry)
                 + kept["reference"].numel() * kept["reference"].element_size())
+            # TILE_PINNED_SUPERSET: the pinned allocator's blocks of the kept lists (powers of two)
+            stats["list_kept_pinned_bytes"] = 0 if kept is None else int(kept.get("pinned_bytes", 0))
             stats["list_cache_hits"] = getattr(self, "_list_hits", 0)  # tile visits served from the call's cache
             stats["list_reuse"] = self.list_reuse_state
             stats["list_cache"] = self.list_cache_state
@@ -2193,6 +2357,9 @@ class TiledForceField:
         config = self.config.lanes
         if config == "off":
             self.lanes_state = "off"
+            return False
+        if self.config.alias_state and self.config.state == "device" and self.device.type == "cuda":
+            self.lanes_state = "off: the aliased device state reads its window on the call's stream"
             return False
         if not padded or self._captured():
             self.lanes_state = f"off: {self.mode} tiles" + (" in CUDA graphs" if self.mode == "compiled" else "")
@@ -2364,8 +2531,7 @@ class TiledForceField:
             return self.dtype, "the call's dtype: fits"
         # A call that reuses the kept lists did not bin the atoms: it needs them, so they stay (float16 instead).
         kept = None if getattr(self, "_reusing", False) else self._kept
-        lists = 0 if kept is None else int(sum(t.numel() * t.element_size() for entry in kept["superset"].values()
-                                                for t in entry) + kept["reference"].numel() * 8)
+        lists = 0 if kept is None else _kept_bytes(kept)  # what _drop_kept returns to the host
         if lists and full <= room + lists:
             self._drop_kept(f"the host state ({full / 2**30:.1f} GiB) fits only without them")
             return self.dtype, f"the call's dtype after dropping the kept lists ({lists / 2**30:.1f} GiB)"
@@ -2376,9 +2542,7 @@ class TiledForceField:
 
     def _drop_kept(self, why):
         """The kept lists go for this call and the later ones (``list_reuse_state`` says why)."""
-        if self._kept is not None:  # (this call's sweeps hold the dict: emptied, they search again, bitwise)
-            self._kept["superset"].clear()
-            self._kept["complete"] = False
+        _release_kept(self._kept)  # (this call's sweeps hold the dict: emptied, they search again, bitwise)
         self._reuse_ok, self._kept = False, None
         self.list_reuse_state = f"off: {why}"
 
@@ -2431,6 +2595,8 @@ class TiledForceField:
             return False
         if config.wavefront == "on":
             return True
+        if config.state == "device":  # "auto" decides on the host's memory; the device pool runs with "on"
+            return False
         # "auto": only where the plain state (x and sc, and the alias window, about a quarter more) would leave the
         # host below the floor: the schedule costs about 3 % of a call (its search pass; 5M SrTiO3, both Ada GPUs).
         # Decided on the first call at an atom count, then kept.
