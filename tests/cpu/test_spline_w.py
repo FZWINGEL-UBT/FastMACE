@@ -140,15 +140,16 @@ def test_omat0_small_keeps_prefetch_ahead_off_on_the_a100(monkeypatch):
 
 
 def test_wprime_stage_edges_adds_the_h200_for_omat0_small(monkeypatch):
-    """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family) for every model, plus the H200 for OMAT-0
-    small (STAGE_EDGES_MODEL_GPUS); the constant still decides an A/B side."""
+    """w' STAGE_EDGES (9 November 2026): STAGE_EDGES_GPUS (the A100 family; the RTX 4000 Ada and RTX 5060 Ti since
+    ada-5060-screen, 11 November 2026) for every model, plus the H200 for OMAT-0 small (STAGE_EDGES_MODEL_GPUS); the
+    constant still decides an A/B side."""
     monkeypatch.setattr(wp, "_device_name", lambda device: device)
     assert wp.STAGE_EDGES is None
     for device, label in (("NVIDIA H200", "omat0-small"), ("NVIDIA A100-SXM4-80GB", "omat0-small"),
-                          ("NVIDIA A100-SXM4-80GB", "omat0-medium"), ("NVIDIA A100-SXM4-80GB", None)):
+                          ("NVIDIA A100-SXM4-80GB", "omat0-medium"), ("NVIDIA A100-SXM4-80GB", None),
+                          ("NVIDIA RTX 4000 Ada Generation", "omat0-small"), ("NVIDIA GeForce RTX 5060 Ti", None)):
         assert wp.stage_edges_default(device, label), (device, label)
-    for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None),
-                          ("NVIDIA RTX 4000 Ada Generation", "omat0-small")):
+    for device, label in (("NVIDIA H200", "omat0-medium"), ("NVIDIA H200", None), ("NVIDIA L4", "omat0-small")):
         assert not wp.stage_edges_default(device, label), (device, label)
     monkeypatch.setattr(wp, "STAGE_EDGES", False)
     assert not wp.stage_edges_default("NVIDIA H200", "omat0-small")
@@ -388,7 +389,8 @@ def test_factor_w_and_cursor32_render_and_compile():
 
 def test_stage_edges_is_off_without_a_listed_gpu():
     assert sf.STAGE_EDGES is None and list(sf.STAGE_EDGES_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB",
-                                                                     "NVIDIA RTX 4000 Ada Generation"]
+                                                                     "NVIDIA RTX 4000 Ada Generation",
+                                                                     "NVIDIA GeForce RTX 5060 Ti"]
 
 
 def test_stage_edges_source_stages_the_tile_and_keeps_the_arithmetic():
@@ -418,7 +420,9 @@ def test_stage_edges_source_compiles_with_nvrtc():
 
 
 def test_stage_sh_reads_the_edge_features_from_shared_memory():
-    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB"]
+    assert wp.STAGE_SH is None and list(wp.STAGE_SH_GPUS) == ["NVIDIA H200", "NVIDIA A100-SXM4-80GB",
+                                                             "NVIDIA RTX 4000 Ada Generation",
+                                                             "NVIDIA GeForce RTX 5060 Ti"]
     blocks = [(1, [0]), (3, [64])]
     kwargs = dict(vector=4, table_w=True, factored=True, scale=True, horner=True, blocks=blocks, spline=GRID)
     plain = wp.render(_schedule(), "float", 4, **kwargs)
@@ -438,7 +442,8 @@ def test_stage_sh_reads_the_edge_features_from_shared_memory():
 
 def test_wprime_stage_edges_is_off_without_a_listed_gpu():
     # on for the A100 family (Alex pack6, 8 November 2026: 0.9643 / 0.9853), off on the H200 (0.9969 / 1.0010)
-    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == ["NVIDIA A100-SXM4-80GB"]
+    assert wp.STAGE_EDGES is None and list(wp.STAGE_EDGES_GPUS) == ["NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                                                                 "NVIDIA GeForce RTX 5060 Ti"]
     assert "NVIDIA A100 80GB PCIe" in wp.STAGE_EDGES_GPUS and "NVIDIA H200" not in wp.STAGE_EDGES_GPUS
     assert wp.stage_edges_default("cpu") is False
 

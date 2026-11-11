@@ -3513,3 +3513,20 @@ MD step b/a, SrTiO3 10×10×10 (b = int32), ab / ba: Ada 1.0001 / 0.9987, RTX 50
   GPU test 3e37bf5a. The A100 A/B of compiled_graphs (Alex 4981483: 0.569 / 0.571, 3.68 → 2.09 µs/atom) is recorded only; making it a default is a later merge, after its gate and a memory guard.
 
 Records: Ada tiled capacity 179.7M SrTiO3 atoms; the A100's 52 % GPU-idle share by Nsight Systems (host-bound in the compiled bodies' Python and autograd). The 397.5M A100 rerun with the heap trim (Alex 4981047) is still pending; its row follows. CPU suite on murphy at the merged tip ddaaed9c: 5,589 passed, 203 skipped, 0 failed (717b9f92 adds only a README note). See `results/tiled-speed-20261111/README.md`.
+
+**Ada and 5060 Ti re-screen of the H200/A100 switches (11 November 2026; worker ada-5060-screen, conductor, decision 66):** each switch measured alone and left out of the candidate set (OMAT-0 medium, SrTiO3 10×10×10 and NbCl5, both orders), then the adopted set against the old defaults, with the 3× float32 gate.
+- **RTX 4000 Ada.**
+  - On: SORT_BY_LENGTH, BUTTERFLY, PACKED8, w′ STAGE_DOUT / STAGE_SH / STAGE_EDGES, POWER_BACKWARD, SC_GENERATED, SC_FACTORED, SPLIT_COLUMNS (OFF23-large 0.9556 / 0.9583), the POLAR megakernel (S 0.896, M 0.950, L 0.968).
+  - The set against the Ada defaults: SrTiO3 0.8255 / 0.8194 (21.4 → 17.7 ms), NbCl5 0.8546 / 0.8558.
+  - Off: GEOM (1.0226 / 1.0209), VIRIAL_ELEMENTWISE, SEGMENT_ROWS (tie), RECEIVER_SUM (structure-dependent), GRAPH_SUM, SCALAR_PATHS, BLOCK_ORDER, DEGREE_PARTS.
+  - BUTTERFLY (off 5 Nov) and STAGE_SH (off 8 Nov) flipped on.
+  - POLAR-1-M and -L: the set was slower (M NaCl 1.0061 / 1.0077). Leave-one-out found STAGE_DOUT, so the Ada joins `STAGE_DOUT_MODEL_OFF_GPUS` for polar1-m and polar1-l; without it, M and L tie with the defaults. OFF23-medium ties.
+- **RTX 5060 Ti.**
+  - On: SPLINE_W with R128 and spline STAGE_EDGES, PACKED8, SORT_BY_LENGTH, GENERIC_FOLD_READOUT_TAIL, POWER_BACKWARD, RECEIVER_SUM, w′ STAGE_EDGES / STAGE_DOUT / STAGE_SH, generic fold_product_linear.
+  - The set against the 5060 Ti defaults: SrTiO3 0.6427 / 0.6478 (23.9 → 15.4 ms), NbCl5 0.6911 / 0.6906.
+  - POLAR: gate_epilogue on for S, M and L; the w′ pair for POLAR-1-M only (NbCl5 0.927 / 0.939). Not for L (NbCl5 1.0098 / 1.0097).
+  - Not adopted: the SC pair (tie), SYMMETRIC_PAIRS (mixed), CUEQ_PROJECTED, BLOCK_ORDER, GRAPH_SUM, DEGREE_PARTS, SPLINE_VECTOR 4.
+  - The 5060 Ti gates use 2×2×2 cells: the 3×3×3 POLAR-1-M float64 reference failed to map GPU memory under WSL.
+- **Gates.** All pass: OMAT-0 on both GPUs, POLAR-1-M and OFF23-medium on the Ada, POLAR S, M and L on the 5060 Ti.
+
+CPU suite on murphy at e63f2a9c: 5,552 passed, 203 skipped, 38 failed. 37 failures came from dftd3_params.npz missing from the tree sent, and 1 from a stale test, fixed in 47cec07f (the only later change). The 8 affected files were rerun with the npz present: 115 passed, 16 skipped, 0 failed. See `results/ada-5060-screen-20261110/README.md` and `docs/current/models-firing.md`.

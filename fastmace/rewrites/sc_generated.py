@@ -25,7 +25,11 @@ SC_GENERATED = None
 # 0.959, stress 0.415 / 0.778 / 1.209).
 # A100 family (9 November 2026, same run id; Modal NVIDIA A100 80GB PCIe, a = its A100 defaults): MD step b/a
 # 0.9685 / 0.9652; gate passes (forces 0.972 / 0.854 / 0.977, stress 0.701 / 0.898 / 1.237).
-SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9785 / 0.9775, 0.9738 / 0.9749; left out of the
+# adopted set 1.0177 / 1.0171, 1.0437 / 1.0434.
+SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe",
+                               "NVIDIA RTX 4000 Ada Generation"))
 # SC_FACTORED (results/other-ways-20261109 section 3; rounding: another basis and summation order): with SC_GENERATED
 # the kernel pair of kernels.cuda.sc_factored, the contraction through memoised CG pair products in a cheaper basis of
 # the descriptor's span, the change of basis folded into the weights once at routing. OMAT-0 medium: 413 operations
@@ -35,8 +39,10 @@ SC_GENERATED_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA A
 # Benchmark_loup MD step b/a, a = the A100 defaults): 0.9889 / 0.9881 (ab / ba); force/stress gate passes with GEOM
 # also on (forces 0.863 / 0.913 / 0.985, stress 0.727 / 0.896 / 1.343). The H200 stopped at its bound (ledger
 # sc0-invariant-basis: under 1 % there). None: on for SC_FACTORED_GPUS; True / False: an A/B side's choice.
+# RTX 4000 Ada (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; on top of SC_GENERATED, MD step
+# b/a SrTiO3 10x10x10 0.9978 / 0.9978, NbCl5 0.9907 / 0.9906, ab / ba): on with the Ada set, gated with it.
 SC_FACTORED = None
-SC_FACTORED_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+SC_FACTORED_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA RTX 4000 Ada Generation"))
 
 _subclasses = {}
 
