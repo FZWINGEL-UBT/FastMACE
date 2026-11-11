@@ -2098,3 +2098,25 @@ def test_large_caps_join_a_default_budget_of_host_state_calls_only(monkeypatch):
     monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", None)  # on the CPU: not an A100
     assert TiledForceField(field, TileConfig(5, mode="auto", state="host")).config.budget_receivers == (
         8192, 16384)
+
+
+def test_large_caps_need_room_on_the_host(monkeypatch):
+    """``TILE_LARGE_CAP_HOST_BYTES`` (the large caps' size rule): the budget takes 32,768 or 65,536 only where the host
+    keeps their per-receiver host bytes (plus 10 %) above ``list_reuse_floor``; the device budget alone decides the
+    smaller caps."""
+    from fastmace.model import tiled as tiled_module
+
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    monkeypatch.setattr(tiled_module, "TILE_LARGE_CAPS", True)
+    per = tiled_module.TILE_LARGE_CAP_HOST_BYTES
+    chosen = {}
+    for name, extra in (("plenty", 1.1 * per * (65536 - 8192) + 1), ("half", 1.1 * per * (32768 - 8192) + 1),
+                        ("short", -1), ("unknown", None)):
+        tiled = TiledForceField(field, TileConfig(8192, mode="auto", state="host"))
+        floor = int(tiled.config.list_reuse_floor)
+        monkeypatch.setattr(tiled_module, "_host_available", lambda extra=extra: None if extra is None
+                            else int(floor + extra))
+        tiled._choose_receivers((8192 * 1000, 10**12))  # the device fits every cap
+        chosen[name] = tiled.receivers
+    assert chosen == {"plenty": 65536, "half": 32768, "short": 16384, "unknown": 65536}

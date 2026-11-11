@@ -165,6 +165,12 @@ TILE_WHOLE_BLOCK_ORDER = False
 TILE_LARGE_CAPS = None
 TILE_LARGE_CAP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 TILE_LARGE_CAP_RECEIVERS = (32768, 65536)
+# The large caps' host cost (the size rule): host-state tiles hold per-tile host buffers (kept lists, staging) that grow
+# with the cap. SrTiO3 160^3 on the A100 (Alex 4985398): host peak 24.3 / 28.0 / 31.9 / 43.3 GB at R 8,192 / 16,384 /
+# 32,768 / 65,536, about 0.33 MB per receiver, while the device workspace fits at every size. ``_choose_receivers``
+# takes a large cap only where the host keeps this much per added receiver (plus 10 %) above ``list_reuse_floor``:
+# at the 397.5M record (229 of the cgroup's 231.5 GB) the cap stays where it was.
+TILE_LARGE_CAP_HOST_BYTES = 350_000
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
 # tile built while the cache had room but too large for what was left is built again from the kept lists (the same
@@ -2781,8 +2787,16 @@ class TiledForceField:
             return
         workspace, available = memory
         per_receiver = workspace / self.receivers
-        fits = [r for r in (self.receivers, *map(int, self.config.budget_receivers))
-                if 1.1 * per_receiver * r <= available]
+        candidates = (self.receivers, *map(int, self.config.budget_receivers))
+        host = _host_available() if any(r in TILE_LARGE_CAP_RECEIVERS for r in candidates) else None
+        floor = int(self.config.list_reuse_floor)
+
+        def host_fits(r):  # TILE_LARGE_CAP_HOST_BYTES: the large caps' host buffers
+            if r not in TILE_LARGE_CAP_RECEIVERS or r <= self.receivers or host is None:
+                return True
+            return host - floor >= 1.1 * TILE_LARGE_CAP_HOST_BYTES * (r - self.receivers)
+
+        fits = [r for r in candidates if 1.1 * per_receiver * r <= available and host_fits(r)]
         chosen = max(fits, default=self.receivers)
         if chosen != self.receivers:
             self._budget_raised = chosen > int(self.config.receivers)
