@@ -1907,11 +1907,13 @@ class TiledForceField:
         if not self._captured():  # fixed addresses only for the graphs' replays: this sweep's outputs themselves,
             slot["out"] = {sweep: dict(zip(names, values))}  # no copy, and no other sweep's kept beside them
             return
-        out = slot["out"].setdefault(sweep, {})
+        # the graphs' outputs apart from an uncaptured call's (which replaces ``slot["out"]``): their addresses stay
+        out = slot.setdefault("graph_out", {}).setdefault(sweep, {})
         for name, value in zip(names, values):
             if name not in out:
                 out[name] = torch.empty_like(value)
             out[name].copy_(value)
+        slot["out"] = {sweep: out}
 
     def _scatter(self, sweep, slot, g, piece, host_nodes=None):
         """Add the slot's outputs into the global buffers (outside the graphs: warm-ups and captures have no side
@@ -1985,6 +1987,7 @@ class TiledForceField:
                 self._body(sweep, slot, g)
             slot["graphs"][sweep] = graph
         graph.replay()
+        slot["out"] = {sweep: slot["graph_out"][sweep]}
 
     # ------------------------------------------------------------------ the call
 
