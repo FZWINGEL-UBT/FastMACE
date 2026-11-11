@@ -272,7 +272,8 @@ def packed8_source(source, bias):
 # (SrTiO3 10x10x10), 1.0156 / 1.0159 (NbCl5); with PACKED8 0.9120 / 0.9139 against PACKED8's 0.9013 / 0.9058 (census on
 # sm_89: 614 -> 667 instructions, stack 8 -> 16 bytes, shared 2.7 -> 10.4 kB).
 GEOM = None
-GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# H200 (12 November 2026, results/h200-pack-20261111): MD step b/a SrTiO3 10^3 0.9857 / 0.9890, NbCl5 0.9891 / 0.9860; gate passes.
+GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"))
 
 
 def geom_default(device):

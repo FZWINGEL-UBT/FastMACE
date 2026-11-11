@@ -49,7 +49,9 @@ TILE_RULES = ("fixed", "waves")
 # results/off-polar-alex-20261106): MD step b/a (b = on), water_216, abab / abba: OFF23-large 0.919 / 0.919; with
 # the OFF tables and the stock first skip, all five OFF models 0.56-0.65. Force gates pass under the 3x rule.
 RADIAL_TF32X3 = None
-RADIAL_TF32X3_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# H200 (12 November 2026, results/h200-pack-20261111): MACE-OFF23-medium water_216 with radial tables, STOCK_FIRST_SKIP and RADIAL_TF32X3 together,
+# MD step b/a 0.7417 / 0.7422 (2.43 -> 1.80 ms); gate passes (forces <= 1.25, stress <= 1.51).
+RADIAL_TF32X3_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 _ALIGN = 4  # cutlass.tf32x3.ALIGNMENT: K and N padded to it
 # SPLIT_COLUMNS: None follows SPLIT_COLUMNS_GPUS; True / False: an A/B side's choice. RTX 5060 Ti (36 SMs), MD step
 # b/a, water_216, abab / abba: MACE-OFF23-large 0.951 / 0.953 (16-column tiles; 32-column tiles 1.07 / 1.06);

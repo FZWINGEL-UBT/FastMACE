@@ -265,7 +265,7 @@ def test_h200_defaults():
     # A100-SXM4: 12 warps with WFRAG_REGION, then W_GROUP (6 November 2026): 0.9718 / 0.9734 together
     assert "NVIDIA A100-SXM4-80GB" in fused_forward.W_GROUP_GPUS
     assert "NVIDIA A100-SXM4-80GB" in fused_forward.WFRAG_REGION_GPUS  # alone 0.9871 / 0.9887
-    assert "NVIDIA H200" not in fused_forward.WFRAG_REGION_GPUS  # a tie: 1.0014 / 1.0010
+    assert "NVIDIA H200" in fused_forward.WFRAG_REGION_GPUS  # 12 Nov re-screen: 0.9877 / 0.9921, 0.9695 / 0.9913
     assert not fused_forward.A_SPLIT_GPUS  # H200 1.0311 / 1.0346 (slower)
     # Idea 27 (6 November 2026): X_LATE on both, MD H200 0.9884 / 0.9882, A100-SXM4 0.9937 / 0.9937
     assert {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} <= set(fused_forward.X_LATE_GPUS)

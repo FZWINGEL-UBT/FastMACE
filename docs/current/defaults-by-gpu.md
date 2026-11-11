@@ -49,9 +49,9 @@ certificate). Commits are where the set last gained a family.
 | POLAR k-space `MEGAKERNEL` (`polar.MEGAKERNEL_GPUS`, from `MEGAKERNEL_MIN_WORK`) | not measured | on | on (NbCl5: S 0.8964 / 0.8964, M 0.9490 / 0.9517, L 0.9678 / 0.9684) | on | rounding | `b155b642`, `b4ec7053`, `d1048f04` |
 | `tf32x3_gemms` by label: OFF ×5, POLAR-1 S, M, L (`DECISION_66_TF32X3_MODEL_GPUS`) | not measured | on | not measured | not measured | precision | `91e428a1`, `1ffd7f34`, `f7f223c1` |
 | `CUEQ_PROJECTED` (`cueq_projection.CUEQ_PROJECTED_GPUS`; not OFF23-large, POLAR-1-S, -M on the A100: `DECISION_66_CUEQ_PROJECTED_EXCLUDED`) | on | on | off (0.9992 / 0.9987 off again: slower on) | off (from the 5060 Ti candidate set: removing it 1.0000 / 0.9997, 0.9920 / 0.9993) | rounding | `b8d977f4` |
-| Stock first block's species skip, MACE-OFF (`generic.modules.STOCK_FIRST_SKIP_GPUS`) | not measured | on | on | on | exact | `90cac1b3`, `42c063ce` |
-| Radial tables with the stock first block, MACE-OFF (`DECISION_66_STOCK_FIRST_TABLES_GPUS`) | not measured | on | on | on | certified | `90cac1b3`, `42c063ce` |
-| Radial last layer as 3×TF32, MACE-OFF (`skinny_linear.RADIAL_TF32X3_GPUS`) | not measured | on | not measured | off (Triton 3×TF32 slower) | precision | `90cac1b3` |
+| Stock first block's species skip, MACE-OFF (`generic.modules.STOCK_FIRST_SKIP_GPUS`) | on (with the two rows below, OFF23-medium 0.7417 / 0.7422, 12 Nov) | on | on | on | exact | `90cac1b3`, `42c063ce` |
+| Radial tables with the stock first block, MACE-OFF (`DECISION_66_STOCK_FIRST_TABLES_GPUS`) | on (12 Nov, with the rows around it) | on | on | on | certified | `90cac1b3`, `42c063ce` |
+| Radial last layer as 3×TF32, MACE-OFF (`skinny_linear.RADIAL_TF32X3_GPUS`) | on (12 Nov, with the two rows above; gate passes) | on | not measured | off (Triton 3×TF32 slower) | precision | `90cac1b3` |
 | Column-split input gradient (`skinny_linear.SPLIT_COLUMNS_GPUS`) | not measured | off (tie, 0.993–1.005) | on (OFF23-large 0.9556 / 0.9583; OFF24 no split) | on | bitwise | `8e733265`, `1aec1931`, `edfc0115` |
 | Model exclusions (`*_MODEL_OFF_GPUS`): `SORT_BY_LENGTH` off for OFF23-small, -large (A100); w′ `STAGE_DOUT` off for POLAR-1-M (A100, Ada) and POLAR-1-L (Ada); `DEGREE_PARTS` off for POLAR-1-M (A100) | not measured (no OFF or POLAR A/B on the H200) | on (the exclusions) | w′ `STAGE_DOUT` off for POLAR-1-M and -L (leave-one-out from the Ada set: M NaCl 0.9868 / 0.9858, L NbCl5 0.9986 / 0.9987 off; the set without it against the defaults: M 0.9986 / 1.0006, 0.9999 / 0.9982, L 1.0005 / 1.0005) | none needed for POLAR-1-M (measured with `STAGE_DOUT` on: 0.9659 / 0.9758, 0.9273 / 0.9389); OFF23-small, -large not measured | rounding / bitwise | `c619d306`, ada-5060-screen |
 | `EDGE_SH` in MH-1's class (`generic.modules.EDGE_SH_MH1_GPUS`, empty) | not measured | off (POLAR-1 tie, S, M, L within 0.4 %; MH-1 not measured) | not measured | not measured | rounding | – |
@@ -93,13 +93,13 @@ certificate). Commits are where the set last gained a family.
 | fused forward `WS_FORWARD` | on | n/a (sm_90 wgmma) | n/a | n/a | rounding | `aa544c69` |
 | fused forward `LANE_INDICES` | on | not measured | not measured | not measured | bitwise | `44f548bf` |
 | fused forward `W_GROUP` | on | on | not measured | not measured | bitwise | `240b2019`, `ff4d1a89` |
-| fused forward `WFRAG_REGION` | off (tie 1.0014 / 1.0010) | on | not measured | not measured | bitwise | `ff4d1a89` |
+| fused forward `WFRAG_REGION` | on (12 Nov re-screen 0.9877 / 0.9921, NbCl5 0.9695 / 0.9913; 6 Nov a tie) | on | not measured | not measured | bitwise | `ff4d1a89` |
 | fused forward `X_LATE` | on | on | not measured | not measured | bitwise | `fc0d7531` |
 | fused forward `CG_FOLD` | on | on | not measured | not measured | rounding | `1388c3a1` |
 | fused forward `A_LD128` | on | on | not measured | not measured | bitwise | `31c394b4` |
 | fused forward `TP_NOFLUSH` | off (0.9992 / 1.0018) | on | not measured | not measured | bitwise | `31c394b4` |
 | fused forward `SH_LDS4` (needs `VEC_SH`) | off (1.0014 / 1.0027) | off (1.0008 / 0.9949) | n/a (`VEC_SH` off) | on | bitwise | `9a6df1f5` |
-| CUTLASS `tf32x3.HYBRID` (`cutlass.tf32x3.HYBRID_GPUS`; TF32 big·big + one FP16 cross mma in every 3×TF32 entry) | not measured | on (0.9896 / 0.9877 SrTiO3, 0.9832 / 0.9846 NbCl5) | n/a | n/a | rounding (gate passes) | review-retries 2026-11-11 |
+| CUTLASS `tf32x3.HYBRID` (`cutlass.tf32x3.HYBRID_GPUS`; TF32 big·big + one FP16 cross mma in every 3×TF32 entry) | on (12 Nov: 0.9909 / 0.9940 SrTiO3, 0.9892 / 0.9885 NbCl5; gate passes) | on (0.9896 / 0.9877 SrTiO3, 0.9832 / 0.9846 NbCl5) | n/a | n/a | rounding (gate passes) | review-retries 2026-11-11 |
 | CUTLASS `LINEAR_DIV` (`cutlass.linear_div.LINEAR_DIV_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `5dc5d799` |
 | CUTLASS `SKIP_SELECT` (`cutlass.skip_select.SKIP_SELECT_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `6561cc13` |
 | `SEGMENT_ROWS` (`cutlass.segment_rows.SEGMENT_ROWS_GPUS`) | off (1.0006 / 1.0000) | on | off (tie with the CUTLASS backend on sm_89: 0.9967 / 0.9981, 0.9984 / 1.0016) | n/a (CUTLASS cubins for sm_80 / sm_90 only) | rounding (3×TF32) | `6c2f2967` |
@@ -114,7 +114,7 @@ certificate). Commits are where the set last gained a family.
 | spline forward `PREFETCH_AHEAD` (off for omat0-small on the A100: `PREFETCH_AHEAD_MODEL_OFF_GPUS`) | off (1.0046 / 1.0067) | on | off (1.0037 / 1.0051, 1.0063 / 1.0073) | off (NbCl5 1.0190 / 1.0073) | bitwise | `8aaace6b`, `50480105` |
 | spline forward `BLOCK_ORDER` | on | on | off (tie 0.9961 / 0.9947, 1.0012 / 1.0000) | off (removing it from the candidate set 0.9988 / 0.9969, 0.9944 / 1.0013) | bitwise | `5e7d961f` |
 | spline forward `PACKED8` | on | on | on (0.9036 / 0.9030, 0.9346 / 0.9357) | on (0.9222 / 0.9246, 0.9456 / 0.9535) | rounding | `e3049399`, `ec25c9c4`, ada-5060-screen |
-| spline forward `GEOM` (`spline_forward.GEOM_GPUS`) | not measured | on | off (1.0226 / 1.0209, 1.0156 / 1.0159) | not measured (needs `SPLINE_W` + `STAGE_EDGES`, on from ada-5060-screen) | rounding | `48000458` |
+| spline forward `GEOM` (`spline_forward.GEOM_GPUS`) | on (12 Nov: 0.9857 / 0.9890 SrTiO3, 0.9891 / 0.9860 NbCl5; gate passes) | on | off (1.0226 / 1.0209, 1.0156 / 1.0159) | not measured (needs `SPLINE_W` + `STAGE_EDGES`, on from ada-5060-screen) | rounding | `48000458` |
 | `COMPOSE_SKIP` | on | on | on (with OMAT-0 tf32x3) | off (needs `tf32x3_gemms`: tf32x3 + compose NbCl5 1.0412 / 1.0396) | rounding | `b8d977f4`, `1cd369e4` |
 | `COMPOSE_FAST` | on | on | on | n/a (with `COMPOSE_SKIP`, off) | bitwise | `b8d977f4`, `1cd369e4` |
 | `COUNT_PLAN` | on | on | off (tie 1.0000 / 1.0004) | n/a (with `COMPOSE_SKIP`, off) | bitwise | `b8d977f4` |
@@ -190,7 +190,7 @@ switches and the POLAR / OFF cells named there. A cell needs:
 | fused forward `CG_FOLD` | Ada, 5060 Ti | A/B + gate |
 | CUTLASS `LINEAR_DIV`, `SKIP_SELECT` | Ada, 5060 Ti | A/B only (bitwise at kernel level) |
 | `R128` `MIN_BLOCKS` 8 for omat0-small | A100, Ada, 5060 Ti | A/B only (bitwise) |
-| spline `GEOM` | H200, 5060 Ti (now that SPLINE_W + STAGE_EDGES are on there) | A/B + gate |
+| spline `GEOM` | 5060 Ti (H200 measured 12 Nov: on) (now that SPLINE_W + STAGE_EDGES are on there) | A/B + gate |
 | `SC_FACTORED` | 5060 Ti only once SC_GENERATED is on there (it needs `tf32x3_gemms`; H200: lab bound under 1 %, no MD A/B) | A/B + gate |
 | `VIRIAL_ELEMENTWISE` | H200; other families than OMAT-0 medium on the 5060 Ti | stress-call A/B (tools/virial_ab.py) + gate |
 | tiled speed switches | H200, A100, Ada | A/B only, except `TILE_VIRIAL`, `TILE_EPILOGUE` (A/B + gate) |

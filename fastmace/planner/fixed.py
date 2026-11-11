@@ -537,8 +537,10 @@ DECISION_66_GENERIC_RADIAL_TABLES_GPUS: tuple[str, ...] = GPUModels(("NVIDIA GeF
 # RTX 4000 Ada (murphy, 8 November 2026, results/off-polar-alex-20261106), the skip and the tables together, MD
 # step b/a, water_216, abab / abba: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725,
 # OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
+# H200 (12 November 2026, results/h200-pack-20261111): MACE-OFF23-medium water_216 with radial tables, STOCK_FIRST_SKIP and RADIAL_TF32X3 together,
+# MD step b/a 0.7417 / 0.7422 (2.43 -> 1.80 ms); gate passes (forces <= 1.25, stress <= 1.51).
 DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
-                                                 "NVIDIA RTX 4000 Ada Generation"))
+                                                 "NVIDIA RTX 4000 Ada Generation", "NVIDIA H200"))
 # generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
 # whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
 # medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;
