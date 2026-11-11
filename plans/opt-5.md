@@ -107,6 +107,8 @@ tensor-only sweep, pre-split operands/epilogue) were negative or neutral on `sm_
 Final follow-ups: 4+4 `setmaxnreg` warpgroup variant, CUTLASS GeForce FP16 check and fused producer split
 all negative (design report §3.7). GEMM-level hybrid work on `sm_120` is closed; `sm_80`/`sm_89`
 qualification of the normalized standalone path awaits owner permission (NAS/workstation pause).
+(Note, 11 November 2026: that qualification ran on 26 October and rejected the path on the A100, RTX A4000 and RTX
+4000 Ada, 1.12–1.71× of cuBLAS; `docs/validation/speed/opt-5.md` §3.11.)
 
 ```text
 Wave 1 (falsifiers first, no library edits):
