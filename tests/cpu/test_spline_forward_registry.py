@@ -12,6 +12,9 @@ binds its own order on the object its launches go through.
 import inspect
 import types
 
+import pytest
+import torch
+
 from fastmace.kernels.oeq_streaming import spline_forward, wprime_backward
 
 
@@ -47,3 +50,39 @@ def test_the_constructor_never_replaces_an_entry():
 def test_the_wprime_build_binds_the_registered_forward():
     source = inspect.getsource(wprime_backward)
     assert "forward = registered_forward(SplineForward(" in source
+
+
+
+def _shared_kernel():
+    """A stand-in with ``SplineForward``'s per-call state (its ``launch_order`` runs on the CPU)."""
+    return types.SimpleNamespace(id=5, order=None, _identity={})
+
+
+def _launch_order(kernel, *args):
+    return spline_forward.SplineForward.launch_order(kernel, *args)
+
+
+def test_two_force_fields_of_different_sizes_each_launch_their_own_order(monkeypatch):
+    monkeypatch.setattr(spline_forward, "_REGISTRY", {})
+    kernel = spline_forward.shared(_shared_kernel())
+    assert spline_forward.shared(_shared_kernel()) is kernel   # force field j's build: the same object
+    small = torch.tensor([2, 0, 1], dtype=torch.int32)        # force field k: 3 receivers
+    large = torch.tensor([4, 3, 0, 1, 2], dtype=torch.int32)  # force field j: 5 receivers
+    kernel.order = small                                      # k binds, then calls (or captures)
+    assert _launch_order(kernel, 3, "cpu") is small
+    kernel.order = large                                      # j binds before its own call
+    assert _launch_order(kernel, 5, "cpu") is large
+    # a call with another row count than the bound order (k's rows while j's order is bound) never reads it
+    identity = _launch_order(kernel, 3, "cpu")
+    assert identity.tolist() == [0, 1, 2] and _launch_order(kernel, 3, "cpu") is identity  # cached per row count
+    assert _launch_order(kernel, 7, "cpu").tolist() == list(range(7))                     # never too short
+    explicit = torch.tensor([1, 0], dtype=torch.int32)
+    assert _launch_order(kernel, 2, "cpu", explicit) is explicit
+
+
+def test_an_order_of_another_dtype_is_refused(monkeypatch):
+    monkeypatch.setattr(spline_forward, "_REGISTRY", {})
+    kernel = spline_forward.shared(_shared_kernel())
+    kernel.order = torch.arange(4)  # int64
+    with pytest.raises(ValueError, match="BLOCK_ORDER"):
+        _launch_order(kernel, 4, "cpu")
