@@ -1,0 +1,81 @@
+{
+ "pack": [
+  [
+   "hybrid",
+   [
+    "fastmace.kernels.cutlass.tf32x3:HYBRID=True"
+   ]
+  ],
+  [
+   "geom",
+   [
+    "fastmace.kernels.oeq_streaming.spline_forward:GEOM=True"
+   ]
+  ]
+ ],
+ "structures": [
+  [
+   "SrTiO3",
+   [
+    10,
+    10,
+    10
+   ]
+  ]
+ ],
+ "gate_args": "parsed",
+ "constants": {
+  "fastmace.kernels.cutlass.tf32x3:HYBRID": true,
+  "fastmace.kernels.oeq_streaming.spline_forward:GEOM": true
+ },
+ "geom": {
+  "a100_form": {
+   "shared_g_per_edge": 54,
+   "base": {
+    "registers": 80,
+    "local": 0,
+    "shared": 3728,
+    "spill_ops": 0,
+    "loop_len": 357
+   },
+   "geom": {
+    "registers": 80,
+    "local": 0,
+    "shared": 10896,
+    "spill_ops": 25,
+    "loop_len": 330
+   }
+  },
+  "h200_form": {
+   "shared_g_per_edge": 54,
+   "base": {
+    "registers": 80,
+    "local": 0,
+    "shared": 3728,
+    "spill_ops": 0,
+    "loop_len": 348
+   },
+   "geom": {
+    "registers": 80,
+    "local": 0,
+    "shared": 10896,
+    "spill_ops": 5,
+    "loop_len": 317
+   }
+  }
+ },
+ "hybrid_cubin": {
+  "arch": [],
+  "entries": 11,
+  "same_entries_as_3xtf32": true
+ },
+ "tarball": {
+  "tools/modal/h200_hybrid_geom.sh": true,
+  "fastmace/kernels/cutlass/tf32x3_hyb_sm90.cubin": true,
+  "fastmace/kernels/cutlass/tf32x3_sm90.cubin": true,
+  "results/loup-a100-20261103/SrTiO3.cif": true,
+  "tools/ab_rewrites.py": true,
+  "tools/force_stress_gate.py": true,
+  ".source_commit": true
+ }
+}
