@@ -65,6 +65,20 @@ TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Genera
 # RTX 4000 Ada device state 0.868 / 0.868, wavefront 0.772 / 0.769; A100-SXM4-80GB 0.792 / 0.789 and 0.782 / 0.785
 # (every A100 model: GPUModels matches the family).
 TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
+# TileConfig.compiled_graphs None: on for these GPU families (decision 66: where a same-process A/B measured the
+# captured compiled bodies faster in both orders), device state only, and only where the memory guard below fits.
+COMPILED_GRAPH_GPUS = GPUModels(())
+# The memory guard of TileConfig.compiled_graphs (on or None): the first compiled call runs uncaptured and measures its
+# tile workspace; the bodies are captured from the next call on when ``available`` holds one capture pool of that
+# workspace per slot, plus the uncaptured warm-ups' own workspace, each with this margin (``compiled_graphs_fit``).
+# A captured call that still runs out of device memory drops its graphs and runs again without them.
+COMPILED_GRAPH_MARGIN = 1.1
+
+
+def compiled_graphs_fit(workspace, available, slots):
+    """Whether ``slots`` capture pools of a measured tile ``workspace`` (bytes), and the warm-ups' workspace beside
+    them, fit ``available`` bytes (the guard of ``TileConfig.compiled_graphs``)."""
+    return (int(slots) + 1) * COMPILED_GRAPH_MARGIN * float(workspace) <= float(available)
 # TILE_PREFETCH_DEVICE (exact): TileConfig.prefetch also with the state on the device, where it builds the next tile's
 # graph on the side stream while the current tile runs (its rows are read in the body, as before). Without it a
 # device-state call built each graph after the previous body had drained the GPU (torch.unique and the edge counts
@@ -256,9 +270,13 @@ class TileConfig:
     boundary_skin: bool = True
     # Compiled tiles (mode "compiled", or "auto" once it compiles): each slot's compiled sweep bodies captured in a
     # CUDA graph (one per slot and sweep, after two warm-ups) and replayed per tile, as mode "graphs" does with the
-    # eager bodies. Device state only (the captured bodies read it), no lanes. Off by default: the gaps between a
-    # compiled call's kernels are about 2 % of it (tiled-call-memory.md, tiled-1m-speed.md).
-    compiled_graphs: bool = False
+    # eager bodies. Device state only (the captured bodies read it), no lanes. The first compiled call runs
+    # uncaptured and measures its workspace; the captures follow only where one capture pool per slot fits beside it
+    # (``compiled_graphs_fit``; the 16 GB A4000 ran out of memory at 975,560 atoms, R 8,192, with graphs on from the
+    # first call), and a captured call that runs out of memory runs again without graphs. None: on for
+    # ``COMPILED_GRAPH_GPUS`` where the configuration allows it (mode compiled or auto, device state, no lanes="on",
+    # no aliased device state), else off; True refuses those configurations.
+    compiled_graphs: bool | None = None
 
     def __post_init__(self):
         if self.mode not in ("auto", "eager", "padded", "graphs", "compiled"):
@@ -274,7 +292,7 @@ class TileConfig:
             raise ValueError(f"TileConfig.receivers must be positive, got {self.receivers!r}")
         if self.species not in ("one_hot", "index"):
             raise ValueError(f"TileConfig.species must be 'one_hot' or 'index', got {self.species!r}")
-        if self.alias_state and self.state == "device" and (self.mode == "graphs" or self.compiled_graphs):
+        if self.alias_state and self.state == "device" and (self.mode == "graphs" or self.compiled_graphs is True):
             raise ValueError("TileConfig.alias_state with state='device' cannot run in CUDA graphs: the window and the "
                              "pooled rows are indexed outside the captured bodies")
         if self.alias_state and self.state == "device" and self.lanes == "on":
@@ -310,7 +328,9 @@ class TileConfig:
             raise ValueError(f"TileConfig.lanes must be 'auto', 'on' or 'off', got {self.lanes!r}")
         if self.lanes == "on" and self.mode in ("eager", "graphs"):
             raise ValueError(f"TileConfig.lanes='on' needs padded or compiled tiles, not mode {self.mode!r}")
-        if self.compiled_graphs:
+        if self.compiled_graphs not in (None, True, False):
+            raise ValueError(f"TileConfig.compiled_graphs must be None, True or False, got {self.compiled_graphs!r}")
+        if self.compiled_graphs is True:
             if self.mode not in ("compiled", "auto"):
                 raise ValueError(f"TileConfig.compiled_graphs needs mode 'compiled' or 'auto', not {self.mode!r}")
             if self.state == "host":
@@ -1233,7 +1253,7 @@ class TiledForceField:
             raise ValueError("TiledForceField does not support joint embeddings or PolarMACE")
         if self.config.mode == "graphs" and field.device.type != "cuda":
             raise ValueError("TileConfig.mode='graphs' needs a CUDA device")
-        if self.config.compiled_graphs and field.device.type != "cuda":
+        if self.config.compiled_graphs is True and field.device.type != "cuda":
             raise ValueError("TileConfig.compiled_graphs needs a CUDA device")
         self.model = model
         self.device = field.device
@@ -1274,6 +1294,11 @@ class TiledForceField:
         self.backward_chunk_scale = int(scale)
         # TILED_SPEED_GPUS: where the tiled speed switches left at None are on
         self._speed_gpu = self.device.type == "cuda" and torch.cuda.get_device_name(self.device) in TILED_SPEED_GPUS
+        # TileConfig.compiled_graphs: None is on for COMPILED_GRAPH_GPUS; the memory guard's verdict (None until the
+        # first compiled call measured), its measurement (workspace, available, slots) and the reason
+        self._graph_gpu = (self.device.type == "cuda"
+                           and torch.cuda.get_device_name(self.device) in COMPILED_GRAPH_GPUS)
+        self._graphs_fit, self._graph_memory, self.graphs_state = None, None, None
         for module in model.modules():  # from each module's own value: a second tiled field scales it once
             if getattr(module, "chunked_backward_edges", 0) > 0:
                 base = getattr(module, "_tile_chunk_base", module.chunked_backward_edges)
@@ -1957,7 +1982,60 @@ class TiledForceField:
     def _captured(self):
         """Whether the slots' sweep bodies run as captured CUDA graphs: mode "graphs" (eager bodies), or compiled
         bodies with ``TileConfig.compiled_graphs``."""
-        return self.mode == "graphs" or (self.mode == "compiled" and self.config.compiled_graphs)
+        return self.mode == "graphs" or (self.mode == "compiled" and self._graphs_wanted() and self._graphs_fit is True)
+
+    def _graphs_wanted(self):
+        """Whether ``TileConfig.compiled_graphs`` asks for captured compiled bodies (before the memory guard): True,
+        or None on ``COMPILED_GRAPH_GPUS`` with a configuration that allows them."""
+        config = self.config
+        if config.compiled_graphs is None:
+            return (getattr(self, "_graph_gpu", False) and config.state == "device" and config.lanes != "on"
+                    and not config.alias_state and config.mode in ("compiled", "auto"))
+        return bool(config.compiled_graphs)
+
+    def _choose_graphs(self, memory, slots, measured_receivers):
+        """The memory guard of ``TileConfig.compiled_graphs`` after the first compiled call (uncaptured): on when
+        ``slots`` capture pools of its tile workspace (scaled to the cap the budget chose) and the warm-ups' fit
+        ``available`` (``compiled_graphs_fit``), else off for the field's life."""
+        if memory is None:
+            self._graphs_fit, self.graphs_state = False, "off: no device memory measurement"
+            return
+        workspace, available = memory
+        workspace = workspace * self.receivers / max(1, int(measured_receivers))
+        self._graph_memory = (workspace, available, int(slots))
+        self._graphs_fit = compiled_graphs_fit(workspace, available, slots)
+        verdict = "fit" if self._graphs_fit else "do not fit"
+        self.graphs_state = (f"{'on' if self._graphs_fit else 'off'}: {int(slots)} capture pools and the warm-ups of "
+                             f"{workspace / 2**30:.2f} GiB (x{COMPILED_GRAPH_MARGIN}) {verdict} "
+                             f"{available / 2**30:.2f} GiB")
+
+    def _graphs_slots_fit(self, slots):
+        """A captured call with more slots than the guard measured: whether their pools still fit (else graphs off,
+        the captured ones dropped)."""
+        if self._graph_memory is None or slots <= self._graph_memory[2]:
+            return True
+        workspace, available, _ = self._graph_memory
+        if compiled_graphs_fit(workspace, available, slots):
+            self._graph_memory = (workspace, available, int(slots))
+            return True
+        self._drop_graphs(f"off: {int(slots)} slots' capture pools of {workspace / 2**30:.2f} GiB do not fit "
+                          f"{available / 2**30:.2f} GiB")
+        return False
+
+    def _drop_graphs(self, reason):
+        """``TileConfig.compiled_graphs`` off for the field's life: the captured graphs, their outputs and pool
+        released."""
+        import torch
+
+        self._graphs_fit, self.graphs_state = False, reason
+        for slot in self._slots.values():
+            slot["graphs"].clear()
+            slot.pop("graph_out", None)
+            slot.pop("out", None)
+        self._pool = None
+        self._graph_key = None
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
 
     def _run_slot(self, sweep, slot, g):
         """The sweep's body on the filled slot: eagerly, or by replaying its graph (captured on first use)."""
@@ -2019,13 +2097,20 @@ class TiledForceField:
                 oom = isinstance(error, torch.cuda.OutOfMemoryError) or "out of memory" in str(error)
                 lower = [int(r) for r in (self.config.receivers, *self.config.budget_receivers)
                          if int(r) < self.receivers]
+                graphs = self.mode == "compiled" and self._captured()
                 lanes = self.lanes_state == "on" and self.config.lanes == "auto"
-                if not (oom and (lanes or (self._budget_raised and lower))):
+                if not (oom and (graphs or lanes or (self._budget_raised and lower))):
                     raise
-                fallback = (self.receivers, self.receivers if lanes else max(lower),
-                            str(error).splitlines()[0][:200])
+                fallback = (self.receivers, self.receivers if graphs or lanes else max(lower),
+                            str(error).splitlines()[0][:200], graphs)
             # Outside the handler, so the failed call's frames (and their tensors) are released.
-            old, new, why = fallback
+            old, new, why, graphs = fallback
+            if graphs:  # TileConfig.compiled_graphs goes first: the same call again without captures
+                self._drop_graphs(f"off: out of device memory in a captured call ({why})")
+                self._g = None
+                self._list_cache = None
+                self._fallback = f"compiled graphs off after running out of device memory ({why})"
+                continue
             if new == old:  # the lanes go first: one tile workspace again at the same cap
                 self._lanes_fit = False
                 self._lane_slots.clear()
@@ -2084,7 +2169,15 @@ class TiledForceField:
         # The first padded (compiled) call also measures: the lanes' fit is its own tile workspace, not the eager
         # first call's scaled to the cap (eager tiles hold several times more: R 16,384 was refused with 12 GiB free).
         lanes_unmeasured = self._lanes_fit is None and padded and not self._captured()
-        measure = (not self._budgeted or self._auto or lanes_unmeasured) and self.device.type == "cuda"
+        # TileConfig.compiled_graphs: the first compiled call runs uncaptured and measures (the memory guard)
+        graphs_unmeasured = self.mode == "compiled" and self._graphs_fit is None and self._graphs_wanted()
+        if graphs_unmeasured:
+            self.graphs_state = "measuring: the first compiled call runs uncaptured"
+        graphs_state = self.graphs_state if self._graphs_wanted() else (
+            "off" if self.config.compiled_graphs is not None else
+            "off: not measured faster on this GPU or configuration" if self.mode == "compiled" else None)
+        measure = (not self._budgeted or self._auto or lanes_unmeasured or graphs_unmeasured) \
+            and self.device.type == "cuda"
         if measure:  # the workspace of this call: its peak above what stays allocated after it
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
@@ -2123,6 +2216,10 @@ class TiledForceField:
         try:
             g = self._globals(n, stress, pos, heads)
             self.heads, self.arange = g["heads"], g["arange"]
+            if padded and self.mode == "compiled" and self._captured():  # the guard: pools for every slot in use
+                self._graphs_slots_fit(len(set(keys)))
+                graphs_state = self.graphs_state
+            stats["compiled_graphs"] = graphs_state
             if padded and self._captured():  # (a call without graphs leaves the captured ones alone)
                 species = self.node_attrs if self._species is None else self._species
                 key = (id(g), pos.data_ptr(), species.data_ptr(), stress)
@@ -2334,6 +2431,7 @@ class TiledForceField:
             # Handed out: the caller holds the forces, not the call (else a caller that drops them still has them
             # on the device through the next call, beside its new buffer: 12 bytes per atom of that call's peak).
             g["forces"] = None
+            memory = None
             if self._auto or not self._budgeted:
                 memory = self._memory()  # None without a CUDA device: the mode and the cap stay
                 self._choose_mode(memory)
@@ -2342,8 +2440,13 @@ class TiledForceField:
                     if self.config.mode != "auto" or self.mode == "compiled":  # "auto": eager tiles take no budget
                         self._choose_receivers(memory)
             elif lanes_unmeasured and measure:  # TileConfig.lanes: a second workspace of this padded call's
-                workspace, available = self._memory()
+                memory = self._memory()
+                workspace, available = memory
                 self._lanes_fit = 2 * 1.1 * workspace <= available
+            if graphs_unmeasured and measure:  # TileConfig.compiled_graphs: the guard, from this call's workspace
+                self._choose_graphs(memory if memory is not None else self._memory(), len(stats["slots"]),
+                                    stats["receivers"])
+                stats["compiled_graphs"] = self.graphs_state
             return out
         finally:
             for module, count in saved:

@@ -210,8 +210,9 @@ planner = minimal.default_planner(user)
 plan = planner.plan_evaluation(user, atoms)
 field = planner.build_evaluation(plan, user, atoms)
 tiled = TiledForceField(field, TileConfig(256, mode="compiled", budget_receivers=()))
-configs = {"off": tiled.config, "on": dataclasses.replace(tiled.config, compiled_graphs=True)}
-kept, results = {}, {"off": [], "on": []}
+configs = {"off": dataclasses.replace(tiled.config, compiled_graphs=False),
+           "on": dataclasses.replace(tiled.config, compiled_graphs=True)}
+kept, results, states = {}, {"off": [], "on": []}, []
 # Each side with its own globals, alternating in one process (tools/bench/tiled_ab.py's TileConfig sides): every
 # switch of side changes the graph key, and the uncaptured side replaces the slots' outputs.
 for side in ("on", "off", "on", "off", "on", "on"):
@@ -219,6 +220,7 @@ for side in ("on", "off", "on", "off", "on", "on"):
     tiled._g = kept.get(side)
     energy, forces, stress = tiled.evaluate(atoms, stress=True)
     kept[side] = tiled._g
+    states.append(tiled.last["compiled_graphs"])
     results[side].append((float(energy), np.asarray(forces, np.float64), np.asarray(stress, np.float64)))
 
 
@@ -227,7 +229,7 @@ def relative(got, expected):
 
 
 off, on = results["off"][-1], results["on"][-1]
-print(json.dumps(dict(tiles=tiled.last["tiles"], calls=len(results["on"]),
+print(json.dumps(dict(tiles=tiled.last["tiles"], calls=len(results["on"]), states=states,
                       energy_rel=abs(on[0] - off[0]) / abs(off[0]), forces=relative(on[1], off[1]),
                       stress=relative(on[2], off[2]),
                       repeat_forces=relative(results["on"][-1][1], results["on"][0][1]))))
@@ -248,6 +250,9 @@ def test_compiled_graphs_alternate_with_uncaptured_calls():
     report = json.loads(result.stdout.strip().splitlines()[-1])
     print(json.dumps(report, indent=1))
     assert report["tiles"] > 1 and report["calls"] == 4, report
+    # the memory guard: the first compiled call runs uncaptured and measures; this small cell fits its pools
+    assert report["states"][0].startswith("on: ") and report["states"][1] == "off", report
+    assert all(state.startswith("on: ") for state in report["states"][2::2]), report
     assert report["energy_rel"] <= 1e-8, report
     assert report["forces"] <= 1e-5 and report["stress"] <= 1e-5, report
     assert report["repeat_forces"] <= 1e-5, report

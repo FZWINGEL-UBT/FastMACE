@@ -425,6 +425,83 @@ def test_compiled_graphs_refuse_other_modes_host_state_lanes_and_the_cpu():
                         TileConfig(mode="auto", compiled_graphs=True))
 
 
+def test_compiled_graphs_none_is_off_where_the_configuration_or_device_refuses():
+    """``compiled_graphs=None`` (the default): no refusal anywhere; off off a CUDA device and off the GPU list."""
+    for kwargs in (dict(mode="padded"), dict(mode="compiled", state="host"), dict(mode="auto", lanes="on")):
+        TileConfig(5, **kwargs)  # None: these configurations run without graphs
+    with pytest.raises(ValueError, match="None, True or False"):
+        TileConfig(5, compiled_graphs="on")
+    calc, atoms = calculator(), structure()
+    tiled = TiledForceField(MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER), TileConfig(5))
+    assert tiled.config.compiled_graphs is None and not tiled._graphs_wanted() and not tiled._captured()
+
+
+def _guarded(receivers=8192, slots=3):
+    """A tiled field's guard state alone (no model): compiled tiles with ``compiled_graphs=True``."""
+    tiled = TiledForceField.__new__(TiledForceField)
+    tiled.config, tiled.mode, tiled.device = TileConfig(5, mode="compiled", compiled_graphs=True), "compiled", \
+        torch.device("cpu")
+    tiled.receivers, tiled._graph_gpu = receivers, False
+    tiled._graphs_fit, tiled._graph_memory, tiled.graphs_state = None, None, None
+    tiled._slots = {key: dict(graphs={1: object()}, graph_out={1: {}}, out={1: {}}) for key in range(slots)}
+    tiled._pool, tiled._graph_key = object(), (1,)
+    return tiled
+
+
+# The 16 GB RTX A4000 (trillian, 3 November 2026; results/tiled-1m-20261103/rtx-a4000-trillian): 975,560 SrTiO3
+# atoms at R 8,192 ran out of memory in the first call with graphs (7.15 GiB in private pools, 2.62 GiB more
+# requested). Its run without graphs measured the compiled call's tiles at 12,743,459,840 bytes peak over a base of
+# 5,236,912,128 in 3 slots; the card holds 16,743,333,888 bytes.
+A4000_WORKSPACE = 12_743_459_840 - 5_236_912_128
+A4000_AVAILABLE = 16_743_333_888 - 5_236_912_128  # at most: the whole card past the base
+
+
+def test_compiled_graphs_guard_turns_the_a4000_case_off():
+    from fastmace.model.tiled import compiled_graphs_fit
+
+    assert not compiled_graphs_fit(A4000_WORKSPACE, A4000_AVAILABLE, 3)
+    assert not compiled_graphs_fit(A4000_WORKSPACE, A4000_AVAILABLE, 1)  # not even one pool beside the warm-ups
+    assert compiled_graphs_fit(A4000_WORKSPACE, 80 * 2**30 - 5_236_912_128, 3)  # an 80 GB A100: room for all
+    tiled = _guarded()
+    tiled._choose_graphs((A4000_WORKSPACE, A4000_AVAILABLE), 3, 8192)
+    assert tiled._graphs_fit is False and not tiled._captured() and tiled.graphs_state.startswith("off: 3 capture")
+    tiled = _guarded()
+    tiled._choose_graphs((A4000_WORKSPACE, 80 * 2**30), 3, 8192)
+    assert tiled._graphs_fit is True and tiled._captured() and tiled.graphs_state.startswith("on")
+    tiled = _guarded(receivers=16384)  # the budget doubled the cap after the measured call: twice the workspace
+    tiled._choose_graphs((A4000_WORKSPACE, 40 * 2**30), 3, 8192)
+    assert tiled._graphs_fit is False and tiled._graph_memory[0] == 2 * A4000_WORKSPACE
+    tiled = _guarded()
+    tiled._choose_graphs(None, 3, 8192)
+    assert tiled._graphs_fit is False
+
+
+def test_compiled_graphs_guard_drops_the_graphs_for_more_slots_or_out_of_memory():
+    tiled = _guarded()
+    tiled._choose_graphs((A4000_WORKSPACE, 5 * 1.1 * A4000_WORKSPACE), 3, 8192)  # 4 pools fit, 5 do not
+    assert tiled._captured() and tiled._graphs_slots_fit(3) and tiled._graphs_slots_fit(4)
+    assert not tiled._graphs_slots_fit(5)
+    assert not tiled._captured() and tiled._pool is None and tiled._graph_key is None
+    assert all(not slot["graphs"] and "graph_out" not in slot and "out" not in slot for slot in tiled._slots.values())
+
+    tiled = _guarded()  # a captured call that runs out of memory runs again without graphs, at the same cap
+    tiled._graphs_fit = True
+    tiled.lanes_state, tiled._budget_raised, tiled._fallback, tiled._g, tiled._list_cache = "off", False, None, {}, {}
+    seen = []
+
+    def call(positions):
+        seen.append(tiled._captured())
+        if tiled._captured():
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory. Tried to allocate 2.62 GiB.")
+        tiled.last = {}
+        return "out"
+
+    tiled._call = call
+    assert tiled(None) == "out" and seen == [True, False] and tiled.receivers == 8192
+    assert tiled.graphs_state.startswith("off: out of device memory") and "compiled graphs off" in tiled._fallback
+    assert tiled.last["budget_fallback"] == tiled._fallback and tiled._g is None
+
+
 # ---------------------------------------------------------------- the species index instead of the one-hot
 
 
