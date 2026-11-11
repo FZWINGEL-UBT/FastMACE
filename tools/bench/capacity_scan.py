@@ -372,6 +372,7 @@ def run_point(args):
                     recaptures=getattr(engine, "recaptures", None),
                     force_bytes_per_edge=getattr(engine, "_force_bytes_per_edge", None),
                     pool_bytes=engine._pool_bytes() if hasattr(engine, "_pool_bytes") else None,
+                    capture_arena=dict(getattr(engine, "capture_arena_info", {}) or {}) or None,
                     neighbour_list=neighbour_memory(nl))
 
     def neighbour_memory(nl):
