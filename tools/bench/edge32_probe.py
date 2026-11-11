@@ -7,6 +7,8 @@
   plus the plan text and the steady peak reserved.
 - ``run ... --tag 2``: the same side again (``edge32-off2.pt``), the run-to-run control: a plan with atomic
   scatters is not bitwise between processes, so off/on is judged against off/off.
+- ``run ... --reproducible --tag r``: the same in a reproducible plan (``fm.Workload(reproducible=True)``), where two
+  processes give bitwise equal trajectories, so off/on is an exact test of the storage change (no one-off evaluations).
 - ``compare A.pt B.pt``: bitwise equality of every saved tensor, else the largest difference.
 
 One side per process (the switch is read when the skin list allocates). Locally through ``tools/ci/local_gpu.py``.
@@ -22,7 +24,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parent.parent
 
 
-def run(out: Path, side: str, repeat: str, steps: int, tag: str = "") -> None:
+def run(out: Path, side: str, repeat: str, steps: int, tag: str = "", reproducible: bool = False) -> None:
     from fastmace.model.compile import configure_allocator
 
     configure_allocator(enabled=True)
@@ -42,11 +44,12 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "") -> None:
     start.set_pbc(True)
     thermalize(start, 300.0, 20261110)
     model = fm.load("omat0-medium")
-    saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), gpu=torch.cuda.get_device_name())
+    saved, record = {}, dict(side=side, repeat=repeat, natoms=len(start), gpu=torch.cuda.get_device_name(),
+                             reproducible=reproducible)
     # One-off evaluations at the start positions, twice in this process: no trajectory in between, so off/on and
     # off/off2 compare the force field's own reproducibility (the MD end states also carry the trajectories' drift).
     single = fm.ForceField(model, start.copy(), precision="float32")
-    for k in range(2):
+    for k in range(0 if reproducible else 2):
         energy, forces, stress = single.evaluate(start, stress=True)
         saved[f"single{k}.energy"] = torch.tensor([energy], dtype=torch.float64)
         saved[f"single{k}.forces"] = torch.from_numpy(forces)
@@ -58,7 +61,8 @@ def run(out: Path, side: str, repeat: str, steps: int, tag: str = "") -> None:
                                                  cell_mode="full"))):
         atoms = start.copy()
         field = fm.ForceField(model, atoms, precision="float32")
-        sim = fm.Simulation(atoms, field, seed=20261110, integrator=integrator)
+        extra = dict(workload=fm.Workload(reproducible=True)) if reproducible else {}
+        sim = fm.Simulation(atoms, field, seed=20261110, integrator=integrator, **extra)
         torch.cuda.reset_peak_memory_stats()
         sim.run(steps=steps)
         torch.cuda.synchronize()
@@ -109,6 +113,8 @@ def main(argv=None):
     r.add_argument("--side", choices=("off", "on"), required=True)
     r.add_argument("--repeat", default="10x10x10")
     r.add_argument("--steps", type=int, default=20)
+    r.add_argument("--reproducible", action="store_true",
+                   help="plan with fm.Workload(reproducible=True): bitwise across processes, so off/on is exact")
     r.add_argument("--tag", default="", help="file suffix (a repeat of one side: the run-to-run control)")
     c = sub.add_parser("compare")
     c.add_argument("a", type=Path)
@@ -116,7 +122,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     if args.cmd == "run":
         args.out.mkdir(parents=True, exist_ok=True)
-        run(args.out, args.side, args.repeat, args.steps, args.tag)
+        run(args.out, args.side, args.repeat, args.steps, args.tag, args.reproducible)
     else:
         compare(args.a, args.b)
 
