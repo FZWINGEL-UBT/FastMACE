@@ -117,6 +117,22 @@ def _route_compose_skip(model):
                 reassociation.bind(table)
 
 
+def route_nested(model):
+    """``_route_nested`` on every first interaction that composes its skip, once its radial table exists: the
+    radial record (``generic_radial_tables``) applies after this one, so it calls this when it has installed the
+    tables. Binds the composed weights again where they are bound (``compose_radial``)."""
+    for module in model.modules():
+        reassociation = getattr(module, "first_reassociation", None)
+        if (reassociation is None or getattr(reassociation, "compose_skip", None) is None
+                or getattr(reassociation, "nested_rotation", None) is not None):
+            continue
+        _route_nested(module, reassociation, reassociation.columns.device)
+        feats = reassociation._buffers.get("species_feats")
+        if (getattr(reassociation, "nested_rotation", None) is not None and feats is not None
+                and getattr(reassociation, "compose_radial", None) is not None):
+            reassociation.bind(feats)
+
+
 def _route_nested(module, reassociation, device):
     """``rewrites.radial.nested`` (``NESTED_RADIAL``) on a first interaction that composes its skip: where the GPU
     says so, the tabled forward runs, the interaction's table is per species pair over the reassociation's and the
@@ -133,18 +149,32 @@ def _route_nested(module, reassociation, device):
 
     if not hasattr(reassociation, "nested_rotation"):
         return
-    if not nested.nested_default(torch.cuda.get_device_name(device)) or not tabled_forward(device):
-        return
-    # every whole-system call of the interaction must take the fused walk (fused_first_applies), the only reader
-    if gm.FIRST_FULL_ROWS or not reassociation.segmented or not gm.fused_first_backward(device):
+    if not nested.nested_default(torch.cuda.get_device_name(device)):
         return
     table, last = getattr(module, "radial_table", None), getattr(module, "radial_last", None)
-    skip = reassociation.compose_skip[2]
-    if table is None or last is None or getattr(table, "coef", None) is None or table.coef.dtype != torch.float32:
+    if table is None:  # the radial record applies after this one and routes again (route_nested)
         return
+    skip = reassociation.compose_skip[2]
     columns = reassociation.columns.cpu().tolist()
-    if (fc_last_weight(last).shape[-1] != nested.COLUMNS or table.columns.cpu().tolist() != columns
-            or getattr(skip, "columns", None) is None or skip.columns.cpu().tolist() != columns):
+    # every whole-system call of the interaction must take the fused walk (fused_first_applies), the only reader
+    reasons = [why for why, failed in (
+        ("the tabled forward is off", not tabled_forward(device)),
+        ("FIRST_FULL_ROWS", gm.FIRST_FULL_ROWS),
+        ("the first sum is not segmented", not reassociation.segmented),
+        ("FUSED_FIRST_BACKWARD is off", not gm.fused_first_backward(device)),
+        ("the radial table has no rows", getattr(table, "coef", None) is None),
+        ("no radial_last", last is None),
+    ) if failed]
+    if not reasons:
+        reasons = [why for why, failed in (
+            ("the table is not float32", table.coef.dtype != torch.float32),
+            ("the folded width is not 64", fc_last_weight(last).shape[-1] != nested.COLUMNS),
+            ("the table's columns differ", table.columns.cpu().tolist() != columns),
+            ("the skip's columns differ", getattr(skip, "columns", None) is None
+             or skip.columns.cpu().tolist() != columns),
+        ) if failed]
+    if reasons:
+        print(f"fastmace: NESTED_RADIAL off here: {'; '.join(reasons)}", file=sys.stderr, flush=True)
         return
     if nested.NESTED_RADIAL is True:
         nested.require(table)  # forced on: a table that needs more far columns fails loudly
