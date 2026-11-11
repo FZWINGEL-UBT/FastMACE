@@ -92,3 +92,29 @@ Gate (`force_stress_gate.py`, ratio to the ASE float32 error, limit 3×; every s
 **Adopted on the A100 family** (decision 66: a rounding switch, faster in both orders, gate passes):
 `HYBRID_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))`, which covers every A100 model. The H200 has an sm_90 hybrid
 cubin, but nothing was measured there, so it stays on 3×TF32.
+
+## Range check before the merge (CPU, murphy)
+
+HYBRID's cross parts are float16, so operands above 32,752 would overflow to inf with no runtime guard. `range_probe.py`
+runs MACE's e3nn OMAT-0 medium model in float32 on the CPU under a TorchDispatchMode. It records max |A| and |B| of
+every mm / addmm / bmm / baddbmm in energy, forces and stress, forward and backward. That covers every product FastMACE
+sends to tf32x3, plus extra ones. Records: `range_probe.json`, `range_probe.log`.
+
+| case | atoms | closest pair Å | max operand, all products | max, feature GEMMs (mm) |
+| --- | --- | --- | --- | --- |
+| SrTiO3 3×3×3 | 135 | 1.95 | 23.4 | 23.4 |
+| NaCl 3×3×3 | 216 | 2.79 | 23.4 | 23.4 |
+| NbCl5 3×3×3 | 1944 | 2.28 | 56.9 | 23.4 |
+| SrTiO3, volume ×0.7 | 135 | 1.73 | 102.2 | 23.4 |
+| SrTiO3, cell lengths ×0.7 | 135 | 1.37 | 778.7 | 60.7 |
+| NaCl, volume ×0.7 | 216 | 2.48 | 35.3 | 23.4 |
+| NaCl, cell lengths ×0.7 | 216 | 1.96 | 285.4 | 23.4 |
+| NaCl, one pair pushed to 0.8 Å | 216 | 0.80 | 362.8 | 101.5 |
+| NaCl 2×2×2 after 300 steps of 2,000 K Langevin MD | 64 | 2.23 | 23.4 | 23.4 |
+
+- Model parameters: max |w| = 81.8. Buffers: 10.8.
+- The values above 102 all come from 3×3 stress and displacement bmm products, which never reach tf32x3.
+- Worst operand: 778.7, which is 42× below the limit.
+- **Bar met:** every max is at or below 3,000 (10× margin).
+- `tests/cpu/test_tf32x3_hybrid.py` checks this record, and checks the weights' margin when the checkpoint is under
+  `FASTMACE_MODELS`.
