@@ -13,7 +13,7 @@ Benchmark_loup SrTiO3 10x10x10 (5,000 atoms, 373,760 padded edges) unless stated
 | 2 | Two half-systems out of phase | two independent half-size force graphs (SrTiO3 10x10x5) on two streams | concurrent 6,326 µs, back to back 6,894 µs, the full system's graph 6,273 µs: concurrent / full **1.008** | **Rejected** (even the uncoupled upper bound gains nothing) |
 | 3 | Machine search over kernel formulations | exhaustive contraction-order search of w′'s trilinear sums with the real CG sparsity | from the unfactored form (602 FP instructions per edge and channel) FACTORED is 251, rank 2 of 27; the best tree 241.7 (−3.7 %), the best per-path mix 238.25 (−5.1 % of the TP arithmetic, about 1 % of the step) | **Closed** (below the bound; the same M-precontraction dropped on 5 Nov) |
 | 4 | GEMM cross terms in FP16, big·big in TF32 | `tools/fp16x3_gemm_bench.py` hybrid rows | error 6.3e-7 to 1.4e-6 against the 2.7e-7 stop rule; time 0.74–1.22 of CUTLASS 3xTF32 (two cuBLAS GEMMs, split unfused) | **Stopped** (accuracy) |
-| 5 | `forward-ghoist` re-screen | `tools/spline_table_bound.py --table-reads ghoist` on today's A100 default (PACKED8, PREFETCH_AHEAD) | forward 0.912 of real (1,256.4 → 1,145.9 µs); every edge on one slab 0.863 | **Candidate**: built as `spline_forward.GHOIST`, A/B below |
+| 5 | `forward-ghoist` re-screen | `tools/spline_table_bound.py --table-reads ghoist` on today's A100 default (PACKED8, PREFETCH_AHEAD) | forward 0.912 of real (1,256.4 → 1,145.9 µs); every edge on one slab 0.863 | Built as `GHOIST`, MD step 0.977–0.989, gate passes; **superseded by `GEOM`** (main, same regrouping) |
 
 ## Idea 1: far-shell edges in half precision
 
@@ -114,5 +114,9 @@ Force/stress gate (`tools/jobs/gate_pack.sh`, SrTiO3 3x3x3, NaCl, NbCl5; ratios 
 
 Both pass. Colab cost: screen 3.34 CU (34 min, 27 of them set-up), batch 2 10.24 CU (98 min).
 
-Adoption (task rule): behind `GHOIST_GPUS`, after the confirmation on Alex A100-SXM4-80GB (jobs 4981264 A/B pack,
-4981265 gate; `alex/`). Until then `GHOIST_GPUS` stays empty.
+**Superseded by GEOM.** Merging main (`1299b32e`) showed that `spline_forward.GEOM` (other-ways-20261109 §4,
+default on the A100 family since 10 November) is the same regrouping, with the g_oi form chosen per path where it
+saves operations (FMULs 69 -> 48 per edge and channel; Alex A100-SXM4-80GB MD step 0.9756 / 0.9806). GHOIST
+applies the g form to every path; it reproduces GEOM's gain on another A100 model (0.9774 / 0.9806) and does not
+stack with it (both rewrite the same sums). GHOIST was therefore dropped at the merge (the source at `cd7575bb`
+keeps it), and the Alex confirmation jobs 4981264 / 4981265 were cancelled before they started.

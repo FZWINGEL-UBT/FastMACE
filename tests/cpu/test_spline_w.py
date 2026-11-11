@@ -532,35 +532,3 @@ def test_block_order_sources_compile_with_nvrtc():
         assert compile_cubin(sf.render(_schedule(), blocks, GRID, R_MAX, [1.0, 0.7], block_order=True, **options),
                              (9, 0))
 
-
-def test_ghoist_regroups_each_output_through_per_edge_g():
-    """GHOIST (11 Nov 2026): every acc_o = fmaf(w, sum c x_i e_j, acc_o) becomes one fmaf(w * x_i, s_g[...]) per
-    sender component, the g values formed by warp 1 at staging; off unless set or listed."""
-    import re
-
-    assert sf.GHOIST is None and len(sf.GHOIST_GPUS) == 0 and not sf.ghoist_default("cpu")
-    schedule = _two_degree_schedule()
-    blocks = [(1, [0]), (3, [64])]
-    staged = sf.render(schedule, blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, "spline_forward0", stage_edges=True)
-    plain = sf.render(schedule, blocks, GRID, R_MAX, [1.0, 0.7], None, 64, 6, "spline_forward0")
-    assert sf.ghoist_supported(staged) and not sf.ghoist_supported(plain)
-    with pytest.raises(ValueError):
-        sf.ghoist_source(plain)
-    out = sf.ghoist_source(staged)
-    sums = re.findall(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", staged)
-    expected = sum(len(set(re.findall(r"\bx(\d+) \*", expr))) for _, expr in sums)
-    assert sums and out.count("s_g[gk + ") == expected
-    assert "she[" not in out and "s_sh" not in out and "GHOIST: warp 1" in out
-    assert out.count("gp[") == expected  # one g per (output, sender component)
-
-
-def test_ghoist_source_compiles_with_nvrtc():
-    from fastmace.kernels import nvrtc_available
-    if not nvrtc_available():
-        pytest.skip("NVRTC is not available")
-    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
-
-    staged = sf.render(_two_degree_schedule(), [(1, [0]), (3, [64])], GRID, R_MAX, [1.0, 0.7], None, 64, 6,
-                       "spline_forward0", stage_edges=True)
-    for capability in ((8, 0), (9, 0)):
-        assert compile_cubin(sf.ghoist_source(staged), capability)

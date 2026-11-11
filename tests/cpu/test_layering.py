@@ -89,10 +89,12 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                 "JOINED_LAYOUT": "first sums d-major, paths read in place; A/B"},
     "fastmace/kernels/cutlass/skip_select.py": {"SKIP_SELECT": "idea 31: species-skip selection in the epilogue; A/B"},
     "fastmace/rewrites/cueq_projection.py": {"CUEQ_PROJECTED": "cuEq projected weight kept; per GPU, A/B"},
-    "fastmace/rewrites/sc_generated.py": {"SC_GENERATED": "interaction 0 division + contraction generated; per GPU, A/B"},
+    "fastmace/rewrites/sc_generated.py": {"SC_GENERATED": "interaction 0 division + contraction generated; per GPU",
+                                          "SC_FACTORED": "SC_GENERATED's factored-basis kernels; per GPU, A/B"},
     "fastmace/kernels/triton/divided_blocks.py": {},
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
+    "fastmace/rewrites/engine.py": {"VIRIAL_ELEMENTWISE": "one-graph strain as products and sums; per GPU, A/B"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.
     "fastmace/kernels/oeq_streaming/runtime.py": {"TABLE_GRADIENT_PER_CHUNK": "per-chunk table gradient; GPU gate A/B"},
     # OMAT-0 A100 profile follow-ups (3 November 2026): A/B switches of the launch screen
@@ -177,7 +179,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                          "FACTOR_W": "spline forward w x common factor; A/B",
                                                          "CURSOR32": "spline forward int loop state; A/B",
                                                          "SHARED_LOCATOR": "idea 5: one spline locator per edge; A/B",
-                                                         "PACKED8": "forward reads the 8-byte packed table; A/B"},
+                                                         "PACKED8": "forward reads the 8-byte packed table; A/B",
+                                                         "GEOM": "forward per-edge shared CG sums; per GPU, A/B"},
     "fastmace/kernels/oeq_streaming/fused_forward.py": {"SKIP_ZERO_COLUMN": "skips W's zero bias column; per GPU, A/B",
                                                         "STREAM_STORE_W": "w stored with __stcs; screen A/B",
                                                         "TENSOR_CORES": "a.W in 3xTF32 on tensor cores; per GPU, A/B",

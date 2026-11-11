@@ -216,3 +216,84 @@ Quadratic-table bound (`F-quad-horner`, kernel lab; [quad-h200/](quad-h200/), [q
 quadratic table of twice the pieces would save at most 3.4 % of w′ before its larger loads; on the A100 the table cost
 is mostly loads, not FMAs. Not built.
 
+## Round 4: the same profile on an Alex A100-SXM4-80GB ([a100-alex/](a100-alex/limiters.md))
+
+`tools/jobs/alex_step_limiters.sh` (NHR@FAU Alex job 4969862, node a0731, source 735158a2 = main with PACKED8,
+BUTTERFLY and the generated layer-0 symmetric contraction) runs `tools/modal/step_limiters.sh` unchanged, with ncu
+2026.1 from the cluster's `cuda/13.2.0` module and the same flags (running clocks, warm caches). The counters are
+open to users on Alex (no ERR_NVGPUCTRPERM), so this profile costs no Modal budget: 9 min of job time.
+
+| | Alex A100-SXM4 (735158a2) | Modal A100 PCIe (0df22417, PACKED8 only) |
+| --- | ---: | ---: |
+| Wall per MD step | 6.51 ms | 7.25 ms |
+| Force graph per replay | 6.37 ms | 7.13 ms |
+| ncu kernel time per force call | 6,209 µs | 6,512 µs |
+
+Per operation the two A100s agree within 3 % (the same 1,410 MHz SM clock; the SXM board's extra bandwidth does not
+show, because nothing large is DRAM-bound). The step is faster on Alex because of later defaults, not the board: w′
+2,256 → 2,177 µs (BUTTERFLY), and cuEq's `uniform_1d` 402 µs → 90 µs plus the generated contraction's forward 78 µs
+and backward 110 µs (codex1109-fused-layer0-sc).
+
+What limits the A100 step now (59 % of the kernel time is FMA-pipe bound):
+
+- **Edge kernels at the FMA roof (3,432 µs, 55 %).** w′ 2,177 µs: FMA pipe 83 %, issue 60 %, L2 55 %. Spline
+  forward 1,255 µs: FMA 84 %, ALU 43 %. Only fewer FMAs help here (the quadratic-table bound was 0.967; round 3).
+- **Tabled outer sum (832 µs).** The backward is L1-bound (L1 64 %, LSU 49 %); the forward is latency-bound on the
+  long scoreboard (9.8 stalls per issue, 23 % warps active, 128 registers). Register caps tied (FORWARD_MAXNREG);
+  FORWARD_WARPS = 2 gave 0.994 / 0.991.
+- **tf32x3 GEMMs (about 980 µs).** At the mma.sync rate (tensor pipe 40–57 %, math-pipe throttle), as on Modal. The
+  smallest launches are under one wave: `species_mm_rows`, `species_mm_rows_grad` and `tf32x3_segment_rows` at
+  0.25–0.76 waves (SM fill 45–70 %), 8 launches, 125 µs together. Even at full fill that saves ≤ 50 µs (≤ 0.8 % of
+  the step), so split-K or a smaller tile for the small shapes is a lead below the 1 % rule.
+- **Generated layer-0 contraction (188 µs).** FMA pipe 93 %: at its roof.
+
+No new lead of 1 % or more. Alex can repeat this profile, or an A/B, without Modal budget:
+`sbatch tools/jobs/alex_step_limiters.sh <job.env>`, with job.env as for `alex_ab_pack.sh`.
+
+## Tensor cores for the edge kernels (owner question, 9 November 2026): no
+
+The edge kernels are at the FP32 FMA roof on the A100, so the one big lever would be moving their tensor product to
+3×TF32 tensor cores (A100 dense TF32 is 8× FFMA, 2.67× after the three-way split; H200 7.4×, 2.5×).
+
+- **Built before:** `TC_TP` (5 November, the then fused forward; edges as K, w x as A): A100 lab 1.276, against a
+  no-TP bound of 0.617. Each A element feeds one mma triple (N = 8), and preparing it (multiply by x, split) costs
+  about as much as the FP32 terms it replaces.
+- **The better layout:** x split once per sender node and shared by all 10 paths as B (channels as N), each edge's
+  `S_e = CG·sh` stacked as A (40 rows, K = 4), w applied to the accumulators afterwards (40 FMAs per channel). The
+  tile shapes pad 88 dense entries to 192 multiply-adds (1.8× from K, 1.2× from M); with the 3×TF32 split that is
+  about 144 tensor-pipe clocks per edge against 176 FFMA clocks today on the A100: at most 0.8 of the TP part, with
+  perfect overlap and no extra register pressure.
+- **The backward is worse:** dx is the transposed product (M = 4 input components padded to 16, 4×), and dsh sums
+  over channels with a per-(edge, channel) operand w·dout that costs about 120 operations per channel to prepare
+  against 88 direct.
+- **Measured today (Alex A100-SXM4, kernel lab, jobs 4970586/7):** w′ without the table's Horner evaluation 0.754
+  (1,985 of 2,631 µs). The old F-no-tp patterns no longer match today's FACTORED w′, and the lab's `forward` kernel is the
+  layer-1 fused forward, not SPLINE_W's (not called eagerly at ≥ 100,000 edges), so the TP share was not timed. The
+  ceiling follows anyway: if the TP were all of the spline forward that is not the table (about 0.8 of 1,255 µs),
+  0.8 of it saves at most about 200 µs, 3 % of the A100 step, before preparation and register costs, which made the
+  built version 28 % slower.
+
+The FP64 pipes were the other way to more multiply-adds per clock; both were rejected on 9 November
+(`fp64-second-pipe`: registers 80 → 128, 1.039–1.186; `fp64-tensor-pipe`: the same padding, 1.27× on the H200).
+Not built.
+
+## Mirror-pair w′ on the A100, against today's defaults (Alex job 4970636): closed
+
+The 5 November mirror-pair screen ran on the H200 and RTX 5060 Ti; on the A100 only the order was timed, and the w′
+has changed since (STAGE_DOUT, SPLINE_W, BUTTERFLY). The A100's w′ is now FMA-bound with the table about a quarter of
+it, so sharing the table work within a mirror pair was the one untested case. Kernel lab, A100-SXM4-80GB, source
+232f6f7a ([tplab-alex/](tplab-alex/)), base 2,179 µs:
+
+| Variant | Ratio | What it bounds |
+| --- | ---: | --- |
+| `F-no-table-horner` | 0.750 | no table lookup or Horner on any edge |
+| `F-half-table` | 1.308 | the table skipped on every second edge, receiver order (90 registers instead of 79) |
+| `B-mirror-order` | 2.873 | edges physically in mirror order |
+| `B-mirror-share` | 3.825 | mirror order, table shared within each pair |
+| `M-mirror-hybrid` | 3.029 | scalars in mirror order, sh/dsh rows through the permutation |
+
+`M-mirror-perm`'s pattern no longer matches today's kernel. Mirror order now costs 2.9×: STAGE_DOUT stages one
+receiver's dout row for a run of edges, and mirror order breaks those runs. Even in receiver order, skipping half the
+table loses (1.308): the branch takes 11 more registers. A pair's partner edge belongs to another receiver, so sharing
+its w would mean storing w per edge (5 KB per edge), which the table exists to avoid. Closed on every GPU.
+

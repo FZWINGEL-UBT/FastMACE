@@ -522,6 +522,8 @@ class MACEForceField:
         # reference calculators' process patch can change it. None (left as MACE has it) when the
         # strain sources do not hash or the forward cannot be rebound; "on" then fails loudly.
         strain = "single_graph_strain" in enabled
+        if strain and not self.is_polar:  # VIRIAL_ELEMENTWISE: "elementwise" where on
+            strain = engine_rewrites.one_graph_choice(self._device)
         if not strain and (_patches.patch_problems("single_graph_strain") or (
                 not self.is_polar and engine_rewrites.strain_problems(type(source).forward))):
             strain = None

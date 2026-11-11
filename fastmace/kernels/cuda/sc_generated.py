@@ -200,7 +200,10 @@ def shape_of(module):
 class GeneratedContraction:
     """The compiled forward and backward of one contraction on the current CUDA device."""
 
-    def __init__(self, module):
+    def __init__(self, module, factored=False):
+        """``factored`` (``rewrites.sc_generated.SC_FACTORED``): the kernels of ``kernels.cuda.sc_factored``, the
+        contraction through memoised CG pair products in a cheaper basis, with ``fold`` mapping the module's weights
+        to that basis; falls back to the monomial kernels (``self.factored`` False) when the basis is not found."""
         from cuda.bindings import driver
 
         from fastmace.kernels.oeq_streaming.runtime import _check, _device_key, compile_cubin, content_id
@@ -211,7 +214,21 @@ class GeneratedContraction:
         self.segments_in, self.segments_w, self.segments_out, self.mul = shape
         etp = module.etp
         terms = merged_terms(getattr(etp, "polynomial", etp))
-        self.source = (render_forward(terms, *shape) + "\n" + render_backward(terms, *shape))
+        self.factored, self.basis = False, None
+        if factored:
+            from fastmace.kernels.cuda import sc_factored
+
+            found = sc_factored.factor(terms, self.segments_in, self.segments_w, self.segments_out)
+            if found is not None:
+                program, features, self.basis = found
+                self.factored = True
+                # the backward capped at 128 registers per thread for mul = 128 (fac-pair4: 0.65 of the monomial pair
+                # on the A100, against 0.72 uncapped)
+                self.source = (sc_factored.render_forward(program, features, *shape, name="sc_generated_forward")
+                               + "\n" + sc_factored.render_backward(program, features, *shape,
+                                                                    name="sc_generated_backward", min_blocks=4))
+        if not self.factored:
+            self.source = (render_forward(terms, *shape) + "\n" + render_backward(terms, *shape))
         cubin = compile_cubin(self.source, torch.cuda.get_device_capability())
         torch.cuda.current_stream()  # make the primary context current
         self._module = _check(driver.cuModuleLoadData(cubin))
@@ -219,6 +236,15 @@ class GeneratedContraction:
         self._backward = _check(driver.cuModuleGetFunction(self._module, b"sc_generated_backward"))
         self.id = content_id("GeneratedContraction", self.source, _device_key())
         _REGISTRY[self.id] = self
+
+    def fold(self, weight):
+        """The weights the kernels read: ``weight [elements, segments_w * mul]`` itself, or (factored) its image in the
+        factored basis (float64 product, weight's dtype)."""
+        if not self.factored:
+            return weight
+        from fastmace.kernels.cuda.sc_factored import fold_weights
+
+        return fold_weights(weight, self.basis, self.segments_w, self.mul)
 
     def _launch(self, function, atoms, tensors):
         from cuda.bindings import driver

@@ -241,95 +241,122 @@ def packed8_source(source, bias):
     return source
 
 
-# GHOIST (11 November 2026, results/a100-colab-ideas-20261111; "G-hoisting" of the third 9 Nov report, rejected then
-# on 5060 Ti numbers; rounding: each output's CG sum regrouped): with STAGE_EDGES every output's sum
-# w * sum_ij c x_i e_j becomes sum_i (w x_i) g_oi, with the channel-independent g_oi = sum_j c e_j computed once per
-# edge while the tile is staged (warp 1, beside warp 0's locator) into shared memory. A100-SXM4-40GB kernel lab
-# (OMAT-0 medium, SrTiO3 10x10x10, today's A100 defaults with PACKED8): the instruction shape alone 0.912 of the
-# forward. None: on for GHOIST_GPUS; True / False: an A/B side's choice.
-GHOIST = None
-GHOIST_GPUS = GPUModels(())
+# GEOM (results/other-ways-20261109 section 4; the 9 November external proposal 1, "shared geometric expressions
+# across the ten paths"; rounding: the CG sum is taken before the multiply by w x_i): with STAGE_EDGES each path of the
+# forward takes the cheapest of three forms by FP32 operations per (edge, channel), float32 +-1 coefficients free:
+# as today; w x_i factored out of a one-component path; or g_oi = sum_j c_oij e_j computed once per tile edge into
+# shared memory (it does not depend on the channel) and acc_o += (w x_i) g_oi. OMAT-0 medium: FMULs per edge and
+# channel 69 -> 48, shared loads 9 -> 28, 80 registers. Kernel lab, SrTiO3 10x10x10, A100 defaults (PACKED8):
+# Alex A100-SXM4-80GB 0.867 / 0.868 of the forward (two jobs); local RTX 5060 Ti 1.080 (memory-bound there).
+# NVIDIA A100-SXM4-80GB (10 November 2026, Alex job 4973813, source 219602cf; Benchmark_loup MD step b/a, a = the A100
+# defaults): 0.9756 / 0.9806 (ab / ba); force/stress gate passes with SC_FACTORED also on (forces 0.863 / 0.913 /
+# 0.985, stress 0.727 / 0.896 / 1.343). The H200 is not measured (issue-bound there, not FMA-bound). None: on for
+# GEOM_GPUS; True / False: an A/B side's choice.
+GEOM = None
+GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 
 
-def ghoist_default(device):
-    """``GHOIST`` on ``device``: the constant when set, else on for ``GHOIST_GPUS``."""
-    return _switch(GHOIST, GHOIST_GPUS, device)
+def geom_default(device):
+    """``GEOM`` on ``device``: the constant when set, else on for ``GEOM_GPUS``."""
+    return _switch(GEOM, GEOM_GPUS, device)
 
 
-_GHOIST_TERM = r"x(\d+) \* e(\d+) \* (-?0x[0-9a-fA-F.]+p[+-]?\d+f)"
+def _f32_unit(literal):
+    """+1, -1 or None: the coefficient literal ("0x1.fff...p-1f") as float32 is exactly +-1."""
+    import struct
+
+    v = struct.unpack("f", struct.pack("f", float.fromhex(literal.rstrip("f"))))[0]
+    return 1 if v == 1.0 else -1 if v == -1.0 else None
 
 
-def ghoist_supported(source):
-    """Whether ``ghoist_source`` applies: a STAGE_EDGES source with one receiver per block and room for warp 1."""
+def geom_source(source):
+    """``GEOM``'s form of a STAGE_EDGES ``spline_forward`` source (float4 or PACKED8 table read): returns (source,
+    number of shared g values per edge)."""
     import re
 
-    c = re.search(r"constexpr int C = (\d+);", source)
-    tile = re.search(r"constexpr int TILE = (\d+);", source)
-    return ("s_tq[TILE]" in source and c is not None and tile is not None
-            and int(c.group(1)) >= 32 + int(tile.group(1)))
+    def replace(text, old, new):
+        if text.count(old) != 1:
+            raise ValueError(f"GEOM: expected one {old!r}, found {text.count(old)}")
+        return text.replace(old, new)
 
-
-def ghoist_source(source):
-    """A STAGE_EDGES ``spline_forward`` source with GHOIST: per output, acc_o += (w x_i) g_oi for each sender
-    component i, g_oi = sum_j c e_j read from ``s_g`` (per tile edge, GD values), which warp 1 fills from the edge's
-    harmonics at staging. Returns the new source; raises ValueError where it does not apply."""
-    import re
-
-    if not ghoist_supported(source):
-        raise ValueError("GHOIST needs a STAGE_EDGES kernel with C >= 32 + TILE")
-    lines = source.split("\n")
-    edge_index = {}      # e<j> of the current block -> its she[] index
-    g_values = []        # per g: [(she index, coefficient literal)]
-    out = []
-    declare = re.compile(r"const float e(\d+) = she\[(\d+)\];")
-    update = re.compile(r"^(\s*)acc\[(\d+)\] = fmaf\(w, (.*), acc\[\2\]\);$")
-    for line in lines:
-        m = declare.search(line)
-        if m:
-            edge_index[m.group(1)] = int(m.group(2))
-            continue  # the e<j> values are read through g only
-        m = update.match(line)
-        if m:
-            indent, o, expr = m.group(1), m.group(2), m.group(3)
-            terms = re.findall(_GHOIST_TERM, expr)
-            if len(terms) != expr.count(" * e") or len(terms) != len(expr.split(" + ")):
-                raise ValueError(f"GHOIST: cannot parse {expr!r}")
-            by_input = {}
-            for i, j, coef in terms:
-                by_input.setdefault(i, []).append((edge_index[j], coef))
-            for i in sorted(by_input, key=int):
-                out.append(f"{indent}acc[{o}] = fmaf(w * x{i}, s_g[gk + {len(g_values)}], acc[{o}]);")
-                g_values.append(by_input[i])
+    term = re.compile(r"x(\d+) \* e(\d+) \* (-?0x[0-9a-fA-F.]+p[+-]?\d+f)")
+    if "s_tq[TILE]" not in source:
+        raise ValueError("GEOM needs the STAGE_EDGES kernel")
+    head, sep, loop = source.partition("        for (int k = 0; k < count; ++k) {")
+    if not sep:
+        raise ValueError("GEOM: no edge loop")
+    parts = re.split(r"(\n            \{\n)", loop)
+    fills, ng, chosen = [], 0, []
+    out = [parts[0]]
+    for marker, block in zip(parts[1::2], parts[2::2]):
+        she = dict(re.findall(r"const float (e\d+) = she\[(\d+)\];", block))
+        rows = re.findall(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", block)
+        if not rows or not she:
+            out += [marker, block]
             continue
-        out.append(line)
-    if not g_values:
-        raise ValueError("GHOIST: no output sums found")
-    source = "\n".join(out)
-    gd = (len(g_values) + 3) // 4 * 4
-    used = sorted({k for g in g_values for k, _ in g})
-
-    def replace(old, new):
-        nonlocal source
-        if source.count(old) != 1:
-            raise ValueError(f"GHOIST: expected one {old!r}")
-        source = source.replace(old, new)
-
-    replace("    __shared__ __align__(16) float s_sh[TILE * ED];",
-            f"    constexpr int GD = {gd};\n    __shared__ __align__(16) float s_g[TILE * GD];")
-    replace("        for (int i = ch; i < count_in * ED; i += C) s_sh[i] = __ldg(sh + base * ED + i);\n", "")
-    fill = [f"        if (ch >= 32 && ch < 32 + count_in) {{  // GHOIST: warp 1 forms the tile's g_oi = sum_j c e_j",
-            "            const float* hp = sh + (base + (ch - 32)) * ED;",
-            "            float* gp = s_g + (ch - 32) * GD;"]
-    fill += [f"            const float h{k} = __ldg(hp + {k});" for k in used]
-    for n, g in enumerate(g_values):
-        expr = " + ".join(f"h{k} * {coef}" for k, coef in g)
-        fill.append(f"            gp[{n}] = {expr};")
-    fill.append("        }")
-    replace("        if (ch < 32) {  // warp 0", "\n".join(fill) + "\n        if (ch < 32) {  // warp 0")
-    replace("            const float* she = s_sh + s_k[k] * ED;", "            const int gk = s_k[k] * GD;")
-    if "she[" in source or "s_sh" in source:
-        raise ValueError("GHOIST: harmonics still read from s_sh")
-    return source
+        terms = {o: [(int(xi), ej, c) for xi, ej, c in term.findall(expr)] for o, expr in rows}
+        for (o, expr) in rows:  # every product of the row parsed, or the path stays as it is
+            if len(terms[o]) != expr.count("*") // 2:
+                raise ValueError(f"GEOM: cannot parse acc[{o}]'s row")
+        xs = sorted({t[0] for ts in terms.values() for t in ts})
+        nonunit = sum(1 for ts in terms.values() for t in ts if _f32_unit(t[2]) is None)
+        cur = sum(len(ts) + 1 for ts in terms.values()) + nonunit
+        factor = 1 + sum(len(ts) for ts in terms.values()) + nonunit if len(xs) == 1 else cur + 1
+        pairs = sum(len({t[0] for t in ts}) for ts in terms.values())
+        hoist = len(xs) + pairs
+        best = min(cur, factor, hoist)
+        new_rows = {}
+        if best == cur:
+            chosen.append("cur")
+            out += [marker, block]
+            continue
+        if best == factor:
+            chosen.append("factor")
+            i = xs[0]
+            for o, ts in terms.items():
+                expr = f"acc[{o}]"
+                for _, ej, c in ts:
+                    unit = _f32_unit(c)
+                    e = f"-e{ej}" if unit == -1 else f"e{ej}" if unit == 1 else f"e{ej} * {c}"
+                    expr = f"fmaf(wx{i}, {e}, {expr})"
+                new_rows[o] = f"acc[{o}] = {expr};"
+        else:
+            chosen.append("hoist")
+            for o, ts in terms.items():
+                expr = f"acc[{o}]"
+                for i in sorted({t[0] for t in ts}):
+                    g = " + ".join(f"q[{she['e' + ej]}] * {c}" for xi, ej, c in ts if xi == i)
+                    fills.append(f"g[{ng}] = {g};")
+                    expr = f"fmaf(wx{i}, s_g[gk + {ng}], {expr})"
+                    ng += 1
+                new_rows[o] = f"acc[{o}] = {expr};"
+        wx = ", ".join(f"wx{i} = w * x{i}" for i in xs)
+        block, n = re.subn(r"(const float w = fmaf\(.*;\n)",
+                           lambda m: m.group(1) + f"                const float {wx};\n", block, count=1)
+        if n != 1:
+            raise ValueError("GEOM: a path without its w line")
+        block = re.sub(r"acc\[(\d+)\] = fmaf\(w, (.*), acc\[\1\]\);", lambda m: new_rows[m.group(1)], block)
+        block = re.sub(r"\s*const float e\d+ = she\[\d+\];", "", block) if best != factor else block
+        out += [marker, block]
+    source = head + sep + "".join(out)
+    if ng:
+        gd = (ng + 3) // 4 * 4
+        source = replace(source, "__shared__ __align__(16) float s_sh[TILE * ED];",
+                         f"__shared__ __align__(16) float s_sh[TILE * ED];\n    constexpr int GD = {gd};\n"
+                         "    __shared__ __align__(16) float s_g[TILE * GD];")
+        body = "\n                ".join(fills)
+        source = replace(source, "        const int count = s_count;\n",
+                         "        for (int kk = ch; kk < count_in; kk += C) {  // GEOM: the tile's g, once per edge\n"
+                         "            const float* q = s_sh + kk * ED;\n"
+                         "            float* g = s_g + kk * GD;\n"
+                         f"                {body}\n"
+                         "        }\n"
+                         "        __syncthreads();\n"
+                         "        const int count = s_count;\n")
+        she = "const float* she = s_sh + s_k[k] * ED;"
+        source = replace(source, she, she + "\n            const int gk = s_k[k] * GD;")
+    source = source.replace("// spline_forward", f"// GEOM (paths: {' '.join(chosen)}); spline_forward", 1)
+    return source, ng
 
 
 def stage_edges_default(device):
@@ -811,10 +838,10 @@ class SplineForward:
         self.packed8 = packed8_bias is not None and self.stage_edges
         if self.packed8:
             self.sources = [packed8_source(s, int(packed8_bias)) for s in self.sources]
-        # GHOIST: each output's CG sum regrouped through per-edge g_oi (rounding)
-        self.ghoist = self.stage_edges and ghoist_default(device) and all(ghoist_supported(s) for s in self.sources)
-        if self.ghoist:
-            self.sources = [ghoist_source(s) for s in self.sources]
+        # GEOM: shared per-edge CG sums for the paths where they save FP32 work (on the table read in use)
+        self.geom = geom_default(device) and self.stage_edges
+        if self.geom:
+            self.sources = [geom_source(s)[0] for s in self.sources]
         if self.shared_locator:  # the producer's source is part of the content id
             self.sources.append(render_locator(self.grid, r_max))
         self.source = "\n".join(self.sources)
@@ -832,7 +859,7 @@ class SplineForward:
                 attr.CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES, function))))
         self._locator = self._functions.pop() if self.shared_locator else None  # registers / local stay listed last
         self.id = content_id("SplineForward", self.source, _device_key(device))
-        _REGISTRY[self.id] = self
+        _REGISTRY.setdefault(self.id, self)  # never replace: see ``shared``
 
     def __call__(self, x, sh, senders, row_ptr, lengths, pairs, table, outs, order=None):
         from cuda.bindings import driver
@@ -845,16 +872,7 @@ class SplineForward:
         if not blocks:
             return
         p = ctypes.c_void_p
-        ordered = ()
-        if self.block_order:  # BLOCK_ORDER: the receivers' order, a permutation of [0, N)
-            order = self.order if order is None else order
-            if order is None or order.numel() != nodes:
-                order = self._identity.get(nodes)
-                if order is None:
-                    order = self._identity[nodes] = torch.arange(nodes, dtype=torch.int32, device=x.device)
-            if order.dtype != torch.int32 or order.device != x.device:
-                raise ValueError("BLOCK_ORDER: the order must be int32 on the kernel's device")
-            ordered = (order.data_ptr(),)
+        ordered = (self.launch_order(nodes, x.device, order).data_ptr(),) if self.block_order else ()
         values = (nodes, edges, x.data_ptr(), sh.data_ptr(), senders.data_ptr(), row_ptr.data_ptr(),
                   lengths.data_ptr(), pairs.data_ptr(), table.data_ptr(), self.intervals, *ordered,
                   *[o.data_ptr() for o in outs])
@@ -862,6 +880,22 @@ class SplineForward:
         stream = driver.CUstream(torch.cuda.current_stream(x.device).cuda_stream)
         for function in self._functions:  # PARTS: each part writes its own output slots
             _check(driver.cuLaunchKernel(function, blocks, 1, 1, self.threads, 1, 1, 0, stream, (values, types), 0))
+
+    def launch_order(self, nodes, device, order=None):
+        """BLOCK_ORDER: the receivers' order a call over ``nodes`` rows launches with: ``order`` when given, else the
+        bound ``order`` (the force field that calls binds its own right before every call and capture,
+        ``forces._bind_streaming_count``) when it has ``nodes`` rows, else the identity of ``nodes`` rows. The object
+        is shared by every equal build (``shared``), so a bound order of another row count is never read; an
+        identity is cached per row count, the same values for every force field, and lives as long as the registry
+        (the process). Any permutation of [0, N) gives the same message."""
+        order = self.order if order is None else order
+        if order is None or order.numel() != nodes:
+            order = self._identity.get(nodes)
+            if order is None:
+                order = self._identity[nodes] = torch.arange(nodes, dtype=torch.int32, device=device)
+        if order.dtype != torch.int32 or order.device != torch.device(device):
+            raise ValueError("BLOCK_ORDER: the order must be int32 on the kernel's device")
+        return order
 
     def locate(self, lengths, pairs):
         """SHARED_LOCATOR: ``spline_locator``'s records ``int32 [E, 4]`` of ``lengths`` ``[E]`` and ``pairs``."""
@@ -878,6 +912,18 @@ class SplineForward:
             _check(driver.cuLaunchKernel(self._locator, (edges + 255) // 256, 1, 1, 256, 1, 1, 0, stream,
                                          (values, types), 0))
         return locator
+
+
+def shared(kernel):
+    """The registered ``SplineForward`` with ``kernel``'s content id, which every equal build uses (``kernel`` itself
+    when it is the first). The custom ops launch ``_REGISTRY[id]``, and that object carries per-call state: the
+    BLOCK_ORDER ``order`` its force field binds before each call, and the identity orders it caches. Replacing the
+    entry with a later equal build (another force field in the process) made earlier force fields launch through the
+    newer object, so their captured graphs read its ``order``; once that object was replaced again and freed, a
+    replay read freed memory (CUDA illegal address in a five-engine A/B process, RTX 4000 Ada, 10 November 2026,
+    results/ada-5060-screen-20261110). The first object stays registered, and each force field binds its own order
+    on it, so a graph keeps the address of the order its force field holds."""
+    return _REGISTRY.setdefault(kernel.id, kernel)
 
 
 @torch.library.custom_op("fastmace::spline_message_blocks", mutates_args=())
@@ -936,7 +982,8 @@ def _(x, sh, senders, row_ptr, locator, pairs, table, spline_id):
     return [x.new_empty(shape) for shape in block_shapes(kernel.blocks, kernel.channels, x.shape[0])]
 
 
-__all__ = ["PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
+__all__ = ["shared", "GEOM", "GEOM_GPUS", "geom_default", "geom_source",
+           "PACKED8", "PACKED8_BITS", "PACKED8_GPUS", "encode_packed8", "packed8_default", "packed8_source",
            "PREFETCH_AHEAD", "PREFETCH_AHEAD_DISTANCE", "PREFETCH_AHEAD_GPUS", "PREFETCH_AHEAD_MODEL_OFF_GPUS", "PREFETCH_PATHS",
            "prefetch_ahead_default", "STAGE_EDGES", "STAGE_EDGES_GPUS", "CURSOR32", "CURSOR32_GPUS", "FACTOR_W", "FACTOR_W_GPUS", "MIN_BLOCKS", "PARTS", "R128", "R128_GPUS", "R128_MIN_BLOCKS_MODEL_GPUS",
            "SHARED_LOCATOR", "SHARED_LOCATOR_GPUS", "SPLINE_W", "SPLINE_W_GPUS", "SplineForward", "THREADS",
