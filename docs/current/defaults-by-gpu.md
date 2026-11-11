@@ -417,6 +417,7 @@ w′ `FOLD_ALPHA` off measured within the run-to-run spread (0.4–0.7 % either 
 
 | Switch | 5060 Ti | Ada | A100 | Evidence | Report |
 | --- | --- | --- | --- | --- | --- |
+| `TileConfig.compiled_graphs` None (`tiled.COMPILED_GRAPH_GPUS`, rounding: the atomics' order): compiled tile bodies in CUDA graphs behind a memory guard (device state) | off (30³ 1.007 / 0.990, 40³ 0.998) | pending (murphy A/B) | on (0.569 / 0.571; gate 3x passed, Alex 4982466) | 975,560 SrTiO3, R 16,384 budget; the guard measures the first compiled call and captures where one pool per slot fits | [tiled-speed-20261111](../../results/tiled-speed-20261111/README.md) |
 | `TileConfig.lanes` `auto` (`tiled.LANE_GPUS`, exact): two sweep-2 tiles on disjoint SM halves | – (1.05× per pair) | on (1.09× per pair) | – | under `cudaMallocAsync` | [tiled-concurrent-tiles](../validation/tiled/tiled-concurrent-tiles.md) |
 | `TileConfig.backward_chunk_scale` `auto` (`tiled.TILE_CHUNK_SCALE`, exact) | ×4 | ×4 | ×1 | 1.08M SrTiO3, wavefront, R 8,192: 5060 Ti −10.5 %, Ada −3.2 %; RTX PRO 6000 tiles do not chunk | `results/tiled-ideas-20261102` |
 | `tiled.TILE_PREFETCH_DEVICE` (`TILED_SPEED_GPUS`, exact): prefetch with the state on the device | on | on | on | OMAT-0 SrTiO3 975,560, device state: 0.939 / 0.941 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |

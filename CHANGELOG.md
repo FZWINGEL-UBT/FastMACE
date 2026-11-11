@@ -37,6 +37,8 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   first compiled call runs uncaptured and measures its tile workspace, the captures follow only where one capture
   pool per slot and the warm-ups fit (`compiled_graphs_fit`, x1.1; the A4000 case stays off), and a captured call
   that runs out of device memory drops its graphs and runs again without them. `--compiled-graphs auto|on|off`.
+  On for the A100 family (0.569 / 0.571 at 975,560 atoms; gate 3x passed, Alex 4982466); off on the RTX 5060 Ti (no
+  gain: not launch-bound).
 - The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
   records:
   - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming

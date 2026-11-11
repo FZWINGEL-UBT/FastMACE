@@ -143,6 +143,11 @@ off against on in one process, 4 blocks of 2 calls, `jobs/alex_cgab.sh`; records
 default (with a memory guard: the graphs keep private pools; the 16 GB A4000 ran out of memory in the first call at
 R 8,192 on 3 November) follows in its own merge request after the gate (Alex 4981512) and the 5060 Ti and Ada A/Bs.
 
+Gate (Alex 4982466, 717b9f92 (4981747 died on a node failure after 35 s), the 3x float32 force/stress gate with
+`compiled_graphs` off and on, tiled R 48, compiled; `jobs/alex_gate_cg.sh`; records `gate/alex-4982466-cg/`): every
+check passes on both sides. With graphs on: SrTiO3 3x3x3 energy 9.72, forces 1.05, stress 0.63; NaCl 2.27, 0.86,
+1.14; NbCl5 8.05, 1.03, 1.59 (energy ratios under the 10 meV floor). So `COMPILED_GRAPH_GPUS` lists the A100 family.
+
 ### The memory guard and the RTX 5060 Ti twin (job 49)
 
 The guard (5c890377, branch `fastmace/tiled-graphs`): the first compiled call runs uncaptured and measures its tile

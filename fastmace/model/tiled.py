@@ -67,7 +67,10 @@ TILE_CHUNK_SCALE = {"NVIDIA GeForce RTX 5060 Ti": 4, "NVIDIA RTX 4000 Ada Genera
 TILED_SPEED_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 # TileConfig.compiled_graphs None: on for these GPU families (decision 66: where a same-process A/B measured the
 # captured compiled bodies faster in both orders), device state only, and only where the memory guard below fits.
-COMPILED_GRAPH_GPUS = GPUModels(())
+# A100-SXM4-80GB 0.569 / 0.571 at 975,560 SrTiO3 atoms (Alex 4981483; the host-bound call: GPU idle 52 % in nsys), gate
+# 3x passed with it on (Alex 4982466); every A100 model (GPUModels matches the family). RTX 5060 Ti: no gain (30^3
+# 1.007 / 0.990, 40^3 0.998; local job 49), not listed.
+COMPILED_GRAPH_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 # The memory guard of TileConfig.compiled_graphs (on or None): the first compiled call runs uncaptured and measures its
 # tile workspace; the bodies are captured from the next call on when ``available`` holds one capture pool of that
 # workspace per slot, plus the uncaptured warm-ups' own workspace, each with this margin (``compiled_graphs_fit``).
