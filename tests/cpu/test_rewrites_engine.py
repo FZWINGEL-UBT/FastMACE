@@ -147,7 +147,8 @@ def test_strain_through_the_registry():
     resolution = registry.resolve(calc.models[0], RewriteConfig())
     assert resolution.enabled == ("single_graph_strain",)
     applied = registry.apply(calc.models[0], resolution, original=calc.models[0])
-    assert applied[0].result.passed and applied[0].result.modules == 2
+    # Two strains, each through the symmetric and the elementwise (VIRIAL_ELEMENTWISE) form.
+    assert applied[0].result.passed and applied[0].result.modules == 4
     assert _patches.record_of("single_graph_strain") is None  # the force field binds it (2-T08b)
 
 
