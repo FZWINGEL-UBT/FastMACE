@@ -98,6 +98,10 @@ with tc.no_global_list(True):
 times = []
 for _ in range(4):
     torch.cuda.synchronize(); t = time.perf_counter(); o = tiled(positions); torch.cuda.synchronize()
+    times.append(time.perf_counter() - t); del o
+with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+    t = time.perf_counter(); o = tiled(positions); torch.cuda.synchronize(); wall = time.perf_counter() - t
+
 import os
 import tempfile
 

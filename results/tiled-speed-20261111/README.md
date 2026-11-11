@@ -46,14 +46,27 @@ All pass; the energy ratios above 3 are under the 0.01 meV/atom floor and as hig
 
 ## Where the steady device-state call's time goes (idea 2)
 
-### A100 kernel regions (Alex 4980926, `a100prof/`): undercounted
+### A100 kernel regions (Alex 4980926 `a100prof/`, Alex 4981379 `kprof7-a100/`)
 
-3899b8b0, SrTiO3 975,560 atoms, device state, R = 16,384: steady calls 3.74 / 3.71 s (3.8 µs/atom). `kprof6.py`
-summed 2,115 ns/atom of kernels (the whole-system call: 1.96 µs/atom), which read as a GPU idle 43 % of the call.
-That was wrong: it charged only kernels attached to torch ops (`FunctionEvent.kernels`) and missed Inductor's Triton
-launches and cuEquivariance's raw `cuLaunchKernel` calls. The idle-gap profile below counts every kernel. A corrected
-region profile (`kprof7.py`, each kernel charged through its correlation id to the call that launched it) is
-PENDING (Alex 4981367).
+SrTiO3 975,560 atoms, device state, R = 16,384, steady calls 3.77 / 3.73 s (3.8 µs/atom; the whole-system call:
+1.96 µs/atom). `kprof7.py` charges every kernel in the profiler's trace, through its correlation id, to the labelled
+method that launched it (autograd's device threads to the caller's label): 24,548 kernels, 2,013 ns/atom (union
+1,995). The GPU is therefore idle about 47 % of the call; the gap to the whole-system call is host-side.
+(`kprof6.py`, 3899b8b0, which counted only kernels attached to torch ops, had 2,115 ns/atom: close.)
+
+| region (ns/atom) | A100 | 5060 Ti (job 42, `kprof7-local/`) |
+| --- | ---: | ---: |
+| sweep 2 backward (oeq w′ backward 525 on the A100) | 623 | 1,479 |
+| sweeps 1 and 3 backward | 298 | 847 |
+| sweep 2 forward (spline 218) | 289 | 1,587 |
+| sweep 3 forward (`fwd3o`) | 269 | 771 |
+| sweep 1 forward (`fwd1m`) | 267 | 752 |
+| scatter | 112 | 110 |
+| tile graph | 62 | 111 |
+| all kernels | 2,013 | 5,917 (wall 6,036) |
+
+A composed interaction 0 in the tile bodies (idea 2) acts on the two interaction-0 forwards, about 535 ns/atom of
+kernels on the A100; the host-side idle time (about 1.8 µs/atom) is the larger lever.
 
 ### Local idle-gap profile (job 40, `gap-local/`, `jobs/gapprof.py`)
 
@@ -63,9 +76,26 @@ the idle gaps total 31 ms (largest: 15 ms charged to `_call`). The 5060 Ti call 
 runs under the kernels. (The first run, `gap-local/job39-gapprof-58.json`, counted the profiler's 6 s `_call` device span as
 busy; job 40 sets device spans over 50 ms aside.)
 
-### A100 idle-gap profile (Alex 4981351, `gap-a100/`)
+### A100 idle-gap profile (Alex 4981351, `gap-a100/`): wrong
 
-69a48049, A100-SXM4-80GB, the same system: steady 3.83 / 3.78 s. In the profiled call (4.74 s) the GPU is busy
-4.39 s and idle 0.35 s (7 %), in gaps charged to `_fill` 74 ms, `_first` 68 ms, `_attrs` 61 ms, `_call` 49 ms and
-less. The A100 call is GPU-bound too: its gap to the whole-system call (3.8 against 1.96 µs/atom) is kernel time in
-the tiles, so idea 2 (the composed interaction 0 and the generated contraction in the tile bodies) stays open.
+`gapprof.py` counted the GPU-timeline copies of the `record_function` annotations (per-tile spans under 50 ms) as
+busy time, which covered the gaps: it reported 4.39 s busy of a 4.74 s profiled call, against 1.96 s of kernels in
+the call (`kprof7`). On the 5060 Ti this did not matter (its GPU is busy). `gapprof2.py` counts only kernel, copy and
+fill events: PENDING (Alex 4981405, local job 44).
+
+## The wavefront's row pool on the device (idea 3): rejected; the aliased device state: measured
+
+eacf7cfd lets `alias_state` run with `state="device"`: the wavefront pool's row map and free rows and the alias
+window live on the device, and the window's rows are planned on the host once after sweep 1. CPU tests on leto
+(`test_tiled.py`, `test_layering.py`): 188 passed. 5060 Ti, 975,560 SrTiO3 atoms, compiled tiles, R 16,384 budget,
+both orders (`jobs/job41.sh`, `jobs/job43.sh`):
+
+| A/B | ab | ba | device state |
+| --- | ---: | ---: | --- |
+| host wavefront (a) against device wavefront (b) | 1.012 | 0.994 | 2.52 GB pool both |
+| plain device state (a) against device wavefront (b) | 1.263 | 1.181 | 4.99 against 2.52 GB |
+| plain device state (a) against aliased device state, no wavefront (b) | 1.034 | 1.021 | 4.99 against 2.52 GB |
+
+The host copies were not the wavefront's cost any more (the copy stream and the host worker hide them); its plan is
+(100 tiles with the boundary skins against 68 and a pool of 91 % of the atoms at this size). The aliased device
+state halves the device state for 2–3 %: an opt-in capacity lever, not a default. Records: `devpool/`, `devalias/`.

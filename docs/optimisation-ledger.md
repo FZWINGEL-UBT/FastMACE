@@ -737,6 +737,8 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [tiled-state-dtype](#tiled-state-dtype) | Host state stored in 16 bits when the host is short (`"auto"`: kept lists first, then float16) | `TileConfig.state_dtype` | FM | DEFAULT `"auto"` (capacity fallback; float16 and bfloat16 not a default) | 2026-11-09 | float16 gate 12-51x, bfloat16 50-750x (fail); f16 store 0.983 / 0.977; host state halved | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 | [tiled-kept-compact](#tiled-kept-compact) | Kept lists delta-encoded below their 3 B per edge | - | FM | REJECTED (bound) | 2026-11-09 | at most a third of the lists; dropping them whole when short saves all | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 | [tiled-receiver-cap](#tiled-receiver-cap) | Receiver caps above 16,384 in the compiled budget (32,768, 65,536) | `TileConfig.budget_receivers` | FM | REJECTED | 2026-11-11 | 5060 Ti device: 32,768 within noise of 16,384 (6.13–6.19 s against 6.12–6.26 s), 65,536 +3.5 % | [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) |
+| [tiled-device-pool](#tiled-device-pool) | The wavefront's row pool (and the alias window) on the device | `TileConfig(state="device", alias_state=True, wavefront="on")` | FM | REJECTED (speed) | 2026-11-11 | 5060 Ti 975,560 atoms: against the host wavefront 1.012 / 0.994; against the plain device state 1.263 / 1.181 | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
+| [tiled-device-alias](#tiled-device-alias) | The aliased state on the device (x and sc only; dE/dx in a planned window) | `TileConfig(state="device", alias_state=True)` | FM | MEASURED (opt-in; capacity lever, not a default) | 2026-11-11 | device state 4.99 → 2.52 GB at 975,560 atoms; 1.034 / 1.021 slower (5060 Ti) | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-heap-trim](#tiled-heap-trim) | `malloc_trim(0)` after the kept lists are dropped or the list cache cleared | `tiled.TILE_HEAP_TRIM` | FM | DEFAULT (memory only) | 2026-11-11 | 7.0 GiB forced drop at 20.1M atoms: resident 8.11 → 5.48 GiB (trimmed 5.37); A100 397.5M: A100PENDING | [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) |
 | [tiled-malloc-mmap](#tiled-malloc-mmap) | glibc mmap threshold 1 MiB for capacity runs | `MALLOC_MMAP_THRESHOLD_` (environment) | FM | MEASURED (environment, not code) | 2026-11-09 | process peak -7 % at 10M atoms; calls within 1 % | [tiled-host-state-dtype](validation/tiled/tiled-host-state-dtype.md) |
 
@@ -858,6 +860,24 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 - What: larger tiles to cut the halo and the per-tile overhead (the A100 397.5M call ran 68 tiles of 16,384 receivers with about 8,920 halo atoms each).
 - Status: REJECTED on the RTX 5060 Ti. 975,560 SrTiO3 atoms, device state, the cap fixed (`--no-budget`), medians of two calls per side: R = 16,384 6.20 / 6.26 s, then 6.14 / 6.12 s at the end; R = 32,768 6.19 / 6.13 s (within the drift); R = 65,536 6.40 / 6.39 s (+3.5 %). Not measured on the A100 or the Ada, where the tiles' share of the GPU differs; open for a screen there.
 - Sources: [tiled-speed-20261110](../results/tiled-speed-20261110/README.md) (`capscreen/`, job 37, 4c9be2bb).
+
+<a id="tiled-device-pool"></a>
+#### tiled-device-pool: the wavefront's row pool on the device (idea 3)
+- Switch: `TileConfig(state="device", alias_state=True, wavefront="on")` (eacf7cfd: the aliased state now runs on the device; the pool's row map and free rows and the alias window live there, the window's rows planned on the host once after sweep 1)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed, `plans/ideas-20261111-tiled.md` idea 3)
+- What: the idea's premise was that the wavefront's gap to the device state is its host copies (1,085 ns/atom in the 10 November profile). With the pool on the device there are none.
+- Status: REJECTED for speed on the RTX 5060 Ti (975,560 SrTiO3 atoms, compiled tiles, R 16,384 budget, both orders, job 41): against the host wavefront 1.012 / 0.994 (`TILE_COPY_STREAM` and `TILE_HOST_WORKER` already hide the copies); against the plain device state 1.263 / 1.181. The wavefront's cost at this size is its plan (100 tiles with the boundary skins against 68, a pool of 91 % of the atoms, a smaller graph cache), not the copies. Exact: CPU tests (device wavefront against the three-sweep call), leto 188 passed.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`devpool/`).
+
+<a id="tiled-device-alias"></a>
+#### tiled-device-alias: the aliased state on the device
+- Switch: `TileConfig(state="device", alias_state=True)` (opt-in; no default changed)
+- Engine: FM
+- Date/round: 11 November 2026 (tiled speed)
+- What: x and sc on the device with dE/dsc in sc's rows and dE/dx in x's rows once an atom is closed, its sum until then in a window whose rows are planned after sweep 1 (`_State._plan_slots`): two of the four state tensors.
+- Status: MEASURED. Device state 4.99 → 2.52 GB at 975,560 SrTiO3 atoms (about 2.6 kB/atom less); 1.034 / 1.021 slower on the RTX 5060 Ti (job 43). Bitwise the plain device state on CPU. A capacity lever for device state near its limit (the Ada and the 5060 Ti hold 3–5M atoms in device state); no automatic choice yet.
+- Sources: [tiled-speed-20261111](../results/tiled-speed-20261111/README.md) (`devalias/`).
 
 <a id="tiled-heap-trim"></a>
 #### tiled-heap-trim: return dropped kept lists to the system
