@@ -114,7 +114,11 @@ def vec(source, n):
         raise ValueError(f"atomics {len(adds)} against accumulators {len(names)}")
     for o, name in adds:
         values = ", ".join(f"{name}_{k}" for k in range(n))
-        out.append(f"            atomicAdd(reinterpret_cast<{vt}*>(dx + input_base + {o} + cbase), make_{vt}({values}));\n")
+        scalars = "".join(f"            atomicAdd(dx + input_base + {o} + cbase + {k}, {name}_{k});\n" for k in range(n))
+        # vector atomicAdd (float2 / float4) exists from sm_90; older GPUs add the N values one by one
+        out.append("#if __CUDA_ARCH__ >= 900\n"
+                   f"            atomicAdd(reinterpret_cast<{vt}*>(dx + input_base + {o} + cbase), make_{vt}({values}));\n"
+                   "#else\n" + scalars + "#endif\n")
     return head + "".join(out) + "    }" + rest
 
 
