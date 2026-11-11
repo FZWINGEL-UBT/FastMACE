@@ -38,7 +38,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   pool per slot and the warm-ups fit (`compiled_graphs_fit`, x1.1; the A4000 case stays off), and a captured call
   that runs out of device memory drops its graphs and runs again without them. `--compiled-graphs auto|on|off`.
   On for the A100 family (0.569 / 0.571 at 975,560 atoms; gate 3x passed, Alex 4982466); off on the RTX 5060 Ti (no
-  gain: not launch-bound).
+  gain: not launch-bound) and the RTX 4000 Ada (40³ 1.0015 with graphs on; at 58³ the guard turns them off).
 - The generic folded path for MACE-MP-0-class models (MACE-OMAT-0 medium and the other generic labels), in two
   records:
   - `generic_chunked_conv_backward` (field `chunked_conv_backward`) runs a generic interaction's streaming

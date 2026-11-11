@@ -132,7 +132,7 @@ def test_round2_defaults(monkeypatch):
     checks = (
         (wprime_backward, "HORNER", wprime_backward.horner_default, {"a100", "5060", "ada"}),
         (wprime_backward, "SCALAR_PATHS", wprime_backward.scalar_paths_default, {"a100"}),
-        (wprime_backward, "BUTTERFLY", wprime_backward.butterfly_default, {"a100", "5060"}),
+        (wprime_backward, "BUTTERFLY", wprime_backward.butterfly_default, {"a100", "5060", "ada"}),
         (wprime_backward, "REDUX", wprime_backward.redux_default, {"5060"}),
         (edge_outer_sum, "BACKWARD_WALK", walk, {"a100"}),
         (generic, "FUSED_FIRST_BACKWARD", generic.fused_first_backward, {"a100", "5060", "ada"}),
@@ -358,7 +358,8 @@ def test_h200_defaults():
     # The RTX 4000 Ada (8 November 2026, results/omat0-ada-capacity-20261108, leto): the spline group with HORNER, which
     # the spline's w' needs, 0.8306 / 0.8273; COMPOSE_SKIP and COMPOSE_FAST ride on tf32x3_gemms (rewrites.precision),
     # on for OMAT-0 medium there; the readout tail; gate passes. Measured and off there: SPLINE_VECTOR 4 and STAGE_SH
-    # (slower, 0.99), COUNT_PLAN and JOINED_LAYOUT (ties), CUEQ_PROJECTED (0.999)
+    # (slower, 0.99), COUNT_PLAN and JOINED_LAYOUT (ties), CUEQ_PROJECTED (0.999). STAGE_SH re-screened on with
+    # STAGE_DOUT and the w' STAGE_EDGES (ada-5060-screen, 11 November 2026).
     ada = "NVIDIA RTX 4000 Ada Generation"
     from fastmace.planner import fixed as planner_fixed
     from fastmace.rewrites import species as species_rewrites
@@ -368,7 +369,7 @@ def test_h200_defaults():
     assert ada in compose_skip.COMPOSE_SKIP_GPUS and ada in compose_skip.COMPOSE_FAST_GPUS
     assert ada in species_rewrites.GENERIC_FOLD_READOUT_TAIL_GPUS
     assert ada in planner_fixed.DECISION_66_TF32X3_OMAT0_GPUS and ada not in planner_fixed.DECISION_66_TF32X3_GPUS
-    assert ada not in wprime_backward.SPLINE_VECTOR_GPUS and ada not in wprime_backward.STAGE_SH_GPUS
+    assert ada not in wprime_backward.SPLINE_VECTOR_GPUS and ada in wprime_backward.STAGE_SH_GPUS
     assert ada not in compose_skip.COUNT_PLAN_GPUS and ada not in compose_skip.JOINED_LAYOUT_GPUS
     assert ada not in cueq_projection.CUEQ_PROJECTED_GPUS
 

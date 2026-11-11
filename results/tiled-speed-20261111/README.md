@@ -148,6 +148,13 @@ Gate (Alex 4982466, 717b9f92 (4981747 died on a node failure after 35 s), the 3x
 check passes on both sides. With graphs on: SrTiO3 3x3x3 energy 9.72, forces 1.05, stress 0.63; NaCl 2.27, 0.86,
 1.14; NbCl5 8.05, 1.03, 1.59 (energy ratios under the 10 meV floor). So `COMPILED_GRAPH_GPUS` lists the A100 family.
 
+RTX 4000 Ada (murphy, 04de68ef, idle check before each run; `jobs/murphy_cg.sh`, `jobs/probe_cg.py`,
+`jobs/murphy_cgab.sh`; records `cg-ada-murphy/`). A probe forcing captures (one process, 4 blocks): 40³ (320,000
+atoms) b/a 1.0015, the guard on (3 capture pools and warm-ups of 3.63 GiB fit 16.56 GiB); 58³ (975,560) b/a 1.0013,
+the guard off (8.63 GiB x 3 do not fit 12.00). The guarded A/B at 58³ (R 8,192, compiled, off against the guard,
+4 blocks of 2 calls): 1.0010 (ab) / 1.0007 (ba) at 5.65 µs/atom, the guard off on both orders (4.7 and 8.6 GiB
+warm-ups). The Ada's compiled call is not launch-bound either: off, as on the 5060 Ti.
+
 ### The memory guard and the RTX 5060 Ti twin (job 49)
 
 The guard (5c890377, branch `fastmace/tiled-graphs`): the first compiled call runs uncaptured and measures its tile

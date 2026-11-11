@@ -1,7 +1,7 @@
 # Defaults by GPU: what runs today and why
 
 Source: main `7d18028d` (10 November 2026; §0 regenerated from the code, §1 compiled at `eca7ba5d` on 5 November and
-extended row by row since). The code is the authority: `fastmace/planner/fixed.py` (auto rules),
+extended row by row since; Ada and 5060 Ti cells re-measured by ada-5060-screen, 11 November 2026). The code is the authority: `fastmace/planner/fixed.py` (auto rules),
 the `*_GPUS` sets next to each kernel switch, and [switch-map.md](switch-map.md) (every config field and its
 `auto` rule). History of every attempt, adopted or not: [optimisation ledger](../optimisation-ledger.md).
 How the A100 OMAT-0 path fits together: [omat0-a100.md](omat0-a100.md).
@@ -22,7 +22,7 @@ measured slower: the cell says which).
 
 ## 0. Every switch by GPU family (main `7d18028d`, 10 November 2026)
 
-One row per switch set, read from the code at `7d18028d`: the `*_GPUS` set beside each switch and
+One row per switch set, read from the code at `7d18028d` (Ada and 5060 Ti cells: the ada-5060-screen merge): the `*_GPUS` set beside each switch and
 `fastmace/planner/fixed.py`. Cells: **on** = default on for that family; **off** = measured and not adopted (the value
 says why: b/a ab / ba, b = the switch on unless stated); **not measured** = no MD-step A/B for that family is recorded
 in the code comments, this page, the ledger or the results it cites; **n/a** = cannot run there (the reason is given).
@@ -43,17 +43,17 @@ certificate). Commits are where the set last gained a family.
 | 128-row tiles, 8 warps (`tile_rule.LARGE_TILE_GPUS`, exact) | not measured | off (A100-SXM4-40GB 1.021 / 1.021) | on | off (1.020 / 1.007) | bitwise | `f2261a09` |
 | `tf32x3_gemms`, MH-1 (`DECISION_66_TF32X3_GPUS`) | not measured | on | off (Triton tf32x3 slower) | off (Triton tf32x3 slower) | precision | `41619478` |
 | float64 D2 `w_tables`, D3 `save_transcendentals` (`DECISION_65_GPUS`, exact; D1 suspended) | not measured | off (D2, D3 slower) | on | on | rounding | `fbfc95f7` |
-| POLAR-1 `wprime_backward` + `fused_folded_forward` (`POLAR_DECISION_66_WPRIME_GPUS`; A100 by label, `POLAR_DECISION_66_WPRIME_LABEL_GPUS`) | not measured | on, M only (L: NbCl5 1.003 / 1.002) | on, M and L | not measured | rounding | `fbe91675`, `f7f223c1` |
-| POLAR-1 `gate_epilogue` (`POLAR_DECISION_66_GATE_EPILOGUE_GPUS`) | not measured | off (tie) | on | not measured | rounding | `fbe91675` |
+| POLAR-1 `wprime_backward` + `fused_folded_forward` (`POLAR_DECISION_66_WPRIME_GPUS`; A100 by label, `POLAR_DECISION_66_WPRIME_LABEL_GPUS`) | not measured | on, M only (L: NbCl5 1.003 / 1.002) | on, M and L | on, M only by label (0.9597 / 0.9589, 0.9380 / 0.9415; L: NbCl5 1.0098 / 1.0097) | rounding | `fbe91675`, `f7f223c1`, ada-5060-screen |
+| POLAR-1 `gate_epilogue` (`POLAR_DECISION_66_GATE_EPILOGUE_GPUS`) | not measured | off (tie) | on | on (with the 5060 Ti set, NbCl5: S 0.9927 / 0.9846, L 0.9869 / 0.9885; NaCl mixed) | rounding | `fbe91675`, ada-5060-screen |
 | POLAR `SPIN_BATCHED`, `FOLD_UPDATE`, `COMPOSE_HEADS`, `PRUNE_DEAD_DEGREES` (`True`, every GPU) | on (pure-removal rule; not measured) | on | on | on | rounding (gates pass) | `657c80b3`, `0d09dc40`, `5176ad1d`, `540fa159` |
-| POLAR k-space `MEGAKERNEL` (`polar.MEGAKERNEL_GPUS`, from `MEGAKERNEL_MIN_WORK`) | not measured | on | not measured | on | rounding | `b155b642`, `b4ec7053` |
+| POLAR k-space `MEGAKERNEL` (`polar.MEGAKERNEL_GPUS`, from `MEGAKERNEL_MIN_WORK`) | not measured | on | on (NbCl5: S 0.8964 / 0.8964, M 0.9490 / 0.9517, L 0.9678 / 0.9684) | on | rounding | `b155b642`, `b4ec7053`, `d1048f04` |
 | `tf32x3_gemms` by label: OFF ×5, POLAR-1 S, M, L (`DECISION_66_TF32X3_MODEL_GPUS`) | not measured | on | not measured | not measured | precision | `91e428a1`, `1ffd7f34`, `f7f223c1` |
-| `CUEQ_PROJECTED` (`cueq_projection.CUEQ_PROJECTED_GPUS`; not OFF23-large, POLAR-1-S, -M on the A100: `DECISION_66_CUEQ_PROJECTED_EXCLUDED`) | on | on | off (0.9992 / 0.9987 off again: slower on) | not measured | rounding | `b8d977f4` |
+| `CUEQ_PROJECTED` (`cueq_projection.CUEQ_PROJECTED_GPUS`; not OFF23-large, POLAR-1-S, -M on the A100: `DECISION_66_CUEQ_PROJECTED_EXCLUDED`) | on | on | off (0.9992 / 0.9987 off again: slower on) | off (from the 5060 Ti candidate set: removing it 1.0000 / 0.9997, 0.9920 / 0.9993) | rounding | `b8d977f4` |
 | Stock first block's species skip, MACE-OFF (`generic.modules.STOCK_FIRST_SKIP_GPUS`) | not measured | on | on | on | exact | `90cac1b3`, `42c063ce` |
 | Radial tables with the stock first block, MACE-OFF (`DECISION_66_STOCK_FIRST_TABLES_GPUS`) | not measured | on | on | on | certified | `90cac1b3`, `42c063ce` |
 | Radial last layer as 3×TF32, MACE-OFF (`skinny_linear.RADIAL_TF32X3_GPUS`) | not measured | on | not measured | off (Triton 3×TF32 slower) | precision | `90cac1b3` |
-| Column-split input gradient (`skinny_linear.SPLIT_COLUMNS_GPUS`) | not measured | off (tie, 0.993–1.005) | not measured | on | bitwise | `8e733265`, `1aec1931` |
-| Model exclusions on the A100: `SORT_BY_LENGTH` off for OFF23-small, -large; w′ `STAGE_DOUT` and `DEGREE_PARTS` off for POLAR-1-M (`*_MODEL_OFF_GPUS`) | not measured (no OFF or POLAR A/B on the H200) | on (the exclusions) | n/a (base switches off) | n/a (base switches off) | rounding / bitwise | `c619d306` |
+| Column-split input gradient (`skinny_linear.SPLIT_COLUMNS_GPUS`) | not measured | off (tie, 0.993–1.005) | on (OFF23-large 0.9556 / 0.9583; OFF24 no split) | on | bitwise | `8e733265`, `1aec1931`, `edfc0115` |
+| Model exclusions (`*_MODEL_OFF_GPUS`): `SORT_BY_LENGTH` off for OFF23-small, -large (A100); w′ `STAGE_DOUT` off for POLAR-1-M (A100, Ada) and POLAR-1-L (Ada); `DEGREE_PARTS` off for POLAR-1-M (A100) | not measured (no OFF or POLAR A/B on the H200) | on (the exclusions) | w′ `STAGE_DOUT` off for POLAR-1-M and -L (leave-one-out from the Ada set: M NaCl 0.9868 / 0.9858, L NbCl5 0.9986 / 0.9987 off; the set without it against the defaults: M 0.9986 / 1.0006, 0.9999 / 0.9982, L 1.0005 / 1.0005) | none needed for POLAR-1-M (measured with `STAGE_DOUT` on: 0.9659 / 0.9758, 0.9273 / 0.9389); OFF23-small, -large not measured | rounding / bitwise | `c619d306`, ada-5060-screen |
 | `EDGE_SH` in MH-1's class (`generic.modules.EDGE_SH_MH1_GPUS`, empty) | not measured | off (POLAR-1 tie, S, M, L within 0.4 %; MH-1 not measured) | not measured | not measured | rounding | – |
 | `FUSED_FIRST_BACKWARD` in MH-1's class (`mh1.modules.FUSED_FIRST_MH1_GPUS`, empty) | not measured | off (POLAR-1 slower: S NaCl 1.006 / 1.006, M 1.005 / 1.004) | not measured | not measured | rounding | – |
 | e3nn `o3.Linear` as BlockLinear (`linear.E3NN_BLOCK_LINEAR_GPUS`, empty) | not measured | not measured | not measured | not measured | not recorded | – |
@@ -66,30 +66,30 @@ certificate). Commits are where the set last gained a family.
 | `generic_radial_tables` (`DECISION_66_GENERIC_RADIAL_TABLES_GPUS`) | on | on | on | on | certified | `27d27f21` (H200) |
 | `generic_fused_folded_forward` + `generic_wprime_backward`, OMAT-0 medium (`DECISION_66_GENERIC_WPRIME_GPUS`) | on | on | on | on | rounding | `27d27f21` (H200) |
 | OMAT-0 small: the pair above + `tf32x3_gemms` (`DECISION_66_GENERIC_WPRIME_LABEL_GPUS`, `…_TF32X3_MODEL_GPUS["omat0-small"]`) | on | on | not measured | not measured | precision + rounding | `979785a7`, `5797d298` |
-| `generic_fold_product_linear` (`DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`), with `FOLD_FIRST_DENSITY_LINEAR` | on | on | on | not measured | rounding | `27d27f21` (H200) |
+| `generic_fold_product_linear` (`DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`), with `FOLD_FIRST_DENSITY_LINEAR` | on | on | on | on (alone 0.9377 / 0.9348, 0.9222 / 0.9166) | rounding | `27d27f21` (H200), ada-5060-screen |
 | `tf32x3_gemms`, OMAT-0 medium (`DECISION_66_TF32X3_GPUS`, `…_OMAT0_GPUS`) | on | on | on (Triton backend, with the compose group) | off (Triton tf32x3 slower) | precision | `27d27f21`, `1cd369e4` |
 | species GEMM (`generic.modules.SPECIES_GEMM_GPUS`) | off (with `species_gemm.CUTLASS` 1.0141 / 1.0175) | off (0.992 / 0.991; its skip runs as 3×TF32) | on | on | exact | `b48c10de` |
 | `FUSED_FIRST_BACKWARD` + `TABLED_FORWARD` | on | on | on | on | rounding | `27d27f21`, `5ddec837` |
 | `EDGE_SH`, generic (`EDGE_SH_GPUS`) | on | on | on | on | rounding | `27d27f21` |
 | `HEAD_SLICE` (`energy.HEAD_SLICE_GPUS`) | on | on | on | on | bitwise | `27d27f21` |
-| `GRAPH_SUM` (`energy.GRAPH_SUM_GPUS`) | on | on | off (1.001 / 0.999) | off (tie) | rounding | `27d27f21` |
-| `SYMMETRIC_PAIRS` (`radial.SYMMETRIC_PAIRS_GPUS`) | on | on | on | not measured | bitwise | `27d27f21` |
-| radial-table forward with 8 warps (`radial_table.WARPS_GPUS`) | on | not measured | not measured | not measured | launch shape (exactness not recorded) | `62556704` |
+| `GRAPH_SUM` (`energy.GRAPH_SUM_GPUS`) | on | on | off (1.001 / 0.999) | off (removing it from the candidate set 0.9971 / 0.9947, 1.0001 / 0.9982) | rounding | `27d27f21` |
+| `SYMMETRIC_PAIRS` (`radial.SYMMETRIC_PAIRS_GPUS`) | on | on | on | off (mixed: removing it from the candidate set 0.9984 / 0.9965, 1.0024 / 1.0033; adding it to the adopted set 0.9926 / 0.9960, 0.9986 / 1.0002: SrTiO3 disagrees) | bitwise | `27d27f21` |
+| radial-table forward with 8 warps (`radial_table.WARPS_GPUS`) | on | not measured | off (tie 0.9975 / 0.9990, 1.0019 / 0.9997) | off (NbCl5 1.0172 / 1.0071) | launch shape (exactness not recorded) | `62556704` |
 | w′ `TABLE_W`, `BLOCK_MESSAGE`, `FACTORED`, `HORNER` | on | on | on | on | rounding | `27d27f21`, `03125b0c`, `1cd369e4` |
-| w′ `SCALAR_PATHS` | on | on | not measured | not measured | rounding | `27d27f21` |
-| w′ `MAX_REGISTERS` 80 (`MAX_REGISTERS_GPUS`) | not measured | not measured | not measured | on | bitwise (register cap) | `03125b0c` |
-| w′ `FOLD_ALPHA` | on | on | not measured | not measured | rounding | `c0813688` |
-| w′ `STAGE_DOUT` | on | on (not POLAR-1-M) | not measured | not measured | bitwise | `6561cc13` |
-| w′ `STAGE_SH` | on | on | off (0.9903 / 0.9905 off again: slower on) | not measured | bitwise | `b8d977f4` |
-| w′ `STAGE_EDGES` (`wprime_backward.STAGE_EDGES_GPUS`; `STAGE_EDGES_MODEL_GPUS` for omat0-small) | medium off (tie 0.9969 / 1.0010); small on | on | not measured | not measured | bitwise | `8aaace6b`, `387ec7bb` |
-| w′ `SPLINE_VECTOR` 4 | on | on | off (0.9918 / 0.9906 with 2: 4 slower) | not measured | bitwise | `78a25fd6`, `b8d977f4` |
-| w′ `BUTTERFLY` | on | on | off (5 Nov: 1.008 / 1.007, 1.006 / 1.000, against the w′ defaults of that day) | on | bitwise | `bcca4189` |
+| w′ `SCALAR_PATHS` | on | on | off (tie 0.9984 / 0.9984, 1.0001 / 0.9987) | off (SrTiO3 1.0015 / 1.0066) | rounding | `27d27f21` |
+| w′ `MAX_REGISTERS` 80 (`MAX_REGISTERS_GPUS`) | not measured | not measured | off (1.0529 / 1.0537, 1.0416 / 1.0401) | on | bitwise (register cap) | `03125b0c` |
+| w′ `FOLD_ALPHA` | on | on | off (1.0077 / 1.0082, 1.0079 / 1.0065) | off (1.0018 / 1.0017, 1.0092 / 1.0005) | rounding | `c0813688` |
+| w′ `STAGE_DOUT` | on | on (not POLAR-1-M) | on, not POLAR-1-M, -L (alone 0.9699 / 0.9694, 0.9848 / 0.9806) | on (with w′ `STAGE_EDGES`, `STAGE_SH`) | bitwise | `6561cc13`, `ec25c9c4`, ada-5060-screen |
+| w′ `STAGE_SH` | on | on | on (re-screen: off again from the Ada set 1.0035 / 1.0028, 1.0078 / 1.0056; the 8 Nov reading flipped) | on (with `STAGE_DOUT`) | bitwise | `b8d977f4`, `ec25c9c4`, ada-5060-screen |
+| w′ `STAGE_EDGES` (`wprime_backward.STAGE_EDGES_GPUS`; `STAGE_EDGES_MODEL_GPUS` for omat0-small) | medium off (tie 0.9969 / 1.0010); small on | on | on (with `STAGE_DOUT`, `STAGE_SH`: 0.9639 / 0.9643, 0.9779 / 0.9758) | on (the three left out of the candidate set 1.0529 / 1.0503, 1.0334 / 1.0341) | bitwise | `8aaace6b`, `387ec7bb`, `ec25c9c4`, ada-5060-screen |
+| w′ `SPLINE_VECTOR` 4 | on | on | off (0.9918 / 0.9906 with 2: 4 slower) | off (removing it from the candidate set 0.9963 / 0.9941, 0.9957 / 0.9997) | bitwise | `78a25fd6`, `b8d977f4` |
+| w′ `BUTTERFLY` | on | on | on (re-screen: 0.9840 / 0.9849, 0.9913 / 0.9931; the 5 Nov reading flipped) | on | bitwise | `bcca4189`, `ec25c9c4` |
 | w′ `REDUX` | off (1.0206 / 1.0202) | off (1.018–1.029) | off (1.009 / 1.008, 1.011 / 1.008) | on | rounding (fixed point) | `6c2f2967` |
 | fused forward `SKIP_ZERO_COLUMN` | on | on | on | off (1.000) | exact | `02a81e13` |
 | fused forward `TENSOR_CORES` | on | on | off (slower: TF32 = 2× FP32) | off (slower) | precision | `27d27f21` |
 | fused forward `VEC_SH` | on | on | not measured | on | bitwise | `27d27f21` |
 | fused forward `VEC_A`, `TC_WFRAG` | on | on | n/a (tensor-core forward off) | n/a (tensor-core forward off) | bitwise | `27d27f21` |
-| fused forward `DEGREE_PARTS` | on | on (not POLAR-1-M) | not measured | not measured | bitwise | `891bf370` |
+| fused forward `DEGREE_PARTS` | on | on (not POLAR-1-M) | off (tie 0.9990 / 0.9990, 1.0007 / 0.9994) | off (removing it from the candidate set 0.9962 / 1.0012, 0.9931 / 0.9990) | bitwise | `891bf370` |
 | fused forward `WS_FORWARD` | on | n/a (sm_90 wgmma) | n/a | n/a | rounding | `aa544c69` |
 | fused forward `LANE_INDICES` | on | not measured | not measured | not measured | bitwise | `44f548bf` |
 | fused forward `W_GROUP` | on | on | not measured | not measured | bitwise | `240b2019`, `ff4d1a89` |
@@ -101,27 +101,27 @@ certificate). Commits are where the set last gained a family.
 | fused forward `SH_LDS4` (needs `VEC_SH`) | off (1.0014 / 1.0027) | off (1.0008 / 0.9949) | n/a (`VEC_SH` off) | on | bitwise | `9a6df1f5` |
 | CUTLASS `LINEAR_DIV` (`cutlass.linear_div.LINEAR_DIV_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `5dc5d799` |
 | CUTLASS `SKIP_SELECT` (`cutlass.skip_select.SKIP_SELECT_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `6561cc13` |
-| `SEGMENT_ROWS` (`cutlass.segment_rows.SEGMENT_ROWS_GPUS`) | off (1.0006 / 1.0000) | on | not measured | not measured | rounding (3×TF32) | `6c2f2967` |
-| tabled `POWER_BACKWARD` | on | off (tie 1.0020 / 0.9977; 1.0006 / 1.0028 on the 8 Nov defaults) | not measured | not measured | rounding | `8a1ed833` |
-| `RECEIVER_SUM` (`receiver_sum.RECEIVER_SUM_GPUS`) | off (tie 0.9992 / 1.0012) | on | not measured | not measured | rounding | `7a2f6b6f` |
+| `SEGMENT_ROWS` (`cutlass.segment_rows.SEGMENT_ROWS_GPUS`) | off (1.0006 / 1.0000) | on | off (tie with the CUTLASS backend on sm_89: 0.9967 / 0.9981, 0.9984 / 1.0016) | n/a (CUTLASS cubins for sm_80 / sm_90 only) | rounding (3×TF32) | `6c2f2967` |
+| tabled `POWER_BACKWARD` | on | off (tie 1.0020 / 0.9977; 1.0006 / 1.0028 on the 8 Nov defaults) | on (alone 0.9935 / 0.9929, 0.9935 / 0.9933) | on (alone 0.9917 / 0.9946, 0.9944 / 0.9941) | rounding | `8a1ed833`, `ec25c9c4`, ada-5060-screen |
+| `RECEIVER_SUM` (`receiver_sum.RECEIVER_SUM_GPUS`) | off (tie 0.9992 / 1.0012) | on | off (mixed by structure: removing it from the Ada set 0.9967 / 0.9964 SrTiO3, 1.0087 / 1.0068 NbCl5) | on (removing it from the candidate set 1.0041 / 1.0006, 1.0034 / 1.0049) | rounding | `7a2f6b6f`, ada-5060-screen |
 | `BACKWARD_WALK` (`edge_outer_sum.BACKWARD_WALK_GPUS`) | off (1.0000 / 1.0001) | on | off (kernel 1.03–1.11) | off (kernel 0.94, near the DRAM floor) | rounding | `03125b0c` |
 | `BINNED_SCREEN` from 10,000 atoms (`pair_search.BINNED_SCREEN_GPUS`) | on | on | not measured | not measured | bitwise | `ac01df97` |
-| `SPLINE_W` (`spline_forward.SPLINE_W_GPUS`) | on | on | on (with `HORNER`) | not measured | rounding (certificate) | `b6da7a6f`, `b8d977f4`, `1cd369e4` |
-| `R128` (`R128_GPUS`) | on | on | on | not measured | bitwise | `b6da7a6f`, `b8d977f4`, `1cd369e4` |
+| `SPLINE_W` (`spline_forward.SPLINE_W_GPUS`) | on | on | on (with `HORNER`) | on (with `R128`, `STAGE_EDGES`: 0.8162 / 0.8183, 0.8548 / 0.8541) | rounding (certificate) | `b6da7a6f`, `b8d977f4`, `1cd369e4`, ada-5060-screen |
+| `R128` (`R128_GPUS`) | on | on | on | on (with `SPLINE_W`) | bitwise | `b6da7a6f`, `b8d977f4`, `1cd369e4`, ada-5060-screen |
 | `R128` with `MIN_BLOCKS` 8 for omat0-small (`R128_MIN_BLOCKS_MODEL_GPUS`) | on | not measured | not measured | not measured | bitwise (register cap) | `e2206bb6` |
-| spline forward `STAGE_EDGES` | on | on | on | not measured | bitwise | `b8d977f4`, `1cd369e4` |
-| spline forward `PREFETCH_AHEAD` (off for omat0-small on the A100: `PREFETCH_AHEAD_MODEL_OFF_GPUS`) | off (1.0046 / 1.0067) | on | not measured | not measured | bitwise | `8aaace6b`, `50480105` |
-| spline forward `BLOCK_ORDER` | on | on | not measured | not measured | bitwise | `5e7d961f` |
-| spline forward `PACKED8` | on | on | not measured | not measured | rounding | `e3049399` |
-| spline forward `GEOM` (`spline_forward.GEOM_GPUS`) | not measured | on | not measured | n/a (needs SPLINE_W + STAGE_EDGES, not on here; 11 Nov check: 0 forwards routed) | rounding | `48000458` |
-| `COMPOSE_SKIP` | on | on | on (with OMAT-0 tf32x3) | not measured | rounding | `b8d977f4`, `1cd369e4` |
-| `COMPOSE_FAST` | on | on | on | not measured | bitwise | `b8d977f4`, `1cd369e4` |
-| `COUNT_PLAN` | on | on | off (tie 1.0000 / 1.0004) | not measured | bitwise | `b8d977f4` |
-| `JOINED_LAYOUT` | on | on | off (tie 1.0006 / 0.9986) | not measured | bitwise | `8aaace6b` |
-| `GENERIC_FOLD_READOUT_TAIL` (`species.GENERIC_FOLD_READOUT_TAIL_GPUS`) | on | on | on | not measured | rounding | `b8d977f4`, `1cd369e4` |
-| `SORT_BY_LENGTH` (`neighbors.skin.SORT_BY_LENGTH_GPUS`) | on | on (not OFF23-small, -large) | not measured | not measured | rounding | `ec716912` |
-| `SC_GENERATED` (`sc_generated.SC_GENERATED_GPUS`) | on | on | not measured | not measured | rounding | `9225793e` |
-| `SC_FACTORED` (`sc_generated.SC_FACTORED_GPUS`) | off (lab bound under 1 %, sc0-invariant-basis; no MD A/B) | on | not measured (needs SC_GENERATED, not measured here) | n/a (needs SC_GENERATED, not on here; 11 Nov check: 0 products routed; kernel lab 1.003) | rounding | `48000458` |
+| spline forward `STAGE_EDGES` | on | on | on | on (with `SPLINE_W`) | bitwise | `b8d977f4`, `1cd369e4`, ada-5060-screen |
+| spline forward `PREFETCH_AHEAD` (off for omat0-small on the A100: `PREFETCH_AHEAD_MODEL_OFF_GPUS`) | off (1.0046 / 1.0067) | on | off (1.0037 / 1.0051, 1.0063 / 1.0073) | off (NbCl5 1.0190 / 1.0073) | bitwise | `8aaace6b`, `50480105` |
+| spline forward `BLOCK_ORDER` | on | on | off (tie 0.9961 / 0.9947, 1.0012 / 1.0000) | off (removing it from the candidate set 0.9988 / 0.9969, 0.9944 / 1.0013) | bitwise | `5e7d961f` |
+| spline forward `PACKED8` | on | on | on (0.9036 / 0.9030, 0.9346 / 0.9357) | on (0.9222 / 0.9246, 0.9456 / 0.9535) | rounding | `e3049399`, `ec25c9c4`, ada-5060-screen |
+| spline forward `GEOM` (`spline_forward.GEOM_GPUS`) | not measured | on | off (1.0226 / 1.0209, 1.0156 / 1.0159) | not measured (needs `SPLINE_W` + `STAGE_EDGES`, on from ada-5060-screen) | rounding | `48000458` |
+| `COMPOSE_SKIP` | on | on | on (with OMAT-0 tf32x3) | off (needs `tf32x3_gemms`: tf32x3 + compose NbCl5 1.0412 / 1.0396) | rounding | `b8d977f4`, `1cd369e4` |
+| `COMPOSE_FAST` | on | on | on | n/a (with `COMPOSE_SKIP`, off) | bitwise | `b8d977f4`, `1cd369e4` |
+| `COUNT_PLAN` | on | on | off (tie 1.0000 / 1.0004) | n/a (with `COMPOSE_SKIP`, off) | bitwise | `b8d977f4` |
+| `JOINED_LAYOUT` | on | on | off (tie 1.0006 / 0.9986) | n/a (with `COMPOSE_SKIP`, off) | bitwise | `8aaace6b` |
+| `GENERIC_FOLD_READOUT_TAIL` (`species.GENERIC_FOLD_READOUT_TAIL_GPUS`) | on | on | on | on (removing it from the candidate set 1.0037 / 1.0048, 1.0071 / 1.0097) | rounding | `b8d977f4`, `1cd369e4`, ada-5060-screen |
+| `SORT_BY_LENGTH` (`neighbors.skin.SORT_BY_LENGTH_GPUS`) | on | on (not OFF23-small, -large) | on (0.9794 / 0.9815, 0.9890 / 0.9908) | on (0.9860 / 0.9868, 0.9967 / 0.9887) | rounding | `ec716912`, `ec25c9c4`, ada-5060-screen |
+| `SC_GENERATED` (`sc_generated.SC_GENERATED_GPUS`) | on | on | on (0.9785 / 0.9775, 0.9738 / 0.9749) | off (routed only under `tf32x3_gemms`, off on the 5060 Ti; with SC_FACTORED a tie in the adopted set 0.9995 / 0.9998, 0.9994 / 1.0026) | rounding | `9225793e`, `ec25c9c4` |
+| `SC_FACTORED` (`sc_generated.SC_FACTORED_GPUS`) | off (lab bound under 1 %, sc0-invariant-basis; no MD A/B) | on | on (0.9978 / 0.9978, 0.9907 / 0.9906) | n/a (needs `SC_GENERATED`, off here) | rounding | `48000458`, `63153034` |
 
 ### 0.3 Tiled mode, plain constants and the memory-rescue rungs
 
@@ -129,7 +129,7 @@ certificate). Commits are where the set last gained a family.
 | --- | --- | --- | --- | --- | --- | --- |
 | Tiled speed switches: `TILE_PREFETCH_DEVICE`, `TILE_VIRIAL`, `TILE_GRAPH_CACHE`, `TILE_FILTER32`, `TILE_EPILOGUE`, `TILE_PINNED_SUPERSET`, `TILE_GRAPH_CACHE_WAVE`, `TILE_HOST_WORKER` (`tiled.TILED_SPEED_GPUS`) | not measured | not measured | not measured | on | exact; `TILE_VIRIAL`, `TILE_EPILOGUE` rounding | `b9362cc9`, `3fdbad6c` |
 | Two sweep-2 lanes (`tiled.LANE_GPUS`, exact) | not measured | not measured | on | off (1.05× per pair) | exact | `d14d07a8` |
-| `VIRIAL_ELEMENTWISE` (`rewrites.engine.VIRIAL_ELEMENTWISE_GPUS`; stress calls with single_graph_strain, every model family; measured on OMAT-0 medium with tools/virial_ab.py, the force call with stress) | not measured | off (bound 0.4 %; 18x18x18 0.9957 / 0.9944) | not measured | on (0.9675 / 0.9648) | rounding | `cde06eb0` |
+| `VIRIAL_ELEMENTWISE` (`rewrites.engine.VIRIAL_ELEMENTWISE_GPUS`; stress calls with single_graph_strain, every model family; measured on OMAT-0 medium with tools/virial_ab.py, the force call with stress) | not measured | off (bound 0.4 %; 18x18x18 0.9957 / 0.9944) | off (order-dependent: 1.0041 / 0.9805, rerun 1.0045 / 0.9810) | on (0.9675 / 0.9648) | rounding | `cde06eb0` |
 | Backward chunks ×4 in tiles (`tiled.TILE_CHUNK_SCALE`, exact) | not measured | not measured (×1) | on | on | exact | `42c975c6` |
 | Every GPU (`True`): `edge_outer_sum.STRIDED_ROWS`, `langevin.NOISE_DRAW_AHEAD`, `runtime.TABLE_GRADIENT_PER_CHUNK`, `tabled_outer_sum.SHAPE_CARRIER`, `skin.SORT_KEYS_ONLY`, `tiled.TILE_FILL_SKIP`; `generic.TILE_BLOCK_ROWS` (`None`: on in every tile) | on | on | on | on | exact (`TILE_BLOCK_ROWS` rounding) | `9ed7f559`, `349f03e3`, `4e7d0b5b`, `d4d7a08a`, `3fdbad6c`, `cfec5551` |
 | Memory-rescue rungs (`planner.memory.MEMORY_RESCUE`, in order): `recompute_conv_weights`, `generic_recompute_conv_weights`, `recompute_first_table`, `generic_recompute_first_table`, `generic_recompute_first_layer`, `recompute_node_segments`, `gate_epilogue` off, `recompute_node_region` | taken only when the plan does not fit (rule 12, decision 67) | same | same | same | the generic rungs rounding, float32 only (`RESCUE_FLOAT32_ONLY`); `generic_recompute_conv_weights` never beside `generic_wprime_backward` (`RESCUE_NOT_BESIDE`) | `7d18028d` (§19 "Rung B beside w′") |
@@ -146,8 +146,9 @@ defaults ([rescreen-20261109](../../results/step-limiters-20261109/README.md#rou
 
 ## Open: not measured per family
 
-Every switch above with a family cell "not measured". Ada and 5060 Ti cells of the OMAT-0 switches are being
-measured by the session `ada-5060-screen` (10 November 2026), which updates its rows in its own merge. A cell needs:
+Every switch above with a family cell "not measured". The session `ada-5060-screen` (10-11 November 2026,
+[results](../../results/ada-5060-screen-20261110/README.md)) measured the Ada and 5060 Ti cells of the OMAT-0
+switches and the POLAR / OFF cells named there. A cell needs:
 
 - **A/B only** (bitwise or exact): a same-process MD-step A/B in both build orders. A pure removal is on after one
   not-slower A/B (owner, 7 November 2026); anything else (a new kernel, tiling, launch shape, memory kept alive) needs
@@ -165,46 +166,33 @@ measured by the session `ada-5060-screen` (10 November 2026), which updates its 
 | 128-row tiles | H200 | A/B only (bitwise) |
 | `tf32x3_gemms`, MH-1 | H200 | A/B + gate (precision) |
 | float64 D2, D3 | H200 | A/B + gate |
-| POLAR-1 `wprime_backward` + fused forward | H200, 5060 Ti | A/B + gate |
-| POLAR-1 `gate_epilogue` | H200, 5060 Ti | A/B + gate |
+| POLAR-1 `wprime_backward` + fused forward | H200 | A/B + gate |
+| POLAR-1 `gate_epilogue` | H200 | A/B + gate |
 | POLAR `SPIN_BATCHED`, `FOLD_UPDATE`, `COMPOSE_HEADS`, `PRUNE_DEAD_DEGREES` | H200 | none to stay on (pure-removal rule); an A/B would only confirm |
-| POLAR k-space `MEGAKERNEL` | H200, Ada | A/B + gate |
+| POLAR k-space `MEGAKERNEL` | H200 | A/B + gate |
 | `tf32x3_gemms` by label (OFF, POLAR-1) | H200, Ada, 5060 Ti | A/B + gate (precision) |
-| `CUEQ_PROJECTED` | 5060 Ti | A/B + gate |
 | stock first skip and stock-first tables (MACE-OFF) | H200 | A/B only (exact) for the skip; A/B + certificate for the tables |
 | radial 3×TF32 (MACE-OFF) | H200, Ada | A/B + gate (precision) |
-| `SPLIT_COLUMNS` | H200, Ada | A/B only (bitwise) |
+| `SPLIT_COLUMNS` | H200 | A/B only (bitwise) |
 | OFF / POLAR model exclusions | H200 | A/B (as their base switches) |
 | `EDGE_SH` in MH-1's class | H200, Ada, 5060 Ti (MH-1 nowhere) | A/B + gate |
 | `FUSED_FIRST_BACKWARD` in MH-1's class | H200, Ada, 5060 Ti (MH-1 nowhere) | A/B + gate |
 | e3nn `o3.Linear` as BlockLinear | every family | A/B (class not recorded) |
 | `generic_chunked_conv_backward` | H200, A100 | A/B + gate |
 | OMAT-0 small pair | Ada, 5060 Ti | A/B + gate (precision) |
-| `generic_fold_product_linear` | 5060 Ti | A/B + gate |
-| `SYMMETRIC_PAIRS` | 5060 Ti | A/B only (bitwise) |
-| radial-table forward 8 warps | A100, Ada, 5060 Ti | A/B (exactness not recorded) |
-| w′ `SCALAR_PATHS`, `FOLD_ALPHA` | Ada, 5060 Ti | A/B + gate |
-| w′ `MAX_REGISTERS` 80 | H200, A100, Ada | A/B only (bitwise) |
-| w′ `STAGE_DOUT`, w′ `STAGE_EDGES` | Ada, 5060 Ti | A/B only (bitwise) |
-| w′ `STAGE_SH`, `SPLINE_VECTOR` 4 | 5060 Ti | A/B only (bitwise) |
+| radial-table forward 8 warps | A100 | A/B (exactness not recorded) |
+| w′ `MAX_REGISTERS` 80 | H200, A100 | A/B only (bitwise) |
 | fused forward `VEC_SH` | Ada | A/B only (bitwise) |
-| fused forward `DEGREE_PARTS`, `W_GROUP`, `X_LATE`, `A_LD128` | Ada, 5060 Ti | A/B only (bitwise) |
+| fused forward `DEGREE_PARTS`, `W_GROUP`, `X_LATE`, `A_LD128` | Ada, 5060 Ti (`DEGREE_PARTS` measured: off on both) | A/B only (bitwise) |
 | fused forward `LANE_INDICES` | A100, Ada, 5060 Ti | A/B only (bitwise) |
 | fused forward `WFRAG_REGION`, `TP_NOFLUSH` | Ada, 5060 Ti | A/B only (bitwise) |
 | fused forward `CG_FOLD` | Ada, 5060 Ti | A/B + gate |
 | CUTLASS `LINEAR_DIV`, `SKIP_SELECT` | Ada, 5060 Ti | A/B only (bitwise at kernel level) |
-| `SEGMENT_ROWS` | Ada, 5060 Ti | A/B + gate (3×TF32) |
-| `POWER_BACKWARD`, `RECEIVER_SUM` | Ada, 5060 Ti | A/B + gate |
 | `BINNED_SCREEN` | Ada, 5060 Ti | A/B only (bitwise) |
-| `SPLINE_W` | 5060 Ti | A/B + gate (certified spline) |
-| `R128`, spline `STAGE_EDGES`, `COMPOSE_FAST`, `COUNT_PLAN`, `JOINED_LAYOUT` | 5060 Ti | A/B only (bitwise) |
 | `R128` `MIN_BLOCKS` 8 for omat0-small | A100, Ada, 5060 Ti | A/B only (bitwise) |
-| spline `PREFETCH_AHEAD`, `BLOCK_ORDER` | Ada, 5060 Ti | A/B only (bitwise) |
-| `PACKED8`, `SORT_BY_LENGTH`, `SC_GENERATED` | Ada, 5060 Ti | A/B + gate |
-| spline `GEOM` | H200, Ada; 5060 Ti only once SPLINE_W + STAGE_EDGES are on there | A/B + gate |
-| `SC_FACTORED` | Ada and 5060 Ti only once SC_GENERATED is on there (H200: lab bound under 1 %, no MD A/B) | A/B + gate |
-| `VIRIAL_ELEMENTWISE` | H200, Ada; other families than OMAT-0 medium on the 5060 Ti | stress-call A/B (tools/virial_ab.py) + gate |
-| `COMPOSE_SKIP`, `GENERIC_FOLD_READOUT_TAIL` | 5060 Ti | A/B + gate |
+| spline `GEOM` | H200, 5060 Ti (now that SPLINE_W + STAGE_EDGES are on there) | A/B + gate |
+| `SC_FACTORED` | 5060 Ti only once SC_GENERATED is on there (it needs `tf32x3_gemms`; H200: lab bound under 1 %, no MD A/B) | A/B + gate |
+| `VIRIAL_ELEMENTWISE` | H200; other families than OMAT-0 medium on the 5060 Ti | stress-call A/B (tools/virial_ab.py) + gate |
 | tiled speed switches | H200, A100, Ada | A/B only, except `TILE_VIRIAL`, `TILE_EPILOGUE` (A/B + gate) |
 | two sweep-2 lanes, tile backward chunks ×4 | H200, A100 | A/B only (exact) |
 
@@ -329,6 +317,25 @@ The A100 plan's one accepted gate failure: OMAT-0 NbCl5 stress 1.8e-7 eV/Å³ ag
 the 3×TF32 GEMMs and the tensor-core forward together (each passes alone); the owner kept both (5 November 2026;
 [omat0-tp-backward](../validation/omat0/omat0-tp-backward.md) §3.1).
 
+### RTX 4000 Ada and RTX 5060 Ti re-screen (ada-5060-screen, 10–11 November 2026)
+
+Every OMAT-0 medium switch that was on for the H200 or the A100 but never measured on these two GPUs, plus GEOM,
+SC_FACTORED, VIRIAL_ELEMENTWISE and SEGMENT_ROWS, as same-process MD-step A/Bs in both build orders (Benchmark_loup
+SrTiO3 10×10×10 and NbCl5), then leave-one-outs from the combined set, the 3× float32 gate and the other models.
+Full record: [results/ada-5060-screen-20261110](../../results/ada-5060-screen-20261110/README.md).
+
+- **Ada** (murphy; against main `4e9388c8` with the registry fix): PACKED8, SORT_BY_LENGTH, SC_GENERATED, SC_FACTORED,
+  BUTTERFLY, w′ STAGE_DOUT, STAGE_SH, w′ STAGE_EDGES, POWER_BACKWARD on; set against today's Ada defaults SrTiO3
+  0.8255 / 0.8194 (21.4 → 17.7 ms), NbCl5 0.8546 / 0.8558; gate passes. BUTTERFLY and STAGE_SH flipped from their
+  5 and 8 November off readings. Other models: POLAR-1-M NaCl was slower (1.0061 / 1.0077) through w′ STAGE_DOUT,
+  now off for POLAR-1-M and -L on the Ada (the set without it: ties, M 0.9986 / 1.0006, L 1.0005 / 1.0005);
+  OFF23-medium a tie (only SORT_BY_LENGTH runs there); gates pass.
+- **5060 Ti** (local): SPLINE_W, R128, spline STAGE_EDGES, PACKED8, SORT_BY_LENGTH, GENERIC_FOLD_READOUT_TAIL,
+  POWER_BACKWARD, RECEIVER_SUM, w′ STAGE_EDGES / STAGE_DOUT / STAGE_SH, `generic_fold_product_linear` on; set
+  against today's 5060 Ti defaults SrTiO3 0.6427 / 0.6478 (23.9 → 15.4 ms), NbCl5 0.6911 / 0.6906; gate passes
+  (2×2×2 supercells: the float64 reference at 3×3×3 failed under WSL). POLAR-1: `gate_epilogue` for S, M, L and the
+  w′ pair for POLAR-1-M by label; gates pass.
+
 ### Mixed cells under decision 66 (6 November 2026)
 
 The owner left this rule to the conductor ("you can decide yourself"). It answers the kernel review's question:
@@ -417,7 +424,7 @@ w′ `FOLD_ALPHA` off measured within the run-to-run spread (0.4–0.7 % either 
 
 | Switch | 5060 Ti | Ada | A100 | Evidence | Report |
 | --- | --- | --- | --- | --- | --- |
-| `TileConfig.compiled_graphs` None (`tiled.COMPILED_GRAPH_GPUS`, rounding: the atomics' order): compiled tile bodies in CUDA graphs behind a memory guard (device state) | off (30³ 1.007 / 0.990, 40³ 0.998) | pending (murphy A/B) | on (0.569 / 0.571; gate 3x passed, Alex 4982466) | 975,560 SrTiO3, R 16,384 budget; the guard measures the first compiled call and captures where one pool per slot fits | [tiled-speed-20261111](../../results/tiled-speed-20261111/README.md) |
+| `TileConfig.compiled_graphs` None (`tiled.COMPILED_GRAPH_GPUS`, rounding: the atomics' order): compiled tile bodies in CUDA graphs behind a memory guard (device state) | off (30³ 1.007 / 0.990, 40³ 0.998) | off (40³ 1.0015 with graphs on; 58³ guard off, 1.0010 / 1.0007) | on (0.569 / 0.571; gate 3x passed, Alex 4982466) | 975,560 SrTiO3, R 16,384 budget; the guard measures the first compiled call and captures where one pool per slot fits | [tiled-speed-20261111](../../results/tiled-speed-20261111/README.md) |
 | `TileConfig.lanes` `auto` (`tiled.LANE_GPUS`, exact): two sweep-2 tiles on disjoint SM halves | – (1.05× per pair) | on (1.09× per pair) | – | under `cudaMallocAsync` | [tiled-concurrent-tiles](../validation/tiled/tiled-concurrent-tiles.md) |
 | `TileConfig.backward_chunk_scale` `auto` (`tiled.TILE_CHUNK_SCALE`, exact) | ×4 | ×4 | ×1 | 1.08M SrTiO3, wavefront, R 8,192: 5060 Ti −10.5 %, Ada −3.2 %; RTX PRO 6000 tiles do not chunk | `results/tiled-ideas-20261102` |
 | `tiled.TILE_PREFETCH_DEVICE` (`TILED_SPEED_GPUS`, exact): prefetch with the state on the device | on | on | on | OMAT-0 SrTiO3 975,560, device state: 0.939 / 0.941 | [tiled-speed](../../results/tiled-speed-20261108/README.md) |

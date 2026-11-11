@@ -30,7 +30,11 @@ SPLINE_W = None
 # Benchmark_loup, ab / ba): with
 # wprime_backward.HORNER, which the spline's w' needs (WPrime.attach_spline), 0.8396 / 0.8304 against the Ada defaults;
 # SPLINE_W and HORNER off again from the Ada set 1.2003 / 1.2015 (b = off); gate passes.
-SPLINE_W_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): SPLINE_W + R128 + STAGE_EDGES alone 0.8162 / 0.8183,
+# 0.8548 / 0.8541; the adopted set against the 5060 Ti defaults 0.6427 / 0.6478, 0.6911 / 0.6906.
+SPLINE_W_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                           "NVIDIA GeForce RTX 5060 Ti"))
 # Launch shape (SX improvement screen, 7 November 2026; plans/notes/sx-layout-opportunities-20261107). THREADS: one
 # owner per (receiver, channel); 128 threads with 128 channels is one receiver per block, so receivers of different
 # degree retire independently instead of in pairs. MIN_BLOCKS: __launch_bounds__' minimum blocks per SM (a register
@@ -53,7 +57,10 @@ R128 = None
 # NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): on top of SPLINE_W 0.8328
 # / 0.8312 against the
 # Ada defaults (SPLINE_W alone 0.8396 / 0.8304); off again from the Ada set, with STAGE_EDGES, 1.0017 / 1.0004.
-R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with SPLINE_W (see SPLINE_W_GPUS).
+R128_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                       "NVIDIA GeForce RTX 5060 Ti"))
 # A model label's own MIN_BLOCKS for the R128 shape on its GPUs, instead of 6 (the label reaches the kernel through
 # the rewrites' context: WPrime's model_label). Bitwise (a register cap). OMAT-0 small on the H200 (9 November 2026,
 # results/h200-omat0-small-20261108, Benchmark_loup, ab / ba, b = 128 threads with MIN_BLOCKS 8 against small's
@@ -121,7 +128,10 @@ STAGE_EDGES = None
 # Benchmark_loup, ab / ba): off again from all ten H200 switches 1.0050 / 1.0044 (b = off).
 # NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): off again from the Ada
 # set 1.0018 / 1.0028.
-STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with SPLINE_W (see SPLINE_W_GPUS).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                              "NVIDIA GeForce RTX 5060 Ti"))
 STAGE_TILE = 32
 # PREFETCH_AHEAD (Codex H200 round-6 report item 2, 8 November 2026; bitwise): with STAGE_EDGES the channel loop hints
 # the table rows of the edge PREFETCH_AHEAD positions later (its first PREFETCH_PATHS paths) into L1 with
@@ -170,7 +180,14 @@ def prefetch_ahead_default(device, model_label=None):
 # 0.9549, 1500 K 0.9587 / 0.9558, gate passes (source 10e23d17). None: on for PACKED8_GPUS; True / False: an A/B
 # side's choice.
 PACKED8 = None
-PACKED8_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9036 / 0.9030, 0.9346 / 0.9357; left out of the
+# adopted set 1.1071 / 1.1028, 1.0721 / 1.0722 (also removes the forward's sm_89 spill); gate with the set.
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): on SPLINE_W alone 0.9222 / 0.9246,
+# 0.9456 / 0.9535; left out of the candidate set 1.0851 / 1.0785, 1.0509 / 1.0621.
+PACKED8_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                          "NVIDIA GeForce RTX 5060 Ti"))
 PACKED8_BITS = (22, 20, 16)  # a0, a1, a2
 
 
@@ -251,7 +268,9 @@ def packed8_source(source, bias):
 # NVIDIA A100-SXM4-80GB (10 November 2026, Alex job 4973813, source 219602cf; Benchmark_loup MD step b/a, a = the A100
 # defaults): 0.9756 / 0.9806 (ab / ba); force/stress gate passes with SC_FACTORED also on (forces 0.863 / 0.913 /
 # 0.985, stress 0.727 / 0.896 / 1.343). The H200 is not measured (issue-bound there, not FMA-bound). None: on for
-# GEOM_GPUS; True / False: an A/B side's choice.
+# GEOM_GPUS; True / False: an A/B side's choice. RTX 4000 Ada (ada-5060-screen, 11 November 2026): off, 1.0226 / 1.0209
+# (SrTiO3 10x10x10), 1.0156 / 1.0159 (NbCl5); with PACKED8 0.9120 / 0.9139 against PACKED8's 0.9013 / 0.9058 (census on
+# sm_89: 614 -> 667 instructions, stack 8 -> 16 bytes, shared 2.7 -> 10.4 kB).
 GEOM = None
 GEOM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
 

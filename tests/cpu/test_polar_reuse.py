@@ -140,7 +140,9 @@ DECISION_66_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generatio
 ADA = "NVIDIA RTX 4000 Ada Generation"
 # Decision 66 for POLAR-1 (owner, 5 November 2026; docs/validation/polar/polar-reuse.md section 4): measured GPUs only.
 POLAR_WPRIME = ("fused_folded_forward", "wprime_backward")  # models with a second interaction (M, L)
-POLAR_MEASURED = {"wprime": (ADA,), "gate_epilogue": (ADA,)}
+POLAR_MEASURED = {"wprime": (ADA,), "gate_epilogue": (ADA, "NVIDIA GeForce RTX 5060 Ti")}  # 5060 Ti: ada-5060-screen
+# The pair by label: POLAR-1-M on the A100 (off-polar-alex) and the RTX 5060 Ti (ada-5060-screen, 11 November 2026).
+POLAR_WPRIME_M = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti")
 # fastmace/off-polar-alex (6 November 2026): tf32x3_gemms for S, M and L on the A100 (every A100 model).
 POLAR_TF32X3 = ("NVIDIA A100-SXM4-80GB",)
 
@@ -150,8 +152,8 @@ def _expected_on(label, gpu):
     on = set()
     if gpu in POLAR_TF32X3:
         on.add("tf32x3_gemms")
-        if label == "polar1-m":  # the pair on the A100 for M only (L: NbCl5 slower in both orders)
-            on.update(POLAR_WPRIME)
+    if gpu in POLAR_WPRIME_M and label == "polar1-m":  # M only (L: NbCl5 slower in both orders on both)
+        on.update(POLAR_WPRIME)
     if gpu in POLAR_MEASURED["wprime"] and label != "polar1-s":
         on.update(POLAR_WPRIME)
     if gpu in POLAR_MEASURED["gate_epilogue"]:
