@@ -7,11 +7,11 @@ from fastmace.kernels.cutlass import tf32x3
 HERE = Path(tf32x3.__file__).parent
 
 
-def test_on_for_the_a100_family_only():
+def test_on_for_the_a100_family_and_the_h200():
     assert tf32x3.HYBRID is None
-    for name in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100-SXM4-40GB", "NVIDIA A100 80GB PCIe"):
+    for name in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100-SXM4-40GB", "NVIDIA A100 80GB PCIe", "NVIDIA H200"):
         assert name in tf32x3.HYBRID_GPUS
-    for name in ("NVIDIA H200", "NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"):
+    for name in ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"):
         assert name not in tf32x3.HYBRID_GPUS
 
 

@@ -599,8 +599,10 @@ STOCK_SKIP_INTERACTIONS: Mapping[str, str] = MappingProxyType({
 # step b/a, water_216, abab / abba: OFF23-small 0.592 / 0.591, -medium 0.688 / 0.683, OFF23b 0.720 / 0.725,
 # OFF24 0.722 / 0.728, OFF23-large 0.749 / 0.745.
 STOCK_FIRST_SKIP = None
+# H200 (12 November 2026, results/h200-pack-20261111): MACE-OFF23-medium water_216 with radial tables, STOCK_FIRST_SKIP and RADIAL_TF32X3 together,
+# MD step b/a 0.7417 / 0.7422 (2.43 -> 1.80 ms); gate passes (forces <= 1.25, stress <= 1.51).
 STOCK_FIRST_SKIP_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
-                                   "NVIDIA RTX 4000 Ada Generation"))
+                                   "NVIDIA RTX 4000 Ada Generation", "NVIDIA H200"))
 
 
 def stock_first_skip_default(device=None):

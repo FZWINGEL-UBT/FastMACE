@@ -3640,3 +3640,11 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Capture arena: stage 1 on Alex (4982478) planned 11,706 MiB against 11,706 MiB reserved, so nothing to overlap; torch 2.14's blocks_by_addr assert on overlapping segments. Records and tools only (`tools/bench/arena/`); the code stays on `fastmace/capture-arena`.
 - Suite on the merged tip 25d5d2eb (leeloo): 5,706 passed, 204 skipped, 0 failed.
 - Records (2a5107c7, Alex 4985845): with EDGE_FORCE on, steady reserved is +12 % at every passing size (36³ 14.42 → 16.12 GiB, 42³ 22.49 → 25.20, 49³ 35.31 → 39.69; step at 49³ 881 → 1,057 ms). Both sides pass 49³ and time out at 53³, so no capacity change can be read.
+
+**H200 packs: A100 switches never measured on the H200 (11–12 November 2026; owner "i approve the h200 pack" and "run it now"; conductor, decision 66): six switches on for the H200.**
+- OMAT-0 medium, Benchmark_loup MD step b/a in both build orders (SrTiO3 10³, NbCl5 3³): `tf32x3.HYBRID` 0.9909 / 0.9940, 0.9892 / 0.9885; `spline_forward.GEOM` 0.9857 / 0.9890, 0.9891 / 0.9860; `fused_forward.WFRAG_REGION` (bitwise, re-screened; a tie on 6 November) 0.9877 / 0.9921, 0.9695 / 0.9913. Gates pass for HYBRID (forces ≤ 0.99, stress ≤ 1.04) and GEOM (forces ≤ 0.95, stress ≤ 1.30).
+- `TP_NOFLUSH`: 0.9968 / 1.0030, 0.9397 / 1.0038 (the ab baseline ran 5 % slow): mixed, stays off.
+- MACE-OFF: radial tables with the stock first block, `STOCK_FIRST_SKIP` and `RADIAL_TF32X3` together, OFF23-medium water_216 0.7417 / 0.7422 (2.43 → 1.80 ms); the gate passes on urea, naphthalene, paracetamol and water_216 (candidate forces ≤ 1.25, stress ≤ 1.51). Measured on OFF23-medium only; taken for the family because the A100 found all five OFF models faster.
+- GEOM winning on the H200 keeps compact angular products unbuilt (rev2 queue §4).
+- Modal cost: pack 1 about $1.19 (sixth), pack 2 $1.76 (fourth, 20-minute timeout), the OFF candidate gate $0.82 (third). See `results/h200-pack-20261111/README.md`.
+- Suite on the branch tip 66cf1ae6 (murphy, idle check incl. our jobs): 5,706 passed, 204 skipped, 0 failed.
