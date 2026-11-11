@@ -3530,3 +3530,16 @@ Records: Ada tiled capacity 179.7M SrTiO3 atoms; the A100's 52 % GPU-idle share 
 - **Gates.** All pass: OMAT-0 on both GPUs, POLAR-1-M and OFF23-medium on the Ada, POLAR S, M and L on the 5060 Ti.
 
 CPU suite on murphy at e63f2a9c: 5,552 passed, 203 skipped, 38 failed. 37 failures came from dftd3_params.npz missing from the tree sent, and 1 from a stale test, fixed in 47cec07f (the only later change). The 8 affected files were rerun with the npz present: 115 passed, 16 skipped, 0 failed. See `results/ada-5060-screen-20261110/README.md` and `docs/current/models-firing.md`.
+
+**Compiled tile bodies in CUDA graphs on the A100, behind a memory guard (11 November 2026; worker tiled-speed, conductor, decision 66):** `TileConfig.compiled_graphs` is now None / True / False, with None as the default.
+- **Default:** None turns it on for `COMPILED_GRAPH_GPUS` (the A100 family), only with device state, mode compiled or auto, lanes not "on", and no aliased device state.
+- **Memory guard:**
+  - The first compiled call runs uncaptured and measures its tile workspace.
+  - Captures follow only where (slots + 1) × 1.1 × workspace fits the available memory (`compiled_graphs_fit`), checked again when more slots appear.
+  - A captured call that runs out of memory drops its graphs and runs again without them.
+- **A100-SXM4-80GB:** 975,560 SrTiO3 atoms, 0.569 / 0.571, 3.68 → 2.09 µs/atom against 1.96 for the whole system (Alex 4981483). The A100 tiled call was host-bound, and the graphs remove the Python and autograd gaps. The 3× gate passes with graphs on (Alex 4982466).
+- **RTX 5060 Ti: off.** 30³ 1.007 / 0.990, 40³ 0.998; at 50³ the guard turns it off (local job 49, under the watchdog).
+- **RTX 4000 Ada: off.** 40³ 1.0015; 58³ 1.0010 / 1.0007, with the guard off.
+- The first idea-11 frame code (`TILE_LOCAL_FRAME`) is included, switched off. The accuracy fix follows in its own merge request.
+
+CPU suite on murphy at the merged tip 0d1ce6d6, collecting `tests/`: 5,600 passed, 873 skipped (203 in tests/cpu as on main, plus 670 GPU tests without CUDA), 1 failed. The failure was the layering allow-list, fixed in 7a62514c (test_layering: 32 passed). See `results/tiled-speed-20261111/`.
