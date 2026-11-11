@@ -1061,8 +1061,16 @@ def _slot_local_vectors(positions64, nodes, node_mask, local, edge_mask, shifts,
 
     rows, low, remaining, remaining_low = _slot_local_parts(positions64, nodes, node_mask, local, edge_mask, shifts,
                                                             cell, inverse, receivers, dtype)
-    receiver, sender = local[1], local[0]
-    vectors = (rows[receiver] - rows[sender] + remaining) + (low[receiver] - low[sender] + remaining_low)
+    both = torch.cat([rows, low], dim=1)  # one gather per end
+    receiver, sender = both[local[1]], both[local[0]]
+    a, b = receiver[:, :3], sender[:, :3]
+    # TwoSum: difference + error == a - b exactly (rows of a tile that meets itself through the boundary are up to
+    # a box apart, and their float32 difference rounds: 3.8e-6 A at 78 A, local job 62)
+    difference = a - b
+    a_part = difference + b
+    b_part = a_part - difference
+    error = (a - a_part) + (b_part - b)
+    vectors = (difference + remaining) + (error + (receiver[:, 3:] - sender[:, 3:]) + remaining_low)
     return torch.where(edge_mask.unsqueeze(1) > 0, vectors, far)
 
 
