@@ -12,8 +12,8 @@ call and 10 % of the H200's (`results/step-limiters-20261109/`, OMAT-0 medium, S
 - **C2 is closed by a bound.** Its falsifier is over the bar on the A100 only: one load per column saves 168 µs
   there, against 130.
 - The real packed table cannot hold the slopes. A packed quadratic or cubic slope needs 9,000–15,000 pieces in
-  the physical region alone, against today's 380 (619 in all). That puts the table at 140–330 MB, against the
-  A100's 40 MB L2.
+  the physical region alone, against today's 380 (619 in all). That puts the slope table alone at 71–91 MB from 1 Å, against
+  the A100's 40 MB L2.
 - The part that does fit, packed values for the forward, is worth at most 76 µs, under the bar.
 
 ## Method
@@ -140,8 +140,8 @@ PACKED8 packs one quadratic per piece and takes the slope from it. The first tab
 - The values pack well: 1,402 pieces × 66 columns × 8 B × 9 pairs is 6.4 MB.
 - The slopes do not. Differentiation multiplies term k by about k², and the cutoff's last piece (r ≈ 5.98 Å) needs
   a 28–75-fold split.
-- A packed slope table at 1e-7 therefore holds 9,600–15,000 pieces in the physical region alone. That is 61 MB as
-  an 8-byte quadratic, or 140 MB with the values and as a cubic, against today's 15 MB. Below 1 Å it takes as many
+- A packed slope table at 1e-7 therefore holds 9,600–15,000 pieces in the physical region alone. That is 71 MB as
+  an 8-byte quadratic or 91 MB as a 16-byte cubic, against today's 15 MB for the whole table. Below 1 Å it takes as many
   again.
 - Both exceed the A100's 40 MB L2, and each edge's lookup lands on a random piece. The falsifier's one cached load
   per column cannot be reached by a certified packed slope.
