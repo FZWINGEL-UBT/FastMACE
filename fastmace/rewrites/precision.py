@@ -91,6 +91,8 @@ def _route_compose_skip(model):
             continue
         reassociation.compose_skip = None
         reassociation.compose_radial = None
+        if hasattr(reassociation, "nested_rotation"):
+            reassociation.nested_rotation = None
         reassociation.compose_joined = False
         reassociation.count_plan = False
         reassociation.joined_layout = False
@@ -102,6 +104,7 @@ def _route_compose_skip(model):
             linear, skip = products
             reassociation.compose_skip = (module.linear, linear, module.skip_tp, skip)
             reassociation.count_plan = compose_skip.count_plan_default(torch.cuda.get_device_name(device))
+            _route_nested(module, reassociation, device)
             if not compose_skip.compose_fast_default(torch.cuda.get_device_name(device)):
                 continue
             reassociation.compose_joined = True
@@ -110,6 +113,34 @@ def _route_compose_skip(model):
             table = reassociation._buffers.get("species_feats")
             if table is not None and reassociation.compose_radial is not None:
                 reassociation.bind(table)
+
+
+def _route_nested(module, reassociation, device):
+    """``rewrites.radial.nested`` (``NESTED_RADIAL``) on a first interaction that composes its skip: where the GPU
+    says so, the tabled forward runs, the interaction's table is per species pair over the reassociation's and the
+    skip's superset columns with 64 folded channels, and every table row passes ``nested.install``'s check. Sets
+    ``reassociation.nested_rotation`` (the maps composed into the products); the table keeps the rotated copies."""
+    import torch
+
+    from fastmace.kernels.triton.tabled_outer_sum import tabled_forward
+    from fastmace.rewrites.generic.modules import fc_last_weight
+    from fastmace.rewrites.radial import nested
+
+    if not hasattr(reassociation, "nested_rotation"):
+        return
+    if not nested.nested_default(torch.cuda.get_device_name(device)) or not tabled_forward(device):
+        return
+    table, last = getattr(module, "radial_table", None), getattr(module, "radial_last", None)
+    skip = reassociation.compose_skip[2]
+    if table is None or last is None or getattr(table, "coef", None) is None or table.coef.dtype != torch.float32:
+        return
+    columns = reassociation.columns.cpu().tolist()
+    if (fc_last_weight(last).shape[-1] != nested.COLUMNS or table.columns.cpu().tolist() != columns
+            or getattr(skip, "columns", None) is None or skip.columns.cpu().tolist() != columns):
+        return
+    if not nested.install(table):
+        return
+    reassociation.nested_rotation = nested.rotation(table, len(columns), len(columns))
 
 
 def _support(model):

@@ -110,6 +110,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                    "PACKED_COEF": "idea 3: channel-pair packed series; per GPU, A/B",
                                                    "FORWARD_MAXNREG": "tabled forward register cap; A100 A/B",
                                                    "SHAPE_CARRIER": "stride-0 shape view, not [E, K] floats; A/B side"},
+    "fastmace/rewrites/radial/nested.py": {"NESTED_RADIAL": "nested first radial basis, split walks; per GPU, A/B"},
     "fastmace/kernels/triton/receiver_sum.py": {"RECEIVER_SUM": "idea 5(b): segmented density sums; per GPU, A/B"},
     "fastmace/kernels/triton/radial_table.py": {"COLUMN_BLOCK": "64-column table forward programs; screen A/B",
                                                 "WARPS": "table forward num_warps; tools/radial_table_lab.py"},
