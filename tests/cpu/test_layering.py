@@ -76,6 +76,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                               "FOLD_FIRST_DENSITY_LINEAR": "round 6 fold of the first linear; A/B",
                                               "GENERIC_FOLD_READOUT_TAIL": "generic readout-tail fold; per GPU, A/B"},
     "fastmace/integrators/langevin.py": {"NOISE_DRAW_AHEAD": "round 6 noise batch drawn ahead on a thread; A/B"},
+    "fastmace/kernels/cutlass/tf32x3.py": {"HYBRID": "None: on for HYBRID_GPUS; True/False: an A/B side"},
     "fastmace/kernels/cutlass/segment_rows.py": {"SEGMENT_ROWS": "block linear rows read and written in place; "
                                                                  "per GPU, A/B",
                                                  "SEGMENT_GROUPED": "every block in one launch; per GPU, A/B"},
@@ -96,6 +97,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
     "fastmace/model/energy.py": {"HEAD_SLICE": "one-head selection as a slice; per GPU, A/B",
                                  "GRAPH_SUM": "one-graph energy sums as reductions; per GPU, A/B"},
     "fastmace/rewrites/engine.py": {"VIRIAL_ELEMENTWISE": "one-graph strain as products and sums; per GPU, A/B"},
+    # Idea 11 (11 November 2026, results/tiled-speed-20261111): float64-built edge vectors; None = the size rule.
+    "fastmace/model/forces.py": {"WHOLE_SYSTEM_FLOAT64_EDGES": "whole-system float64 edge vectors; None = by size, A/B"},
     # omat0-capacity-2 (2 November 2026): the GPU gate compares the per-chunk table gradient with the whole one.
     "fastmace/kernels/oeq_streaming/runtime.py": {"TABLE_GRADIENT_PER_CHUNK": "per-chunk table gradient; GPU gate A/B"},
     # OMAT-0 A100 profile follow-ups (3 November 2026): A/B switches of the launch screen
@@ -135,7 +138,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                 "TILE_HOST_WORKER": "host-state writes on a worker thread; None = per GPU, A/B",
                                 "TILE_COPY_STREAM": "host-state write copies on a side stream; None = per GPU, A/B",
                                 "TILE_HEAP_TRIM": "malloc_trim after dropped kept lists; memory only, default on",
-                                "TILE_LOCAL_FRAME": "tile-local float64-built edge vectors (idea 11); accuracy, A/B"},
+                                "TILE_LOCAL_FRAME": "tile-local float64-built edge vectors (idea 11); None = by size, A/B"},
     "fastmace/longrange/polar.py": {"SHARED_GEOMETRY": "one unmasked k-space geometry per call; A/B",
                                    "FUSED_FOURIER": "k-space sums without dense cos/sin; A/B",
                                    "SPIN_BATCHED": "alpha and beta field features in one call; default on",

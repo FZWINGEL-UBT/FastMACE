@@ -40,6 +40,8 @@ def parse_args(argv=None):
     p.add_argument("--repeat", required=True, help="NXxNYxNZ")
     p.add_argument("--receivers", type=int, default=8192)
     p.add_argument("--no-budget", action="store_true", help="the receiver cap stays --receivers")
+    p.add_argument("--b-receivers", type=int, default=None,
+                   help="side b's own TiledForceField with this fixed receiver cap (both sides --no-budget)")
     p.add_argument("--mode", choices=("eager", "padded", "compiled", "auto"), default="auto")
     p.add_argument("--host-state", action="store_true")
     p.add_argument("--alias-state", action="store_true")
@@ -97,7 +99,7 @@ def main(argv=None):
     atoms = tiled_capacity.supercell(args.structure, repeat, 0.0, 0.0)
     n = len(atoms)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, model=args.model, order=args.order,
-                  a=args.a, b=args.b, receivers=args.receivers, mode=args.mode, host_state=args.host_state,
+                  a=args.a, b=args.b, receivers=args.receivers, b_receivers=args.b_receivers, mode=args.mode, host_state=args.host_state,
                   alias_state=args.alias_state, wavefront=args.wavefront, device=torch.cuda.get_device_name(),
                   torch=torch.__version__, source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"))
     args.output.mkdir(parents=True, exist_ok=True)
@@ -109,19 +111,27 @@ def main(argv=None):
     with tiled_capacity.no_global_list(True):
         field = planner.build_evaluation(plan, user, atoms, call_rows=args.receivers, release_node_attrs=True,
                                          release_whole_system=True, global_list=False)
-        tiled = TiledForceField(field, TileConfig(
-            args.receivers, None, mode=args.mode, neighbours="tiles", budget_receivers=() if args.no_budget else None,
-            state="host" if args.host_state else "device", alias_state=args.alias_state, wavefront=args.wavefront,
-            species="index"))
+        def tiled_field(receivers):
+            fixed = args.no_budget or args.b_receivers is not None
+            return TiledForceField(field, TileConfig(
+                receivers, None, mode=args.mode, neighbours="tiles", budget_receivers=() if fixed else None,
+                state="host" if args.host_state else "device", alias_state=args.alias_state,
+                wavefront=args.wavefront, species="index"))
+
+        tiled = tiled_field(args.receivers)
+        # --b-receivers: side b's own field (its own slots, state and kept lists; the force field is shared)
+        tiled_of = {"a": tiled, "b": tiled if args.b_receivers is None else tiled_field(args.b_receivers)}
         positions = field._prepare_one_off(atoms)
     record["rewrites"] = [str(r) for r in getattr(field, "applied", ())]
-    configs = {"a": dataclasses.replace(tiled.config, **config_a), "b": dataclasses.replace(tiled.config, **config_b)}
+    configs = {"a": dataclasses.replace(tiled_of["a"].config, **config_a),
+               "b": dataclasses.replace(tiled_of["b"].config, **config_b)}
     own = bool(config_a or config_b)  # TileConfig sides: each side's own globals and state
     globals_of = {}
 
     kept = {}
 
     def call(side, keep=False):
+        tiled = tiled_of[side]
         if own:
             tiled.config = configs[side]
             tiled._g, tiled._kept = globals_of.get(side, (None, None))
@@ -147,7 +157,7 @@ def main(argv=None):
         entry = {}
         for side in order:
             entry[side] = [call(side) for _ in range(args.calls)]
-            record["last"][side] = dict(tiled.last)
+            record["last"][side] = dict(tiled_of[side].last)
         blocks.append(entry)
         record["blocks"] = blocks
         path.write_text(json.dumps(record, indent=1, default=str))

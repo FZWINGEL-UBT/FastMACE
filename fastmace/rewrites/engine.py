@@ -382,6 +382,76 @@ def strain_prepare_graph(one_graph):
     return found
 
 
+# Idea 11 (whole-system path; tiled-speed 11 November 2026): the edge vectors from float64 positions. MACE forms
+# ``positions[receiver] - positions[sender] + shifts`` from the model's float32 positions, so every vector carries the
+# float32 spacing of its coordinates (1.5e-5 A at 226 A, 1.1e-4 at 1,500 A; the perfect crystal's largest force grows
+# with it: 6^3 SrTiO3 1.9e-5 eV/A at the origin, 8.1e-5 at +200 A). A force field that keeps its float64 positions in
+# the dict under POSITIONS64_KEY (and its float64 cell under CELL64_KEY) gets each vector plus a detached correction:
+# the float64 vector minus the float32 one, rounded to float32. The value is the float64 vector's rounding; the
+# gradient is MACE's (the correction is a constant); with a strain the correction strains with its edge.
+POSITIONS64_KEY = "fastmace_positions64"
+CELL64_KEY = "fastmace_cell64"
+
+
+def float64_edge_vectors(vectors, positions64, edge_index, unit_shifts, cell64, displacement=None, positions=None):
+    """``vectors`` (MACE's, float32) corrected to the float64 vectors of ``positions64`` and ``unit_shifts @ cell64``;
+    returns (vectors, lengths).
+
+    With a strain (``displacement``, and ``positions`` the unstrained float32 positions the forces differentiate by)
+    the vectors are rebuilt from ``positions`` and strained as edges, ``v + v @ sym``: MACE strains the positions,
+    so the stress's gradient sums ``position (x) force`` over the atoms, which cancels in float32 far from the origin
+    (2.1e-4 relative at +1,500 A on the CPU test's 64 atoms, 4.7x the origin call's); the edges' sum does not."""
+    import torch
+
+    sender, receiver = edge_index[0], edge_index[1]
+    shifts64 = (unit_shifts.to(torch.float64).unsqueeze(-1) * cell64).sum(1)  # no FP64 GEMM
+    exact = positions64[receiver] - positions64[sender] + shifts64
+    if displacement is not None:
+        vectors = positions[receiver] - positions[sender]  # the shift is a constant: in the correction
+    correction = (exact - vectors.detach().to(torch.float64)).to(vectors.dtype)
+    vectors = vectors + correction
+    if displacement is not None:  # the strain the stress differentiates by, on the edges
+        symmetric = 0.5 * (displacement[0] + displacement[0].transpose(-1, -2))
+        vectors = vectors + (vectors.unsqueeze(-1) * symmetric).sum(1)
+    return vectors, torch.linalg.vector_norm(vectors, dim=-1, keepdim=True)
+
+
+def _float64_edges(variant):
+    """``variant`` (a ``strain_prepare_graph``) whose vectors and lengths are ``float64_edge_vectors``' where the dict
+    carries POSITIONS64_KEY; the same context otherwise. Its globals are the variant's (it reads none: the names it
+    needs are closure cells), and ``__wrapped__`` is the variant."""
+    vectors_of, positions_key, cell_key = float64_edge_vectors, POSITIONS64_KEY, CELL64_KEY
+
+    def prepare_graph(data, compute_virials=False, compute_stress=False, compute_displacement=False,
+                      lammps_mliap=False):
+        context = variant(data, compute_virials=compute_virials, compute_stress=compute_stress,
+                          compute_displacement=compute_displacement, lammps_mliap=lammps_mliap)
+        positions64 = data.get(positions_key)
+        if positions64 is None or lammps_mliap:
+            return context
+        strained = compute_virials or compute_stress or compute_displacement
+        vectors, lengths = vectors_of(context.vectors, positions64, data["edge_index"], data["unit_shifts"],
+                                      data[cell_key], context.displacement if strained else None,
+                                      data["positions"])
+        return context._replace(vectors=vectors, lengths=lengths)
+
+    # Its own code object for each variant (Dynamo caches compiled frames per code object; 2-T19b).
+    out = _rebound(prepare_graph, variant.__globals__)
+    out.__wrapped__ = variant
+    return out
+
+
+def float64_edges_prepare_graph(one_graph):
+    """``strain_prepare_graph(one_graph)`` with float64 edge vectors for a dict that carries POSITIONS64_KEY (the
+    ``prepare_graph`` of every ``strain_forward``); made once per process for each choice."""
+    variant = strain_prepare_graph(one_graph)
+    key = ("float64_edges", variant)
+    found = _REBOUND.get(key)
+    if found is None:
+        found = _REBOUND[key] = _float64_edges(variant)
+    return found
+
+
 def strain_forward(function, one_graph):
     """``function`` (a model forward) whose ``prepare_graph`` is ``strain_prepare_graph(one_graph)``.
 
@@ -392,7 +462,7 @@ def strain_forward(function, one_graph):
     problems = strain_problems(function)
     if problems:
         raise StrainBindingError("; ".join(problems))
-    prepare_graph = strain_prepare_graph(one_graph)
+    prepare_graph = float64_edges_prepare_graph(one_graph)  # float64 edge vectors where the dict asks (idea 11)
     key = (function, prepare_graph)
     found = _REBOUND.get(key)
     if found is None:
@@ -625,9 +695,10 @@ CONFIG_FIELDS = {
 RECORDS = {"single_graph_strain": PROCESS_RECORDS["single_graph_strain"]}
 
 __all__ = [
-    "CONFIG_FIELDS", "PROCESS_RECORDS", "RECORDS", "STRAIN_ATTRIBUTE", "StrainBindingError", "UNFUSED_ADDMM_UUID",
+    "CELL64_KEY", "CONFIG_FIELDS", "POSITIONS64_KEY", "PROCESS_RECORDS", "RECORDS", "STRAIN_ATTRIBUTE", "StrainBindingError", "UNFUSED_ADDMM_UUID",
     "VIRIAL_ELEMENTWISE", "VIRIAL_ELEMENTWISE_GPUS", "bind_strain_path", "capture_safe_mask_head",
-    "first_derivative_forces", "first_derivative_forces_virials", "install", "one_graph_choice",
+    "first_derivative_forces", "first_derivative_forces_virials", "float64_edge_vectors",
+    "float64_edges_prepare_graph", "install", "one_graph_choice",
     "single_graph_elementwise_displacement", "single_graph_symmetric_displacement", "strain_forward", "strain_inputs",
     "strain_path", "strain_prepare_graph", "strain_problems", "strained_outputs_and_gradients", "unfused_addmm_key",
     "unfused_full_addmm_rule", "virial_elementwise_default",
