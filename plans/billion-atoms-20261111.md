@@ -55,6 +55,37 @@ the record's settings on a Colab A100 (A100 family rewrites; 40 GB is ample at 2
 Output: a table of B/atom by owner (positions float32/float64, forces, species, maps, tiles, the plan's sort, kept
 lists' device parts, tile workspace), which fixes step 1's list.
 
+**Result (11 November 2026; Colab A100-SXM4-40GB, `94d8035b`, 3.91 CU, records `results/billion-atoms-20261111/census-colab/`).**
+SrTiO3 160³ (20,480,000 atoms), the record's settings; the compiled call at R 16,384 took 312.6 s. Peaks per atom at
+20M carry about 30-50 B/atom of size-independent tables (spline tables, slots, tile workspace); the per-atom part:
+
+| Live at the peak before the first tile | Source | B/atom |
+| --- | --- | ---: |
+| the call's float64 input positions (also the tile-local frame's rows) | the caller (`_prepare_one_off`), `tiled._g.local_frame` | 24 |
+| float32 positions | `field.positions` | 12 |
+| the call's forces | `tiled.py:2837` (`_globals`) | 12 |
+| species index, sender groups, the whole-system receiver order (int32 each) | `forces.py:778-779`, `:1025` | 12 |
+| cell binning of the tile lists: integer cells, bins (int16 [N, 3] each), order, starts | `tile_list.py:86-104` | 19 |
+| the plan's order (int64; the tiles are views of it) | `tiled.py:861` | 8 |
+| `local_of` (int32) | `tiled.py:2321` | 4 |
+| node energies | `_globals` | 4 |
+| host-state staging on the device | `tiled.py:523`, `:614` | about 5 |
+
+That is about 100 B/atom, matching the 397.5M record's 101 before the tiles (the sorts' temporaries come before
+the peak counter's reset and stay below it). At 10^9 atoms the A100-80 leaves about 79 GB beside the tile workspace,
+so step 1 has to cut at least 22 B/atom, better 30.
+
+**Step 1's list from the census** (ranked by B/atom; each exact):
+1. **Float64 positions on the host** (24): the caller passes pinned host float64 positions; each slot gets its tile's
+   float64 rows gathered on the host and copied with the slot's other buffers (`_fill`), and `_slot_local_parts`
+   reads those rows instead of `positions64[nodes]`; the cell binning reads host chunks. The kept lists' float64
+   distance test (`_source`, 24 B/atom when the lists are kept) takes the tile's rows too.
+2. **The plan's order in int32** (4) and the tiles as int32 views, widened per tile where a kernel needs int64.
+3. **Species index and sender groups in uint8** (6) where the model has at most 255 columns and groups; the
+   whole-system receiver order (4) is not built for the tiled call (its kernels run per tile).
+4. **The bins' int16 [N, 3] atom bins** (6) recomputed per tile from the float32 positions and the cell instead of
+   stored (exact: the same float64 arithmetic on the same values), if 1-3 leave too little room.
+
 ### 1. Device per-atom arrays on a diet (idea 8 of `ideas-20261111-tiled.md`)
 
 Target: at most 70 B/atom at the peak (10^9 atoms: 70 GB plus fixed, about 10 GB left on 80 GiB). First the
@@ -101,8 +132,8 @@ separate it from the 10^9 question, at a second node-day.
 
 | Step | State | Record |
 | --- | --- | --- |
-| 0 | planned | |
-| 1 | planned | |
-| 2 | planned | |
+| 0 | done: about 100 B/atom live before the first tile, 24 of it float64 positions | `census-colab/` (Colab A100, 3.91 CU) |
+| 1 | in progress: the four cuts above | |
+| 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); GPU probe queued on Alex (4984768), the Colab G4 unavailable twice | `jobs/alex_overflow.sh` |
 | 3 | planned | |
 | 4 | not reserved (owner, 11 November 2026) | |
