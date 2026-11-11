@@ -56,7 +56,8 @@ def test_strain_forward_is_made_once_per_function_and_choice(one_graph):
     function = models.ScaleShiftMACE.forward
     first, second = engine.strain_forward(function, one_graph), engine.strain_forward(function, one_graph)
     assert first is second and first.__globals__ is second.__globals__
-    assert first.__globals__["prepare_graph"] is engine.strain_prepare_graph(one_graph)
+    assert first.__globals__["prepare_graph"] is engine.float64_edges_prepare_graph(one_graph)
+    assert first.__globals__["prepare_graph"].__wrapped__ is engine.strain_prepare_graph(one_graph)
     assert engine.strain_forward(models.MACE.forward, one_graph) is not first
 
 

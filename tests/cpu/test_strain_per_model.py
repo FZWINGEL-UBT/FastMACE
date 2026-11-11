@@ -124,7 +124,7 @@ def test_the_snapshot_follows_patches_installed_or_undone_after_it(one_graph):
     _patches.set_single_graph_strain(True)
     assert variant.__globals__["get_symmetric_displacement"] is strain
     assert forward.__globals__.get("get_symmetric_displacement") is models_strain
-    assert forward.__globals__["prepare_graph"] is variant
+    assert forward.__globals__["prepare_graph"].__wrapped__ is variant
     _patches.restore("single_graph_strain")
     _patches.set_first_derivative_only(False)
     for name in ("compute_forces", "compute_forces_virials"):
