@@ -135,8 +135,10 @@ TILE_EPILOGUE = None
 # residual force 1.64e-4 -> 1.32e-3 eV/A from 1M to 149M atoms); in the frame they carry a few 1e-6 A in any
 # box (6e-6 A worst case). Where the call's float64 positions are on the device, each tile builds its float32 rows
 # relative to its first receiver instead (``_tile_local``; no stored bytes); the bins and offsets (18 bytes per atom
-# beside the field's float32 positions) only for positions on the host.
-TILE_LOCAL_FRAME = False
+# beside the field's float32 positions) only for positions on the host. None (auto, the conductor's size rule of 11
+# November): on where the structure's extent (the largest |coordinate| of the positions and of the cell's corners) is
+# at least ``forces.FLOAT64_EDGES_EXTENT`` (64 A), decided once per atom count and cell; True / False: every size.
+TILE_LOCAL_FRAME = None
 TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in float32
 # TILE_FILL_SKIP (exact): a tile whose graph the call's graph cache (TILE_GRAPH_CACHE) takes is not also packed into
 # the host list cache (the copy back to the host and its sync), which only sweeps that build the graph again read. A
@@ -987,7 +989,11 @@ def _tile_local(rows64, receiver_rows, local, shifts, cell, inverse, dtype):
     import torch
 
     count, e = rows64.shape[0], local.shape[1]
-    shift = torch.round(shifts.double() @ inverse) @ cell
+    from fastmace.neighbors.skin import times_3x3
+
+    # Element-wise 3 x 3 products: as cuBLAS DGEMMs they cost 0.46 s of a 2.1 s call at 320,000 atoms on the RTX
+    # 5060 Ti (local job 52; FP64 GEMM is slow on GeForce parts).
+    shift = times_3x3(torch.round(times_3x3(shifts.double(), inverse)), cell)
     image = torch.zeros_like(rows64)
     if e:
         edge = torch.arange(e, device=local.device)
@@ -1018,7 +1024,11 @@ def _frame_vectors(frame, ei, shifts, edge_mask, far):
     import torch
 
     bins, offsets, cell, inverse, width = frame
-    shift = torch.round(shifts.double() @ inverse) @ cell
+    from fastmace.neighbors.skin import times_3x3
+
+    # Element-wise 3 x 3 products: as cuBLAS DGEMMs they cost 0.46 s of a 2.1 s call at 320,000 atoms on the RTX
+    # 5060 Ti (local job 52; FP64 GEMM is slow on GeForce parts).
+    shift = times_3x3(torch.round(times_3x3(shifts.double(), inverse)), cell)
     k = torch.floor(shift / width)
     rem = (shift - k * width).to(offsets.dtype)
     coarse = ((bins[ei[1]] - bins[ei[0]]).double() + k).mul_(width).to(offsets.dtype)
@@ -2305,7 +2315,8 @@ class TiledForceField:
         bound = None
         try:
             g = self._globals(n, stress, pos, heads)
-            g["local_frame"], g["frame"] = self._frames(positions, n) if TILE_LOCAL_FRAME else (None, None)
+            g["local_frame"], g["frame"] = (self._frames(positions, n) if self._frame_wanted(positions, n)
+                                            else (None, None))
             stats["local_frame"] = ("tiles" if g["local_frame"] is not None else
                                     "bins" if g["frame"] is not None else None)
             self.heads, self.arange = g["heads"], g["arange"]
@@ -2663,6 +2674,29 @@ class TiledForceField:
             self._lane_slots.clear()
             self._edge_step = None
             self._graph_key = None
+
+    def _frame_wanted(self, positions, n):
+        """``TILE_LOCAL_FRAME`` for this call: None decides by the structure's extent (``forces.float64_edges_wanted``),
+        once per atom count and cell (one host read of the positions' largest |coordinate|)."""
+        import numpy as np
+
+        from fastmace.model import forces as forces_module
+
+        if TILE_LOCAL_FRAME is not None:
+            return bool(TILE_LOCAL_FRAME)
+        if str(self.dtype) == "torch.float64":  # float64 positions: nothing to fix
+            return False
+        cell = getattr(self.field.neighbours, "cell", None)
+        if cell is None:
+            cell = self.field.data["cell"].reshape(3, 3).detach().cpu().numpy()
+        cell = np.asarray(cell, dtype=np.float64).reshape(3, 3)
+        key = (n, cell.tobytes())
+        kept = getattr(self, "_frame_choice", None)
+        if kept is None or kept[0] != key:
+            largest = float(positions.abs().max()) if n else 0.0
+            extent = max(largest, forces_module.structure_extent(np.zeros((0, 3)), cell))
+            kept = self._frame_choice = (key, forces_module.float64_edges_wanted(None, extent))
+        return kept[1]
 
     def _frames(self, positions, n):
         """``TILE_LOCAL_FRAME``: ``(local_frame, frame)``, one of them set. Tile-local positions (``(positions64,

@@ -152,9 +152,42 @@ def test_released_whole_system_drops_the_float64_positions(calculators, monkeypa
     assert not field.float64_edges
 
 
-def test_float64_models_and_the_default_keep_mace_vectors(calculators):
+def test_float64_models_and_small_boxes_keep_mace_vectors(calculators):
+    """The default (None) decides by size: a float64 model never, a float32 one only from 64 A of extent."""
     f64, f32 = calculators
-    assert forces_module.WHOLE_SYSTEM_FLOAT64_EDGES is False
+    assert forces_module.WHOLE_SYSTEM_FLOAT64_EDGES is None
+    small = structure()
+    assert forces_module.structure_extent(small.get_positions(), small.cell.array) < 64
     for calc in (f64, f32):
-        field = MACEForceField(calc, structure(), neighbours=NEIGHBOURS, engine=EAGER)
+        field = MACEForceField(calc, small, neighbours=NEIGHBOURS, engine=EAGER)
         assert not field.float64_edges and engine.POSITIONS64_KEY not in field.data
+    moved = small.copy()
+    moved.positions = moved.positions + OFFSET
+    assert MACEForceField(f32, moved, neighbours=NEIGHBOURS, engine=EAGER).float64_edges
+    assert not MACEForceField(f64, moved, neighbours=NEIGHBOURS, engine=EAGER).float64_edges
+
+
+def test_size_rule():
+    cell = np.diag([30.0, 30.0, 30.0])
+    assert forces_module.structure_extent(np.zeros((0, 3)), cell) == 30.0
+    assert forces_module.structure_extent(np.array([[0.0, -70.0, 1.0]]), cell) == 70.0
+    tilted = np.array([[40.0, 0, 0], [30.0, 30.0, 0], [0, 0, 10.0]])
+    assert forces_module.structure_extent(np.zeros((1, 3)), tilted) == 70.0  # the a + b corner
+    assert not forces_module.float64_edges_wanted(None, 63.9)
+    assert forces_module.float64_edges_wanted(None, 64.0)
+    assert forces_module.float64_edges_wanted(True, 1.0) and not forces_module.float64_edges_wanted(False, 1e4)
+
+
+@pytest.mark.parametrize("offset, expected", [(0.0, False), (1500.0, True)])
+def test_tiled_frame_follows_the_size_rule(calculators, offset, expected):
+    from fastmace.model import tiled as tiled_module
+    from fastmace.model.tiled import TileConfig, TiledForceField
+
+    _, f32 = calculators
+    assert tiled_module.TILE_LOCAL_FRAME is None
+    atoms = structure()
+    atoms.positions = atoms.positions + offset
+    field = MACEForceField(f32, atoms, neighbours=NEIGHBOURS, engine=EAGER)
+    tiled = TiledForceField(field, TileConfig(5, mode="eager"))
+    tiled.evaluate(atoms)
+    assert (tiled.last["local_frame"] == "tiles") is expected

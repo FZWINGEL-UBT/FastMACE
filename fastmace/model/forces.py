@@ -176,8 +176,35 @@ SPECIES_DEPENDENT = "fixed_species_superset"
 # Idea 11 (tiled-speed 11 November 2026): the whole-system call's edge vectors from float64 positions
 # (``engine.float64_edge_vectors``) for float32 models with a bound strain path (non-polar): the float64 positions in
 # the dict (24 bytes per atom, until ``release_whole_system``) and a detached per-edge correction in the forward.
-# MEASURED on accuracy; default False until the 3x gate and a not-slower A/B.
-WHOLE_SYSTEM_FLOAT64_EDGES = False
+# None (auto, the conductor's size rule of 11 November): on where the structure's extent (the largest |coordinate| of
+# the positions and of the cell's corners) is at least FLOAT64_EDGES_EXTENT (64 A: float32's coordinate spacing there,
+# 7.6e-6 A, is four times a 30 A box's 1.9e-6); below it the dict carries no float64 positions and the call is MACE's
+# (nothing to pay). True / False: on / off for every size.
+# Local job 51 (RTX 5060 Ti, SrTiO3 6^3, OMAT-0 medium float32): the perfect crystal's largest force 2.2e-6 eV/A with it
+# at 0, +200 and +1,500 A (without: 2.0e-5, 8.1e-5, 1.33e-3); the call with stress 1.016 / 1.015 at 40,000 atoms.
+WHOLE_SYSTEM_FLOAT64_EDGES = None
+FLOAT64_EDGES_EXTENT = 64.0
+
+
+def structure_extent(positions, cell):
+    """The largest |coordinate| of ``positions`` [N, 3] and of the corners of ``cell`` [3, 3] (Angstrom)."""
+    import itertools
+
+    import numpy as np
+
+    cell = np.asarray(cell, dtype=np.float64).reshape(3, 3)
+    corners = np.array([np.asarray(c, dtype=np.float64) @ cell for c in itertools.product((0, 1), repeat=3)])
+    positions = np.asarray(positions, dtype=np.float64).reshape(-1, 3)
+    largest = float(np.abs(positions).max()) if positions.size else 0.0
+    return max(largest, float(np.abs(corners).max()))
+
+
+def float64_edges_wanted(switch, extent):
+    """``WHOLE_SYSTEM_FLOAT64_EDGES`` for a structure of ``extent`` (``structure_extent``): None means on from
+    FLOAT64_EDGES_EXTENT."""
+    if switch is None:
+        return extent >= FLOAT64_EDGES_EXTENT
+    return bool(switch)
 
 # The batch entries the tiled path's force field keeps on the device (``release_whole_system``): every other
 # per-atom entry is read by the whole-system call only.
@@ -540,8 +567,9 @@ class MACEForceField:
                 not self.is_polar and engine_rewrites.strain_problems(type(source).forward))):
             strain = None
         # The float64 edge vectors ride on the bound strain path (its prepare_graph reads the dict's float64 positions).
-        self.float64_edges = bool(WHOLE_SYSTEM_FLOAT64_EDGES and strain is not None and not self.is_polar
-                                  and self._dtype != torch_float64())
+        self.float64_edges = bool(strain is not None and not self.is_polar and self._dtype != torch_float64()
+                                  and float64_edges_wanted(WHOLE_SYSTEM_FLOAT64_EDGES,
+                                                           structure_extent(atoms.get_positions(), atoms.cell.array)))
         self.applied = ()
         self.split_forces = False
         self.dynamo_reset = False
