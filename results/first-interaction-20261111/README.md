@@ -9,8 +9,12 @@ call and 10 % of the H200's (`results/step-limiters-20261109/`, OMAT-0 medium, S
   202 µs, against a bar of 130 µs.
 - Of the three correct kernels built from it, the best keeps only 76 µs of that saving on the A100. That is under
   the conductor's stop line of about 130 µs.
-- **C2 stays open, for the A100 family only.** One load per column saves 168 µs on the A100, over its 130 µs bar.
-  It is under the bar on the 5060 Ti (measured) and on the H200 (estimated from the census).
+- **C2 is closed by a bound.** Its falsifier is over the bar on the A100 only: one load per column saves 168 µs
+  there, against 130.
+- The real packed table cannot hold the slopes. A packed quadratic or cubic slope needs 9,000–15,000 pieces in
+  the physical region alone, against today's 380 (619 in all). That puts the table at 140–330 MB, against the
+  A100's 40 MB L2.
+- The part that does fit, packed values for the forward, is worth at most 76 µs, under the bar.
 
 ## Method
 
@@ -110,8 +114,42 @@ How the H200 figure is estimated:
 - **Forward:** the H200 forward is issue-bound (63 %), and its sm_90 instruction count falls only 2.2 % (372 →
   364). The bounds run from 2 µs (instructions only) to 18 µs (the A100's 16 % fraction) on its 112 µs.
 
-C2 is therefore not stopped. The conductor scoped the real build to the A100 family (11 November): a packed table
-with its own certificate, plus the 3× float32 gate. It is not built yet. See the ledger entry for the next step.
+C2 was therefore not stopped by its falsifier. The conductor scoped the real build to the A100 family (11 November):
+a packed table with its own certificate, plus the 3× float32 gate.
+
+### C2's real form: the piece-count bound (offline, CPU)
+
+PACKED8 packs one quadratic per piece and takes the slope from it. The first table's backward needs the slope of all
+64 columns at every edge, and the current fit holds values and slopes to 1e-7 of their scale. The bound uses
+`c2-bound/c2_piece_bound.py` (output `c2-bound/output.txt`):
+
+- **Input:** the newest cached 66-column table on the PC, `radial-tables/f8a363ff….pt`: 9 pairs, 619 pieces,
+  6 terms, certificate worst 0.36.
+- **Method:** for each piece it finds the smallest split into m equal parts after which the dropped Chebyshev terms
+  fall under the tolerance. Term k of a piece shrinks as m^-k when the piece is split.
+- **Normalisation:** each column's largest value (or slope) over the whole domain. This is more lenient than the
+  fit's local scale, so the counts are lower bounds.
+
+| Tolerance | Value as a quadratic | Slope as a quadratic | Slope as a cubic | Slope pieces from 1 Å (quadratic / cubic) |
+| --- | ---: | ---: | ---: | ---: |
+| 1e-7 (today's fit) | 1,402 pieces | 30,355 | 18,502 | 15,001 / 9,617 |
+| 4.8e-7 (PACKED8's 22-bit a0) | 984 | 18,841 | 12,413 | 9,374 / 6,469 |
+| 1e-6 | 825 | 14,906 | 10,501 | 7,455 / 5,435 |
+
+**Reading the table.**
+- The values pack well: 1,402 pieces × 66 columns × 8 B × 9 pairs is 6.4 MB.
+- The slopes do not. Differentiation multiplies term k by about k², and the cutoff's last piece (r ≈ 5.98 Å) needs
+  a 28–75-fold split.
+- A packed slope table at 1e-7 therefore holds 9,600–15,000 pieces in the physical region alone. That is 61 MB as
+  an 8-byte quadratic, or 140 MB with the values and as a cubic, against today's 15 MB. Below 1 Å it takes as many
+  again.
+- Both exceed the A100's 40 MB L2, and each edge's lookup lands on a random piece. The falsifier's one cached load
+  per column cannot be reached by a certified packed slope.
+- What remains is the value-only packing for the forward (6.4 MB). The falsifier bounds it at 76 µs, under the
+  130 µs bar.
+
+**Verdict: C2 stops (bound).** A table that is coarser in the slopes would need a looser certificate than today's,
+and the falsifier's 168 µs would not survive the extra DRAM traffic.
 
 ## Files
 
@@ -121,4 +159,5 @@ with its own certificate, plus the 3× float32 gate. It is not built yet. See th
 - `a100-alex/`: the falsifiers.
 - `a100-alex-aligned/`: the run-aligned walk.
 - `a100-alex-walk/`: the single-loop walk.
+- `c2-bound/`: C2's piece-count bound (script and output).
 - `job5060.sh`: the local job script.
