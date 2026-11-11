@@ -152,7 +152,7 @@ separate it from the 10^9 question, at a second node-day.
 | Step | State | Record |
 | --- | --- | --- |
 | 0 | done: about 100 B/atom live before the first tile, 24 of it float64 positions | `census-colab/` (Colab A100, 3.91 CU) |
-| 1 | in: host float64 positions, uint8 maps, no whole-system order (34 B/atom); gate and A/B on Alex 4984899 | `073f1f37`, `jobs/alex_step1.sh` |
-| 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); Alex 4984768 at 750M: the gathers bitwise (compiled and eager `_tile_vectors`, compiled `_slot_local_vectors`), untouched rows zero, the flat view's tail right; `index_add_` differed by 3e-5 at 1M as at 750M (the atomics' order with random values), so again with integer values in 4984899 | `jobs/alex_overflow.sh` |
-| 3 | planned | |
+| 1 | in (34 B/atom): gate 3x 12/12 (Alex 4984899); host rows 1.043 / 1.021 at 58^3 (a capacity option, not a default) | `073f1f37`, `step1-alex-4984899/` |
+| 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); Alex 4984768 at 750M: the gathers bitwise (compiled and eager `_tile_vectors`, compiled `_slot_local_vectors`), untouched rows zero, the flat view's tail right; `index_add_` differed by 3e-5 at 1M as at 750M (the atomics' order with random values), again with integer values in 4984899: every check bitwise at 1M and 750M | `jobs/alex_overflow.sh`, `step1-alex-4984899/probe-*` |
+| 3 | running: Alex 4985152 (one A100-80, 430^3 with `--host-positions`) | `jobs/alex_go.sh` |
 | 4 | not reserved (owner, 11 November 2026) | |
