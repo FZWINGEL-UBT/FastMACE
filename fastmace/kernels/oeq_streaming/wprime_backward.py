@@ -177,7 +177,11 @@ BUTTERFLY = None
 # November 2026 (results/step-limiters-20261109: kernel lab H200 0.956 against today's w' defaults; force/stress
 # gate passes on both): MD step b/a, b = on, SrTiO3 10x10x10 and NbCl5: H200 (e3049399) 0.9863 / 0.9861 and
 # 0.9936 / 0.9903; A100-SXM4-80GB (dad5375b, with PACKED8) 0.9910 / 0.9892 and 0.9942 / 0.9973.
-BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9840 / 0.9849, 0.9913 / 0.9931; left out of the
+# adopted set 1.0062 / 1.0061, 1.0058 / 1.0034 (w' 1306 -> 928 instructions, 94 -> 80 registers on sm_89).
+BUTTERFLY_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA H200", "NVIDIA A100-SXM4-80GB",
+                            "NVIDIA RTX 4000 Ada Generation"))
 # Round 5 (5 November 2026, external idea "integer warp reductions"). REDUX: the end-of-edge sums of the EDGE_DIM
 # edge-gradient components and dr in fixed point through the hardware integer reduction (redux.sync.add.s32,
 # compute capability 8.0+): per component one redux.sync.max of the lanes' exponents sets a power-of-two scale with
@@ -213,12 +217,25 @@ HOIST_SCALE_GPUS = GPUModels(())
 # A/B side's choice. MD-step A/B on the current main (6 November 2026, Modal, SrTiO3 10x10x10): H200 0.9616 / 0.9638,
 # A100-SXM4-80GB 0.9896 / 0.9920 (both build orders); bitwise, so no gate.
 STAGE_DOUT = None
-STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9699 / 0.9694, 0.9848 / 0.9806; STAGE_DOUT,
+# STAGE_SH and STAGE_EDGES left out of the adopted set together 1.0228 / 1.0200, 1.0261 / 1.0232.
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): w' STAGE_EDGES + STAGE_DOUT + STAGE_SH left out
+# of the candidate set together 1.0529 / 1.0503, 1.0334 / 1.0341.
+STAGE_DOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                             "NVIDIA GeForce RTX 5060 Ti"))
 # GPUs where a model label keeps STAGE_DOUT off (WPrime's model_label). POLAR-1-M on the A100 family (9 November
 # 2026, results/off-polar-a100-r2-20261109, NHR Alex A100-SXM4-80GB job 4970848, against the A100 defaults of
-# 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911.
+# 6f03bd02, b = off, ab / ba): NaCl 0.9682 / 0.9770, NbCl5 0.9920 / 0.9911. RTX 4000 Ada (ada-5060-screen, 11 November
+# 2026, results/ada-5060-screen-20261110, murphy): the Ada set slowed POLAR-1-M NaCl (1.0061 / 1.0077 against the Ada
+# defaults); leave-one-out from the set, b = STAGE_DOUT off: NaCl 0.9868 / 0.9858 (switches that do not run for
+# POLAR read 0.994-1.002). The set without STAGE_DOUT against the Ada defaults (leto): NaCl 0.9986 / 1.0006, NbCl5
+# 0.9999 / 0.9982. POLAR-1-L NbCl5 on the Ada: the set 1.0033 / 1.0021, leave-one-out b = STAGE_DOUT off 0.9986 /
+# 0.9987, the set without it against the defaults 1.0005 / 1.0005 (leto).
 STAGE_DOUT_MODEL_OFF_GPUS = MappingProxyType({
-    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe")),
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA RTX 4000 Ada Generation")),
+    "polar1-l": GPUModels(("NVIDIA RTX 4000 Ada Generation",)),
 })
 STAGE_DOUT_CHUNK = 32  # edges per block (1..32: one ballot finds a run's end)
 # STAGE_DOUT's row as quartets of output-gradient components (Codex H200 follow-up, 7 November 2026, item 2): with
@@ -241,7 +258,13 @@ STAGE_SH = None
 # NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108): off again from the Ada set
 # 0.9903 / 0.9905 (b = off):
 # slower there, off.
-STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with STAGE_EDGES left out of the adopted set 1.0035 / 1.0028,
+# 1.0078 / 1.0056.
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with STAGE_DOUT and w' STAGE_EDGES (see STAGE_DOUT_GPUS).
+STAGE_SH_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                           "NVIDIA GeForce RTX 5060 Ti"))
 # STAGE_EDGES (w'; Codex H200 round-6 report, 8 November 2026; bitwise): with STAGE_DOUT, STAGE_SH and SPLINE_W,
 # the block's chunk of edges is staged once at block entry: the features of all its edges (one coalesced float4 copy
 # by the whole block), and per edge (warp 0, a lane per edge) sender, receiver, spline interval, t, 1 / h and the
@@ -253,7 +276,12 @@ STAGE_EDGES = None
 # A100 family (8 November 2026, results/h200-fastpath-20261108/round6-a100, NHR Alex A100-SXM4-80GB job 4963944;
 # OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9643 / 0.9853;
 # all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
-STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# RTX 4000 Ada (ada-5060-screen, 10-11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): w' STAGE_EDGES + STAGE_DOUT + STAGE_SH alone 0.9639 / 0.9643,
+# 0.9779 / 0.9758; left out of the adopted set alone 1.0032 / 0.9981, 1.0043 / 1.0064 (with STAGE_SH: see there).
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): with STAGE_DOUT and STAGE_SH (see STAGE_DOUT_GPUS).
+STAGE_EDGES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation", "NVIDIA GeForce RTX 5060 Ti"))
 # A model label's own extra GPUs for STAGE_EDGES, on top of STAGE_EDGES_GPUS (the label reaches the kernel through the
 # rewrites' context: WPrime's model_label). OMAT-0 small on the H200 (9 November 2026, results/h200-omat0-small-20261108,
 # Benchmark_loup, ab / ba): alone on small's defaults 0.9857 / 0.9825 (b = on); with JOINED_LAYOUT, removing it from the

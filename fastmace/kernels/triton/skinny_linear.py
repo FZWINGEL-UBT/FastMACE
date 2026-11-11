@@ -59,9 +59,11 @@ _ALIGN = 4  # cutlass.tf32x3.ALIGNMENT: K and N padded to it
 # by decision 66 on the 5060 Ti. A100-SXM4-80GB (Alex 4961878; OFF23-large's 640-row chunks split on 108 SMs):
 # OFF23-large 0.999 / 0.998, OFF23-small 0.993 / 1.001, -medium 0.999 / 1.005, OFF23b 1.000 / 1.004, OFF24
 # 1.002 / 0.998: a tie, so measured and left off (it changes the tiling and launch grid, so decision 66 needs
-# a measured speed-up in both orders, not the pure-removal tie; conductor 8 November). The Ada is not measured.
+# a measured speed-up in both orders, not the pure-removal tie; conductor 8 November). RTX 4000 Ada (48 SMs; murphy,
+# ada-5060-screen, 10 November 2026, results/ada-5060-screen-20261110): OFF23-large 0.9556 / 0.9583, OFF24 0.9990 /
+# 0.9979 (no split there), so on by decision 66.
 SPLIT_COLUMNS = None
-SPLIT_COLUMNS_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti",))
+SPLIT_COLUMNS_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation"))
 SPLIT_BLOCK_P = 16
 
 

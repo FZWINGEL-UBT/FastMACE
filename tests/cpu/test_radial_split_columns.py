@@ -32,9 +32,9 @@ def test_split_columns_is_one_wave_of_the_split_grid(rows, p, sms, block_m, expe
     assert skinny_linear.split_columns(rows, p, sms, block_m) == expected
 
 
-def test_the_default_is_the_5060_ti_only_and_never_on_the_cpu(monkeypatch):
+def test_the_default_is_the_5060_ti_and_the_ada_and_never_on_the_cpu(monkeypatch):
     assert skinny_linear.SPLIT_COLUMNS is None
-    assert tuple(skinny_linear.SPLIT_COLUMNS_GPUS) == ("NVIDIA GeForce RTX 5060 Ti",)
+    assert tuple(skinny_linear.SPLIT_COLUMNS_GPUS) == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
     assert skinny_linear.split_columns_default("cpu") is False
     monkeypatch.setattr(skinny_linear, "SPLIT_COLUMNS", True)
     assert skinny_linear.split_columns_default("cpu") is False

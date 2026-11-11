@@ -24,7 +24,10 @@ from fastmace.kernels.gpu_models import GPUModels
 # 0.9990 / 0.9985, gate as the default; the A100 80GB PCIe follows it (the owner: relative results carry over).
 # H200: a tie (0.9992 / 1.0012), off.
 RECEIVER_SUM = None
-RECEIVER_SUM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9985 / 0.9994, 1.0073 / 0.9987;
+# left out of the candidate set 1.0041 / 1.0006, 1.0034 / 1.0049.
+RECEIVER_SUM_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe", "NVIDIA GeForce RTX 5060 Ti"))
 BLOCK = 1024
 WARPS = 4
 

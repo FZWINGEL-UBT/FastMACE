@@ -28,12 +28,14 @@ def gpu(monkeypatch):
 
 def test_the_maps_list_the_measured_models_on_the_a100_family():
     assert set(skin.SORT_BY_LENGTH_MODEL_OFF_GPUS) == {"off23-small", "off23-large"}
-    assert set(wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS) == {"polar1-m"}
+    assert set(wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS) == {"polar1-m", "polar1-l"}  # -L: the Ada only
     assert set(fused_forward.DEGREE_PARTS_MODEL_OFF_GPUS) == {"polar1-m"}
     for table in (skin.SORT_BY_LENGTH_MODEL_OFF_GPUS, wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS,
                   fused_forward.DEGREE_PARTS_MODEL_OFF_GPUS):
-        for gpus in table.values():
-            assert A100 in gpus and A100_PCIE in gpus and H200 not in gpus
+        for label, gpus in table.items():
+            assert H200 not in gpus
+            if table is not wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS or label != "polar1-l":
+                assert A100 in gpus and A100_PCIE in gpus
 
 
 @pytest.mark.parametrize("label", ["off23-small", "off23-large"])
@@ -69,6 +71,18 @@ def test_stage_dout_and_degree_parts_are_off_for_polar1_m_on_the_a100(gpu, monke
     gpu(A100)
     assert wprime_backward.stage_dout_default("cuda", "polar1-m")
     assert fused_forward.degree_parts_default(A100, "polar1-m")
+
+
+def test_stage_dout_is_off_for_polar1_on_the_ada(gpu):
+    # ada-5060-screen, 11 November 2026: leave-one-out from the Ada set, POLAR-1-M NaCl 0.9868 / 0.9858 and POLAR-1-L
+    # NbCl5 0.9986 / 0.9987 with it off
+    for label in ("polar1-m", "polar1-l"):
+        assert "NVIDIA RTX 4000 Ada Generation" in wprime_backward.STAGE_DOUT_MODEL_OFF_GPUS[label]
+    gpu("NVIDIA RTX 4000 Ada Generation")
+    assert not wprime_backward.stage_dout_default("cuda", "polar1-m")
+    assert not wprime_backward.stage_dout_default("cuda", "polar1-l")
+    assert wprime_backward.stage_dout_default("cuda", "polar1-s")
+    assert wprime_backward.stage_dout_default("cuda", "omat0-medium")
 
 
 def test_the_neighbour_list_passes_its_label_to_the_sort_default(monkeypatch):

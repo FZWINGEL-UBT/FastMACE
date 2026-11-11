@@ -405,12 +405,20 @@ DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDI
 # 0.994 / 0.993. The fused forward goes with wprime_backward, as for OMAT-0; POLAR-1-S has no interaction for
 # either (SECOND_INTERACTION).
 POLAR_DECISION_66_WPRIME_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
-POLAR_DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; NaCl / NbCl5 3x3x3, warm-up 300,
+# 8 x 200, ab / ba): gate_epilogue alone POLAR-1-S NaCl 1.0043 / 0.9992, NbCl5 0.9897 / 0.9909; -M 1.0032 / 0.9969,
+# 0.9839 / 0.9944; -L 1.0000 / 0.9991, 0.9863 / 0.9874. With the 5060 Ti's adopted OMAT-0 constants on (the default
+# from this screen): -S NaCl 1.0080 / 0.9971, NbCl5 0.9927 / 0.9846; -L 0.9988 / 1.0027, 0.9869 / 0.9885 (NbCl5 faster
+# in both orders, NaCl mixed: the mixed-cell rule). 3x float32 gates pass at 2x2x2 (S, M, L; NaCl, NbCl5).
+POLAR_DECISION_66_GATE_EPILOGUE_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA GeForce RTX 5060 Ti"))
 # The same pair by label (fastmace/off-polar-alex, 6 November 2026, NHR@FAU Alex A100-SXM4-80GB, on top of the A100's
 # tf32x3_gemms, NaCl / NbCl5 3x3x3, both build orders): POLAR-1-M 0.9755 / 0.9768, 0.9200 / 0.9195 (gate passes).
 # POLAR-1-L is not here: NaCl 0.9563 / 0.9570 but NbCl5 1.0028 / 1.0018 (slower in both orders, the mixed-cell rule).
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026): POLAR-1-M alone NaCl 0.9597 / 0.9589, NbCl5 0.9380 / 0.9415; with
+# gate_epilogue and the 5060 Ti's OMAT-0 constants (its w' kernel then takes STAGE_EDGES / STAGE_DOUT / STAGE_SH)
+# 0.9659 / 0.9758, 0.9273 / 0.9389; gate passes (2x2x2). POLAR-1-L not: NbCl5 1.0098 / 1.0097 (NaCl 0.9373 / 0.9348).
 POLAR_DECISION_66_WPRIME_LABEL_GPUS = MappingProxyType({
-    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti")),
 })
 # The records that act on the interactions after the reassociated first one (fastmace.rewrites.radial attach_wprime
 # and attach_w_tables, mh1 fused_folded_forwards skip it): a one-interaction model with reassociate_first has none,
@@ -534,10 +542,12 @@ DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDI
 # generic_fold_product_linear (fold_product_linear on a generic model, 4 November 2026): "auto" on only on the GPUs
 # whose same-process A/Bs in both build orders measured it faster (decision 66; every A100 model, GPUModels). OMAT-0
 # medium, MD step b/a (b = the fold), abab / abba: RTX 4000 Ada SrTiO3 10x10x10 0.9986 / 0.9960, NbCl5 0.9911 / 0.9849;
-# A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828 (docs/validation/omat0/generic-fold-product.md). The RTX 5060 Ti was
-# not measured and keeps it off unless asked for.
+# A100-SXM4-80GB 0.9928 / 0.9931 and 0.9805 / 0.9828 (docs/validation/omat0/generic-fold-product.md).
 # NVIDIA H200 (5 November 2026, results/h200-defaults-20261105): MD step b/a 1.033 / 1.032 (b = off; OMAT-0 medium,
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): alone 0.9377 / 0.9348, 0.9222 / 0.9166;
+# left out of the candidate set 1.0950 / 1.0917, 1.1331 / 1.1376.
 # The skin list's edge_index in int32 (11 November 2026, results/edge-index-int32-20261111): OMAT-0 medium SrTiO3
 # 10x10x10, MD step b/a (b = int32), ab / ba: RTX 4000 Ada 1.0001 / 0.9987, RTX 5060 Ti 1.0022 / 0.9959; the 3x
 # float32 gate passed on the Ada (SrTiO3 forces 0.79, NaCl 0.91). A100-SXM4-80GB (Alex 4981362): b/a 0.9960 / 0.9951,
@@ -545,7 +555,7 @@ DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDI
 DECISION_66_EDGE_INDEX_INT32_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
                                                "NVIDIA A100-SXM4-80GB"))
 DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
-                                                   "NVIDIA H200"))
+                                                   "NVIDIA H200", "NVIDIA GeForce RTX 5060 Ti"))
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):

@@ -450,7 +450,11 @@ GENERIC_FOLD_READOUT_TAIL = None
 # NVIDIA RTX 4000 Ada Generation (8 November 2026, results/omat0-ada-capacity-20261108, leto): 0.9974 / 0.9962 against
 # the Ada defaults, off
 # again from the Ada set 1.0020 / 1.0026 (b = off); gate passes.
-GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
+# RTX 5060 Ti (ada-5060-screen, 11 November 2026, results/ada-5060-screen-20261110; OMAT-0 medium, Benchmark_loup,
+# SrTiO3 10x10x10 / NbCl5, ab / ba): left out of the candidate set 1.0037 / 1.0048,
+# 1.0071 / 1.0097.
+GENERIC_FOLD_READOUT_TAIL_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation",
+                                            "NVIDIA GeForce RTX 5060 Ti"))
 
 
 def generic_fold_readout_tail_default(name=None) -> bool:

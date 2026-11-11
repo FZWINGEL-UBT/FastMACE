@@ -259,13 +259,20 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            "radial_tables": (*FACTORED_LABELS, *GENERIC_FAMILY_LABELS,
                              *(label for label in LABELS if label.startswith("off"))),
            # species_tables: PolarMACE.forward pinned too (polar-T01); the folds stay MH-1's
-           "species_tables": (*MH1_LABELS, *fixed.POLAR_GRAPH_LABELS), "fold_product_linear": MH1_LABELS,
+           # fold_product_linear: MH-1's fold, and the generic (density family) fold on this file's GPU since
+           # ada-5060-screen (DECISION_66_GENERIC_FOLD_PRODUCT_GPUS, 11 November 2026)
+           "species_tables": (*MH1_LABELS, *fixed.POLAR_GRAPH_LABELS),
+           "fold_product_linear": (*MH1_LABELS, *(label for label, facts in LABEL_FACTS.items()
+                                                  if facts[1][0] == DENSITY_FIRST)),
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
            # decision 66 (3 November 2026): OMAT-0 medium too, this file's GPU is measured
-           "fused_folded_forward": (*MH1_LABELS, "omat0-medium"), "wprime_backward": (*MH1_LABELS, "omat0-medium"),
-           "gate_epilogue": MH1_LABELS,
+           # POLAR-1-M on this file's GPU since ada-5060-screen (POLAR_DECISION_66_WPRIME_LABEL_GPUS)
+           "fused_folded_forward": (*MH1_LABELS, "omat0-medium", "polar1-m"),
+           "wprime_backward": (*MH1_LABELS, "omat0-medium", "polar1-m"),
+           # POLAR-1 S, M, L on this file's GPU since ada-5060-screen (POLAR_DECISION_66_GATE_EPILOGUE_GPUS)
+           "gate_epilogue": (*MH1_LABELS, "polar1-s", "polar1-m", "polar1-l"),
            "tf32x3_gemms": ()}  # decision 66: the A100-SXM4-80GB only, not this file's GPU
 
 
@@ -761,7 +768,7 @@ def test_plans_equal_the_research_engine(label, capsys):
                 assert label not in APPLIES[name], (label, argv)
                 assert got_off[name].startswith("not a qualified POLAR-1 checkpoint, decision 58"), (label, argv)
             elif name == "fold_product_linear" and got_off.get(name, "").startswith("generic fold not measured"):
-                # generic_fold_product_linear: decision 66, this file's GPU (RTX 5060 Ti) is not measured
+                # generic_fold_product_linear: decision 66, off on a GPU outside DECISION_66_GENERIC_FOLD_PRODUCT_GPUS
                 assert label not in APPLIES[name] and capabilities.rewrite_support(model)[stage2[name]][0], (label,
                                                                                                              argv)
             elif name == "tf32x3_gemms" and name in got_off:  # this file's GPU is not a decision-66 tf32x3 GPU
@@ -1059,8 +1066,10 @@ def test_decision_66_wprime_backward_on_the_measured_gpus():
     plan = plan_for("omol0-xl")
     assert plan.rewrites.wprime_backward == "off"
     assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured model, decision 66")
-    # POLAR-1-M/L: measured on the RTX 4000 Ada only (polar-T01), not on this file's GPU; POLAR-1-S: one interaction.
-    plan = plan_for("polar1-m")
+    # POLAR-1-M: on this file's GPU since ada-5060-screen (11 November 2026); POLAR-1-L: the Ada only (polar-T01);
+    # POLAR-1-S: one interaction.
+    assert plan_for("polar1-m").rewrites.wprime_backward == "on"
+    plan = plan_for("polar1-l")
     assert dict(plan.auto_options_off)["wprime_backward"].startswith("not a measured GPU, decision 66")
     assert dict(plan_for("polar1-s").auto_options_off)["wprime_backward"] == fixed.SECOND_INTERACTION
     float64 = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
