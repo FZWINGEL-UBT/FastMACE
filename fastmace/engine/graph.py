@@ -1525,13 +1525,23 @@ class GraphEngine(Engine):
 
         for mode, name in ((arena_cuda.VIRTUAL, "virtual"), (arena_cuda.RECORD, "device")):
             pool = self._arena_pool(shim)
-            shim.mode(mode)
             shim.clear_log()
-            arena_cuda.start_history()
             try:
+                if mode == arena_cuda.VIRTUAL:
+                    shim.alias_fill(torch.cuda.current_device())
+                shim.mode(mode)
+                arena_cuda.start_history()
                 self._pool = pool.id
                 self._arena_capture_keys(keys)
                 events = arena_cuda.stop_history(pool.id)
+                if mode == arena_cuda.VIRTUAL:
+                    # Every buffer of the virtual pool is one aliased granule: nothing may run on it. The shim
+                    # refuses requests from a stream that is not capturing (warm-ups and autotuning run eagerly
+                    # outside the pool, before their capture), and any kernel that wrote to it changed the canary.
+                    uncaptured = shim.counters()["uncaptured"]
+                    if uncaptured or not shim.alias_intact():
+                        raise _ArenaFallback(f"the virtual recording pool was used outside a capture "
+                                             f"({uncaptured} request(s) refused, canary intact: {shim.alias_intact()})")
             except Exception as error:  # noqa: BLE001 - the device recording is tried next
                 torch.cuda.memory._record_memory_history(enabled=None)
                 self.capture_arena_info[f"record_{name}_error"] = f"{type(error).__name__}: {error}"[:500]

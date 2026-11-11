@@ -12,7 +12,10 @@
  *                one shared physical chunk (cuMemCreate of one granule, cuMemMap at every granule): every pointer
  *                is valid device memory, as Triton's launcher checks at capture, yet the recording costs one
  *                granule. A capture only records pointers; such a graph aliases all its buffers and must never be
- *                replayed. Frees unmap and return the range.
+ *                replayed. Frees unmap and return the range. Nothing may execute on these ranges: a request from a
+ *                stream that is not capturing is refused and counted (arena_uncaptured), and the shared granule is
+ *                a canary (arena_alias_fill before the recording, arena_alias_intact after): any kernel that wrote
+ *                to the record pool changed it.
  * Every call is logged, so a planned capture can be checked against its plan.
  *
  * Guard (owner, 10 November 2026; the HYPERVISOR_ERROR crashes of the local 5060 Ti under WSL2): a request for
@@ -51,6 +54,9 @@ typedef int (*mem_map_t)(uint64_t, size_t, size_t, unsigned long long, unsigned 
 typedef int (*mem_unmap_t)(uint64_t, size_t);
 typedef int (*mem_set_access_t)(uint64_t, size_t, const mem_access *, size_t);
 typedef int (*mem_release_t)(unsigned long long);
+typedef int (*stream_capturing_t)(void *, int *);
+typedef int (*memset_d8_t)(uint64_t, unsigned char, size_t);
+typedef int (*memcpy_dtoh_t)(void *, uint64_t, size_t);
 
 static mem_alloc_t mem_alloc;
 static mem_free_t mem_free;
@@ -63,6 +69,11 @@ static mem_map_t mem_map;
 static mem_unmap_t mem_unmap;
 static mem_set_access_t mem_set_access;
 static mem_release_t mem_release;
+static stream_capturing_t stream_capturing;
+static memset_d8_t memset_d8;
+static memcpy_dtoh_t memcpy_dtoh;
+static uint64_t alias_probe; /* one granule of address space that maps the shared chunk, for the canary */
+static int64_t uncaptured;
 static unsigned long long alias_handle; /* the shared physical chunk of mode 2 */
 static size_t alias_granule;
 static int alias_device = -1;
@@ -99,6 +110,9 @@ static int resolve(void) {
     mem_unmap = (mem_unmap_t)dlsym(h, "cuMemUnmap");
     mem_set_access = (mem_set_access_t)dlsym(h, "cuMemSetAccess");
     mem_release = (mem_release_t)dlsym(h, "cuMemRelease");
+    stream_capturing = (stream_capturing_t)dlsym(h, "cuStreamIsCapturing");
+    memset_d8 = (memset_d8_t)dlsym(h, "cuMemsetD8_v2");
+    memcpy_dtoh = (memcpy_dtoh_t)dlsym(h, "cuMemcpyDtoH_v2");
     return (mem_alloc && mem_free && mem_info) ? 0 : -1;
 }
 
@@ -135,9 +149,22 @@ static int alias_ready(int device) {
     if (mem_granularity(&granule, &prop, 0) != 0 || !granule) return -1;
     unsigned long long handle = 0;
     if (mem_create(&handle, granule, &prop, 0) != 0) return -1;
+    uint64_t probe = 0;
+    mem_access access = {{1, device}, 3};
+    if (va_reserve(&probe, granule, granule, 0, 0) != 0) {
+        mem_release(handle);
+        return -1;
+    }
+    if (mem_map(probe, granule, 0, handle, 0) != 0 || mem_set_access(probe, granule, &access, 1) != 0) {
+        mem_unmap(probe, granule);
+        va_free(probe, granule);
+        mem_release(handle);
+        return -1;
+    }
     alias_handle = handle;
     alias_granule = granule;
     alias_device = device;
+    alias_probe = probe;
     return 0;
 }
 
@@ -145,9 +172,18 @@ static void alias_unmap(uint64_t p, size_t mapped) {
     for (size_t at = 0; at < mapped; at += alias_granule) mem_unmap(p + at, alias_granule);
 }
 
-static uint64_t virtual_alloc(size_t size, int device) {
+static int capturing(void *stream) {
+    int status = 0; /* CU_STREAM_CAPTURE_STATUS_ACTIVE = 1 */
+    return stream_capturing && stream_capturing(stream, &status) == 0 && status == 1;
+}
+
+static uint64_t virtual_alloc(size_t size, int device, void *stream) {
     uint64_t p = 0;
     if (resolve() != 0 || !va_reserve || virtual_n >= VIRTUAL_CAP || alias_ready(device) != 0) return 0;
+    if (!capturing(stream)) { /* memory used outside a capture would run on the aliased granule */
+        uncaptured++;
+        return 0;
+    }
     size_t span = (size + alias_granule - 1) / alias_granule * alias_granule;
     if (va_reserve(&p, span, alias_granule, 0, 0) != 0) return 0;
     size_t at = 0;
@@ -184,7 +220,7 @@ void *arena_malloc(size_t size, int device, void *stream) {
     (void)stream;
     uint64_t p = 0;
     if (mode == 2) {
-        p = virtual_alloc(size, device);
+        p = virtual_alloc(size, device, stream);
         record(1, (int64_t)size, p);
         return (void *)p;
     }
@@ -249,11 +285,30 @@ int64_t arena_fallback_bytes(void) { return fallback_bytes; }
 int64_t arena_planned_served(void) { return plan_k; }
 int64_t arena_refusals(void) { return refusals; }
 int64_t arena_virtual_live(void) { return virtual_n; }
+int64_t arena_uncaptured(void) { return uncaptured; }
+/* The canary: fill the shared granule with ``value`` (device must be the pool's), then check it. -1: no granule. */
+int arena_alias_fill(int device, int value) {
+    if (resolve() != 0 || alias_ready(device) != 0 || !memset_d8) return -1;
+    uncaptured = 0;
+    return memset_d8(alias_probe, (unsigned char)value, alias_granule) == 0 ? 0 : -1;
+}
+int arena_alias_intact(int value) {
+    if (!alias_probe || !memcpy_dtoh) return -1;
+    unsigned char *host = malloc(alias_granule);
+    if (!host) return -1;
+    int ok = memcpy_dtoh(host, alias_probe, alias_granule) == 0;
+    for (size_t i = 0; ok && i < alias_granule; i++) ok = host[i] == (unsigned char)value;
+    free(host);
+    return ok;
+}
 uint64_t arena_base(void) { return base; }
 int arena_release(void) {
     if (base && resolve() == 0) mem_free(base);
     base = 0;
     if (alias_handle && !virtual_n && mem_release) { /* the shared chunk, once no range maps it */
+        mem_unmap(alias_probe, alias_granule);
+        va_free(alias_probe, alias_granule);
+        alias_probe = 0;
         mem_release(alias_handle);
         alias_handle = 0;
         alias_device = -1;

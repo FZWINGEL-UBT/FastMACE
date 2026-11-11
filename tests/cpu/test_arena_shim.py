@@ -27,7 +27,7 @@ def lib(tmp_path):
     so = arena_cuda.build(tmp_path)
     lib = ctypes.CDLL(str(so))
     for name in ("arena_mismatches", "arena_fallback_bytes", "arena_planned_served", "arena_refusals",
-                 "arena_virtual_live", "arena_log_count", "arena_set_headroom"):
+                 "arena_virtual_live", "arena_log_count", "arena_set_headroom", "arena_uncaptured"):
         getattr(lib, name).restype = ctypes.c_int64
     lib.arena_set_headroom.argtypes = [ctypes.c_int64]
     lib.arena_set_plan.argtypes = [ctypes.c_int64, ctypes.POINTER(ctypes.c_int64), ctypes.POINTER(ctypes.c_int64),
@@ -79,6 +79,15 @@ def test_virtual_mode_without_a_driver_returns_null_and_holds_nothing(lib):
     assert not lib.arena_malloc(2 << 20, 0, None)
     lib.arena_mode(0)
     assert lib.arena_virtual_live() == 0
+
+
+@linux_cc
+def test_the_canary_needs_its_granule(lib):
+    """Without a driver there is no shared granule: filling it fails and the canary reads as not set (-1), so the
+    engine's recording falls back to device memory instead of trusting it."""
+    assert lib.arena_alias_fill(0, 0xFF) == -1
+    assert lib.arena_alias_intact(0xFF) == -1
+    assert lib.arena_uncaptured() == 0
 
 
 @linux_cc

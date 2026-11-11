@@ -24,6 +24,7 @@ HERE = Path(__file__).resolve().parent
 SOURCE = HERE / "arena_shim.c"
 RECORD, PLANNED, VIRTUAL = 0, 1, 2
 HEADROOM_BYTES = 1 << 30  # the shim refuses device memory beyond the free memory minus this
+CANARY = 0xFF  # the virtual mode's shared granule: NaN as float, -1 as an integer, so a read of it also shows
 POOL_ACTIONS = ("alloc", "free_completed", "segment_alloc", "segment_free", "segment_map", "segment_unmap")
 HISTORY_ENTRIES = 2_000_000
 _PROCESS: dict[str, Any] = {}  # "shim": the loaded Shim; "owner": the id of the engine holding the arena
@@ -71,9 +72,11 @@ class Shim:
         self.so = str(so)
         lib = ctypes.CDLL(self.so)
         for name in ("arena_log_count", "arena_mismatches", "arena_fallback_bytes", "arena_planned_served",
-                     "arena_refusals", "arena_virtual_live", "arena_set_headroom"):
+                     "arena_refusals", "arena_virtual_live", "arena_set_headroom", "arena_uncaptured"):
             getattr(lib, name).restype = ctypes.c_int64
         lib.arena_set_headroom.argtypes = [ctypes.c_int64]
+        lib.arena_alias_fill.argtypes = [ctypes.c_int, ctypes.c_int]
+        lib.arena_alias_intact.argtypes = [ctypes.c_int]
         lib.arena_base.restype = ctypes.c_uint64
         lib.arena_log_get.argtypes = [ctypes.c_int64, ctypes.POINTER(ctypes.c_int64), ctypes.POINTER(ctypes.c_int64),
                                       ctypes.POINTER(ctypes.c_uint64)]
@@ -108,7 +111,17 @@ class Shim:
         lib = self.lib
         return {"mismatches": int(lib.arena_mismatches()), "fallback_bytes": int(lib.arena_fallback_bytes()),
                 "planned_served": int(lib.arena_planned_served()), "refusals": int(lib.arena_refusals()),
-                "virtual_live": int(lib.arena_virtual_live()), "base": int(lib.arena_base())}
+                "virtual_live": int(lib.arena_virtual_live()), "uncaptured": int(lib.arena_uncaptured()),
+                "base": int(lib.arena_base())}
+
+    def alias_fill(self, device: int, value: int = CANARY) -> None:
+        """Fill the shared granule of the virtual mode with ``value`` and reset the uncaptured count."""
+        if self.lib.arena_alias_fill(int(device), int(value)) != 0:
+            raise RuntimeError("the arena allocator could not map or fill its shared granule")
+
+    def alias_intact(self, value: int = CANARY) -> bool:
+        """The shared granule still holds ``value`` everywhere: no kernel wrote to the recording pool."""
+        return self.lib.arena_alias_intact(int(value)) == 1
 
     def release(self) -> None:
         self.lib.arena_release()
