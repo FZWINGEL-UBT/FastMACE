@@ -92,7 +92,9 @@ def main(argv=None):
                         torch.float32, far),
           local_vectors(small64, rows, node_mask, local, edge_mask, shifts, cell, inverse, receivers,
                         torch.float32, far))
-    values = torch.randn((args.edges, 3), generator=gen).to(device)
+    # Small integers: every sum is exact in float32, so the atomics' order (index_add_ on CUDA) cannot change it and
+    # only an index error can (Alex 4984768: random normals differed by 3e-5 at 1M atoms as at 750M, the order).
+    values = torch.randint(-1024, 1025, (args.edges, 3), generator=gen).to(device, torch.float32)
     del pos
     forces = torch.zeros((n, 3), dtype=torch.float32, device=device)
     forces.index_add_(0, ei[1], values, alpha=-1)

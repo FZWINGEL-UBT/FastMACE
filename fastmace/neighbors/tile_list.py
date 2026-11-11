@@ -26,6 +26,22 @@ from .skin import times_3x3
 
 CHUNK = 1 << 22  # atoms per chunk of the binning
 
+
+def rows_on_host(positions, device):
+    """Whether the float64 ``positions`` stay on the host while the list works on ``device`` (billion-atom plan,
+    step 1: 24 bytes per atom off the device). Then the binning reads them a chunk at a time and each tile's
+    distance test gathers its own rows on the host: the same float64 values, so the same edges. (A function, so
+    the CPU tests can take this path where host and device are one.)"""
+    return torch.device(positions.device) != torch.device(device)
+
+
+def abs_max(positions, chunk=CHUNK):
+    """``float(positions.abs().max())`` a chunk of rows at a time (no whole-system temporary; the same value)."""
+    largest = 0.0
+    for start in range(0, positions.shape[0], chunk):
+        largest = max(largest, float(positions[start:start + chunk].abs().max()))
+    return largest
+
 # The tile's edge order as one int64 key ``primary * natoms + sender`` while it stays below this; above it (sender
 # groups x natoms^2 past 2^63: 10 species at 1e9 atoms, 3 at 1.75e9) two stable sorts, sender then primary, give the
 # same order (plans/billion-atoms-20261111.md, step 2).
@@ -78,7 +94,8 @@ class TileNeighbours:
 
         In chunks of ``CHUNK`` atoms, keeping each atom's integer cell and bin as int32 (the same integer values
         as their float64 and int64 forms, so ``edges`` is unchanged): the whole-system transients of a tiled call
-        decide its peak at the largest sizes (tiled-call-memory.md)."""
+        decide its peak at the largest sizes (tiled-call-memory.md). ``positions`` may stay on the host
+        (``rows_on_host``): each chunk is copied to the device."""
         k = torch.tensor(self.bins, device=self.device)
         self.positions = positions
         n = positions.shape[0]
@@ -93,7 +110,7 @@ class TileNeighbours:
         wide = 0  # the largest cell image, for the offsets' dtype
         for start in range(0, n, CHUNK):
             stop = min(start + CHUNK, n)
-            frac = times_3x3(positions[start:stop], self.inverse)
+            frac = times_3x3(positions[start:stop].to(self.device), self.inverse)
             offsets = torch.floor(frac)
             b = torch.minimum(torch.clamp(((frac - offsets) * k).long(), min=0), k - 1)
             self.offsets[start:stop] = offsets
@@ -136,7 +153,13 @@ class TileNeighbours:
             self.float_dtype)
         del image
         shifts64 = times_3x3(unit.to(torch.float64), self.cell)
-        vectors = self.positions[receiver] - self.positions[sender] + shifts64
+        if rows_on_host(self.positions, self.device):  # the tile's rows only, gathered on the host
+            rows = torch.unique(torch.cat([receivers.long(), sender]))  # sorted
+            here = self.positions[rows.cpu()].to(self.device)
+            vectors = here[torch.searchsorted(rows, receiver)] - here[torch.searchsorted(rows, sender)] + shifts64
+            del rows, here
+        else:
+            vectors = self.positions[receiver] - self.positions[sender] + shifts64
         r2 = (vectors * vectors).sum(dim=1)
         del vectors
         keep = (r2 < self.cutoff ** 2) & ~((sender == receiver) & (unit == 0).all(dim=1))

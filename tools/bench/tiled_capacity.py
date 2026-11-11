@@ -111,6 +111,9 @@ def parse_args(argv=None):
     p.add_argument("--memory-history", action="store_true",
                    help="record the CUDA allocator's trace during the build and keep the allocations live at the "
                         "build's device peak, by the source line that made them (build_peak in the record)")
+    p.add_argument("--host-positions", action="store_true",
+                   help="keep the call's float64 positions on the host (--tile-list; TILE_HOST_ROWS: 24 bytes per "
+                        "atom off the device)")
     p.add_argument("--call-history", type=int, default=None, metavar="CALL",
                    help="record the CUDA allocator's trace during tiled call CALL (0-based) and keep the allocations "
                         "made in it that are live at its peak, by source line (call_peak in the record; the peak "
@@ -419,7 +422,8 @@ def main(argv=None):
         record["phase"] = "neighbours"
         torch.cuda.reset_peak_memory_stats()
         before = torch.cuda.memory_allocated()
-        positions = field._prepare_one_off(atoms)
+        positions = field._prepare_one_off(atoms, host=args.host_positions)
+        record["host_positions"] = bool(args.host_positions)
         record["edges_within_cutoff"] = int(field.neighbours.count)
         record["phases"]["neighbours"] = mem(before)
         save()
