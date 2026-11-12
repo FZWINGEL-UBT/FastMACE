@@ -33,9 +33,9 @@ Register caps (`census_cap{72,80,96}.json`) spill and recompute addresses, which
 | variant | kind | sm_90 instr/edge | Δ | regs (H200 blocks/SM) | sm_80 instr/edge | regs |
 |---|---|---:|---:|---:|---:|---:|
 | base | | 2,198 | | 72 (7) | 2,169 | 96 |
-| skip | exact | 2,026 | −7.8 % | 96 (5) | 1,999 | 128 |
+| skip | rounding (FMA order) | 2,026 | −7.8 % | 96 (5) | 1,999 | 128 |
 | hoist | exact | 2,141 | −2.6 % | 80 (6) | 2,131 | 96 |
-| skip+hoist | exact | 1,990 | −9.5 % | 96 (5) | 1,976 | 128 |
+| skip+hoist | rounding (FMA order) | 1,990 | −9.5 % | 96 (5) | 1,976 | 128 |
 | vec2 | rounding | 2,046 | −6.9 % | 128 (4) | 2,050 | 128 |
 | skip+vec2 | rounding | 1,864 | −15.2 % | 128 (4) | 1,860 | 128 |
 | vec4 | rounding | 2,489 | +13.2 % | 141 (3) | 2,435 | 140 |
@@ -47,8 +47,8 @@ Register caps (`census_cap{72,80,96}.json`) spill and recompute addresses, which
 - **vecN** (`CHANNEL_VECTOR`): each lane takes N consecutive channels, with float-N loads of the staged dout row and x,
   and vector atomics on sm_90 (scalar below). The per-lane dsh and dr sums change order, so this is a rounding change.
 
-All three switches are off by default (`SKIP_OUTSIDE_GPUS`, `HOIST_DX_GPUS`, `CHANNEL_VECTOR_GPUS` are empty).
-They are only turned on after a measured H200 win.
+The three switches were built off by default. After the H200 job, `SKIP_OUTSIDE` and `HOIST_DX` are on for the H200
+(see the decision below).
 
 ## Lab runs
 
@@ -71,6 +71,52 @@ They are only turned on after a measured H200 win.
   skip is not bitwise: for inside edges the arithmetic is the same, but the compiler schedules the FMAs differently.
   So the lab and the H200 picker now treat it as rounding, and a skip winner also gets the force/stress gate.
   dx is never bitwise (its atomics' order varies).
-- H200: `tools/modal/wprime_h200_lab_ab.sh` runs the lab of base plus the 7 variants, then the MD-step A/B in both
-  orders for the best variant (it must be at least 1 % faster than base, and bitwise for exact variants or within
-  1e-5 for rounding ones). A rounding winner also gets the 3× float32 force/stress gate.
+- H200 (Modal, `tools/modal/wprime_h200_lab_ab.sh` at 1ad25fa8, 11 Nov 23:51 UTC, NVIDIA H200, 547 s, $0.79
+  metered; `h200-job/`). The job runs the lab of base and the 7 variants. Then `tools/modal/wprime_h200_pick.py` takes
+  the fastest valid variant under 0.99 and runs its MD-step A/B in both orders. A variant that is not bitwise in
+  dsh / dr also gets the force/stress gate.
+
+  | variant | µs | ratio | regs (H200 blocks/SM) | dsh / dr vs base |
+  |---|---:|---:|---:|---|
+  | base | 1,042.3 | 1.000 | 72 (7) | |
+  | skip | 1,064.4 | 1.021 | 96 (5) | 5.5e-10 / 6.9e-8 |
+  | hoist | 1,041.1 | 0.999 | 80 (6) | bitwise |
+  | **skip+hoist** | **1,014.2** | **0.973** | 96 (5) | 5.5e-10 / 6.9e-8 |
+  | vec2 | 1,152.5 | 1.106 | 128 (4) | 1.4e-7 / 6.2e-7 |
+  | skip+vec2 | 1,127.9 | 1.082 | 128 (4) | 1.4e-7 / 6.2e-7 |
+  | vec4 | 1,674.4 | 1.606 | 141 (3) | 2.1e-7 / 6.5e-7 |
+  | skip+vec4 | 1,527.6 | 1.466 | 167 (3) | 2.1e-7 / 6.5e-7 |
+
+  MD step b/a for skip+hoist, OMAT-0 medium, Benchmark_loup, both build orders:
+
+  | structure | a → b | b/a |
+  |---|---|---|
+  | SrTiO3 10x10x10, ab | 3.3599 → 3.3227 ms | 0.9889 |
+  | SrTiO3 10x10x10, ba | 3.3537 → 3.3288 ms | 0.9926 |
+  | NbCl5 3x3x3, ab | 1.0692 → 1.0503 ms | 0.9823 |
+  | NbCl5 3x3x3, ba | 1.0674 → 1.0472 ms | 0.9811 |
+
+  Force/stress gate (`h200-job/gate-skip-hoist/`, production against ASE float32, both against float64) passes:
+
+  | structure | forces | stress |
+  |---|---:|---:|
+  | NaCl | 0.86 | 0.81 |
+  | SrTiO3 3x3x3 | 0.88 | 0.46 |
+
+  NbCl5 was not in the gate.
+  The variant counts as rounding only because the compiler orders the inside edges' FMAs differently (dsh 5.5e-10
+  relative). The arithmetic is the same and the padding edges' zeros are exact. The conductor accepted it on that
+  basis (12 Nov).
+
+## Decision (conductor, decision 66, 12 Nov)
+
+- `SKIP_OUTSIDE` and `HOIST_DX` are on for the H200, together only: alone they lose (1.021) or tie (0.999).
+  `HOIST_DX_GPUS` is `SKIP_OUTSIDE_GPUS`. `WPrime` turns `HOIST_DX`'s default on only when `SKIP_OUTSIDE` is on
+  and the kernel is float32 FACTORED with STAGE_DOUT.
+- `CHANNEL_VECTOR` stays off. Its register growth (128–167 registers) costs more than the cut in instructions.
+- The A100 keeps both off: skip+hoist was 1.025 there.
+- This was measured on OMAT-0 medium only. Other model families on the H200 that use TABLE_W get it through the GPU
+  set; that cell is listed as open in `docs/current/defaults-by-gpu.md`.
+- Takeaway: on the H200 the instruction count only pays at the same occupancy class. skip alone cuts 7.8 % of the
+  instructions but falls from 7 to 5 blocks per SM. With hoist on top, the cut is larger (9.5 %) at the same 96
+  registers, and that wins.

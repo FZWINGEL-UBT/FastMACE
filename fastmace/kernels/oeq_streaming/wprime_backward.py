@@ -314,16 +314,21 @@ EDGE_FORCE_GPUS = GPUModels(())
 # H200 w' instruction tuning (12 November 2026, results/wprime-h200-20261111): an edge at or beyond the cutoff (the
 # engine's padding edges; the skin list is compacted to the cutoff) writes dsh = 0 and dr = 0 and skips the channel
 # loop, so the table loads need no zero fill (sm_90 census: 2,198 -> 2,026 instructions per edge and lane, 72 -> 96
-# registers). Exact. None: on for SKIP_OUTSIDE_GPUS; True / False: an A/B side's choice.
+# registers). Exact in exact arithmetic; the compiler schedules the inside edges' FMAs differently (H200 lab: dsh
+# 5.5e-10, dr 6.9e-8 relative), so rounding. None: on for SKIP_OUTSIDE_GPUS; True / False: an A/B side's choice.
+# On the H200 together with HOIST_DX only (both sets hold the same GPUs): H200 lab (OMAT-0 medium, SrTiO3 10x10x10)
+# skip 1.021, hoist 0.999, both 0.973 (1,042.3 -> 1,014.2 us); MD step b/a SrTiO3 10x10x10 0.9889 / 0.9926, NbCl5
+# 0.9823 / 0.9811; force/stress gate passed (NaCl, SrTiO3 3x3x3). A100: both 1.025, off.
 SKIP_OUTSIDE = None
-SKIP_OUTSIDE_GPUS = GPUModels(())
+SKIP_OUTSIDE_GPUS = GPUModels(("NVIDIA H200",))
 # The same lane (wprime_tuning's post-render transforms; float32 FACTORED kernels with STAGE_DOUT). HOIST_DX: the dx
 # atomics' address as one pointer per lane (exact; sm_90 census 2,198 -> 2,141, 80 registers). CHANNEL_VECTOR 2 / 4:
 # that many consecutive channels per lane with vector dout, x and dx accesses (rounding: each lane's dsh and dr sums in
-# another channel order; with SKIP_OUTSIDE, CHANNEL_VECTOR 2: 1,864 at 128 registers). None: on for the *_GPUS sets
-# (none yet); True / False, 0 / 2 / 4: an A/B side's choice.
+# another channel order; with SKIP_OUTSIDE, CHANNEL_VECTOR 2: 1,864 at 128 registers). None: on for the *_GPUS sets;
+# True / False, 0 / 2 / 4: an A/B side's choice. HOIST_DX_GPUS = SKIP_OUTSIDE_GPUS (the two win together only, see
+# above); CHANNEL_VECTOR lost on the H200 (vec2 1.106, skip+vec2 1.082, vec4 1.606, skip+vec4 1.466: registers).
 HOIST_DX = None
-HOIST_DX_GPUS = GPUModels(())
+HOIST_DX_GPUS = SKIP_OUTSIDE_GPUS
 CHANNEL_VECTOR = None
 CHANNEL_VECTOR_GPUS = MappingProxyType({})  # device name -> 2 or 4
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
@@ -1024,7 +1029,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     vectors ``vec [E, 3]`` after ``dr`` and writes ``dL/dv [E, 3]`` through ``dsh`` (edge_sh3's backward contracted
     in the epilogue, one lane per edge) instead of ``dsh [E, 16]``. ``skip_outside`` (``SKIP_OUTSIDE``; with
     ``table_w``): an edge at or beyond the cutoff writes its zeros and skips the channel loop, whose table loads are
-    then unconditional (exact)."""
+    then unconditional (exact arithmetic; rounding through the FMA order)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -1332,6 +1337,9 @@ class WPrimeBackward:
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force,
                              skip_outside=self.skip_outside)
         self.hoist_dx, self.channel_vector = hoist_dx_default(device), channel_vector_default(device)
+        if HOIST_DX is None:  # the default: with SKIP_OUTSIDE only (they win together), where it was measured
+            self.hoist_dx = (self.hoist_dx and self.skip_outside and scalar == "float" and bool(self.factored)
+                             and bool(self.stage_dout))
         if self.hoist_dx or self.channel_vector:  # HOIST_DX / CHANNEL_VECTOR (wprime_tuning; raise where unmatched)
             from fastmace.kernels.oeq_streaming import wprime_tuning
             self.source = wprime_tuning.apply(self.source, self.hoist_dx, self.channel_vector)

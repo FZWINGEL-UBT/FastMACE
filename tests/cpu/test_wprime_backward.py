@@ -325,9 +325,20 @@ def test_skip_outside_lab_form_is_the_template():
 
 def test_skip_outside_default(monkeypatch):
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", None)
-    assert not wp.skip_outside_default(torch.device("cpu")) and len(wp.SKIP_OUTSIDE_GPUS) == 0
+    assert not wp.skip_outside_default(torch.device("cpu"))
+    assert set(wp.SKIP_OUTSIDE_GPUS) == {"NVIDIA H200"}  # H200 MD step 0.9889 / 0.9926, 0.9823 / 0.9811 (12 Nov)
+    monkeypatch.setattr(wp, "_device_name", lambda device: "NVIDIA H200")
+    assert wp.skip_outside_default(None)
+    monkeypatch.setattr(wp, "SKIP_OUTSIDE", False)  # an A/B side's choice wins over the set
+    assert not wp.skip_outside_default(None)
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", True)
     assert wp.skip_outside_default(torch.device("cpu"))
+
+
+def test_skip_outside_and_hoist_dx_together_only():
+    """SKIP_OUTSIDE and HOIST_DX win on the H200 together only (lab 0.973; alone 1.021 and 0.999): one GPU set."""
+    assert wp.HOIST_DX_GPUS is wp.SKIP_OUTSIDE_GPUS
+    assert "NVIDIA A100-SXM4-80GB" not in wp.SKIP_OUTSIDE_GPUS  # A100 lab: both 1.025
 
 
 def test_skip_outside_compiles_with_nvrtc():
@@ -374,7 +385,7 @@ def test_hoist_dx_and_channel_vector_defaults(monkeypatch):
     monkeypatch.setattr(wp, "HOIST_DX", None)
     monkeypatch.setattr(wp, "CHANNEL_VECTOR", None)
     assert not wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 0
-    assert len(wp.HOIST_DX_GPUS) == 0 and len(wp.CHANNEL_VECTOR_GPUS) == 0
+    assert set(wp.HOIST_DX_GPUS) == {"NVIDIA H200"} and len(wp.CHANNEL_VECTOR_GPUS) == 0
     monkeypatch.setattr(wp, "HOIST_DX", True)
     monkeypatch.setattr(wp, "CHANNEL_VECTOR", 2)
     assert wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 2

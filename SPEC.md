@@ -3648,3 +3648,12 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - GEOM winning on the H200 keeps compact angular products unbuilt (rev2 queue §4).
 - Modal cost: pack 1 about $1.19 (sixth), pack 2 $1.76 (fourth, 20-minute timeout), the OFF candidate gate $0.82 (third). See `results/h200-pack-20261111/README.md`.
 - Suite on the branch tip 66cf1ae6 (murphy, idle check incl. our jobs): 5,706 passed, 204 skipped, 0 failed.
+
+**H200 w′ instruction tuning (11–12 November 2026; owner "Can you try the search space and instruction tune on h200?" and "Go ahead" for one H200 job; conductor, decision 66): `wprime_backward.SKIP_OUTSIDE` and `HOIST_DX` on for the H200, together only.**
+- Formulation search closed: the best per-path mix saves 45 FP instructions per edge, about 22 µs (0.66 % of the 3.369 ms step), under the 1 % gate; the complex basis and the h-form are worse.
+- sm_90 census per edge and lane: base 2,198 instructions (72 registers); skip 2,026 (96), hoist 2,141 (80), skip+hoist 1,990 (96), vec2 2,046 (128), skip+vec2 1,864 (128), vec4 2,489 (141), skip+vec4 1,909 (167); no spills.
+- H200 lab (OMAT-0 medium, SrTiO3 10³): skip+hoist 0.973; skip alone 1.021, hoist alone 0.999, so the two share one GPU set and HOIST_DX's default needs SKIP_OUTSIDE. `CHANNEL_VECTOR` lost (1.082–1.606) and stays off.
+- MD step b/a both orders: SrTiO3 10³ 0.9889 / 0.9926, NbCl5 3³ 0.9823 / 0.9811. Gate (NaCl, SrTiO3 3³) passes: forces 0.86, 0.88; stress 0.81, 0.46. NbCl5 not in the gate. Rounding only through the compiler's FMA order for the inside edges (dsh 5.5e-10, dr 6.9e-8 relative); accepted by the conductor.
+- A100 (Colab, H200 plan via the alias): skip+hoist 1.025, skip 0.997: off.
+- Measured on OMAT-0 medium only; the GPU set turns it on for every H200 w′ with TABLE_W (open cell in defaults-by-gpu).
+- Modal: one H200 job, 547 s, $0.79 metered. See `results/wprime-h200-20261111/README.md`.
