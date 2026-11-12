@@ -347,6 +347,14 @@ HOIST_DX_GPUS = SKIP_OUTSIDE_GPUS
 # None: on for WEIGHTED_VECTOR_GPUS; True / False: an A/B side's choice.
 WEIGHTED_VECTOR = None
 WEIGHTED_VECTOR_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# Per-model exclusions (decision 66 per-model off-lists; fastmace/wprime-off-polar, 12 November 2026,
+# results/wprime-off-polar-20261112). POLAR-1-M is the only OFF / POLAR plan with a w' kernel on the A100 family (MH-1's
+# class, no TABLE_W: WEIGHTED_VECTOR is the only 12 November switch that reaches it; sm_80 census 2,084 -> 2,052 per
+# edge, 96 registers both). Alex A100-SXM4-80GB, b = off against the defaults, ab / ba: NaCl 0.9932 / 1.0041, NbCl5
+# 0.9987 / 0.9986 (on slower in both orders on NbCl5, mixed on NaCl: no gain, the mixed-cell rule); gate passes on.
+WEIGHTED_VECTOR_MODEL_OFF_GPUS = MappingProxyType({
+    "polar1-m": GPUModels(("NVIDIA A100-SXM4-80GB",)),
+})
 CHANNEL_VECTOR = None
 CHANNEL_VECTOR_GPUS = MappingProxyType({})  # device name -> 2 or 4
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
@@ -1384,7 +1392,7 @@ class WPrimeBackward:
         if self.late_pullback:  # decided before the render: WEIGHTED_VECTOR yields to it
             from fastmace.kernels.oeq_streaming import wprime_pullback
             self.late_pullback = wprime_pullback.supported(kernels.schedule, scalar, blocks)
-        self.weighted_vector = weighted_vector_on(device, self.factored, self.late_pullback)
+        self.weighted_vector = weighted_vector_on(device, self.factored, self.late_pullback, model_label)
         self.launches = 0  # host-side launch count (tests: the EDGE_FORCE kernel ran)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
@@ -1946,16 +1954,20 @@ def hoist_dx_default(device):
     return bool(HOIST_DX) if HOIST_DX is not None else _device_name(device) in HOIST_DX_GPUS
 
 
-def weighted_vector_default(device):
-    """``WEIGHTED_VECTOR`` on ``device``: the constant when set, else on for ``WEIGHTED_VECTOR_GPUS``."""
-    return bool(WEIGHTED_VECTOR) if WEIGHTED_VECTOR is not None else _device_name(device) in WEIGHTED_VECTOR_GPUS
+def weighted_vector_default(device, model_label=None):
+    """``WEIGHTED_VECTOR`` on ``device``: the constant when set, else on for ``WEIGHTED_VECTOR_GPUS`` except the
+    label's ``WEIGHTED_VECTOR_MODEL_OFF_GPUS``."""
+    if WEIGHTED_VECTOR is not None:
+        return bool(WEIGHTED_VECTOR)
+    name = _device_name(device)
+    return name in WEIGHTED_VECTOR_GPUS and name not in WEIGHTED_VECTOR_MODEL_OFF_GPUS.get(model_label, ())
 
 
-def weighted_vector_on(device, factored, late_pullback):
+def weighted_vector_on(device, factored, late_pullback, model_label=None):
     """Whether a w' kernel on ``device`` takes WEIGHTED_VECTOR: ``weighted_vector_default`` on a FACTORED kernel, and
     never under LATE_PULLBACK (it rewrites every path into its Cartesian form; its block parser is not checked
     against weighted sources; conductor, 12 November 2026)."""
-    return bool(factored) and not late_pullback and weighted_vector_default(device)
+    return bool(factored) and not late_pullback and weighted_vector_default(device, model_label)
 
 
 def channel_vector_default(device):
@@ -2201,7 +2213,7 @@ class WPrime(torch.nn.Module):
 
 __all__ = ["EDGE_FORCE", "EDGE_FORCE_GPUS", "edge_force_default", "edge_force_supported",
            "SKIP_OUTSIDE", "SKIP_OUTSIDE_GPUS", "skip_outside_default", "HOIST_DX", "HOIST_DX_GPUS",
-           "hoist_dx_default", "WEIGHTED_VECTOR", "WEIGHTED_VECTOR_GPUS",
+           "hoist_dx_default", "WEIGHTED_VECTOR", "WEIGHTED_VECTOR_GPUS", "WEIGHTED_VECTOR_MODEL_OFF_GPUS",
            "weighted_vector_default", "weighted_vector_on", "CHANNEL_VECTOR", "CHANNEL_VECTOR_GPUS", "channel_vector_default",
            "streaming_conv_wprime_backward_force", "BLOCK_LDG", "BLOCK_LDG_GPUS",
            "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",

@@ -1,0 +1,37 @@
+2026-11-12T19:27:06+0100 host=leeloo gpu=NVIDIA RTX 4000 Ada Generation, 595.99.02 src=66e48e5a89a52dd014067b78123d68d20ff3f858
+2026-11-12T19:27:07+0100 sources idle: load=5.22 2.79 1.55
+2026-11-12T19:27:07+0100 start sources
+sources exit=0 factored {"nodes": 100, "ops": 177, "by_kind": {"mul": 68, "lin": 89, "dot": 20}, "output_fma": 13, "check": 7.626214712601333e-09}
+sources written /mnt/homes/zwingel/fm-slc/runs/ada-leeloo-item6/sources
+2026-11-12T19:27:40+0100 end sources
+2026-11-12T19:27:40+0100 start census
+census exit=1
+2026-11-12T19:27:41+0100 end census
+2026-11-12T19:27:41+0100 lab idle: load=3.35 2.59 1.53
+2026-11-12T19:27:41+0100 start lab
+lab exit=0 fac-fused: 177.5 us  sc0_fwd 177.5 fac-pair: 463.6 us  sc0_fwd 176.7  sc0_bwd 287.0 fac-pair4: 464.4 us  sc0_fwd 176.7  sc0_bwd 287.5 registers {'gen': 40, 'gen-fused': 40, 'gen-bwd': 64, 'fac-fused': 40, 'fac-bwd': 64, 'fac-bwd4': 92}, local bytes {'gen': 0, 'gen-fused': 0, 'gen-bwd': 0, 'fac-fused': 0, 'fac-bwd': 0, 'fac-bwd4': 0}, counts {'gen': {'terms': 94, 'monomials': 94, 'groups': 13, 'fmul_monomials': 149, 'fp32_per_channel': 256}, 'gen-fused': {'terms': 94, 'monomials': 94, 'groups': 13, 'fmul_monomials': 149, 'fp32_per_channel': 272}, 'gen-bwd': {'terms': 94, 'monomials': 94, 'group
+2026-11-12T19:28:03+0100 end lab
+2026-11-12T19:28:03+0100 done
+2026-11-12T19:33:03+0100 host=leeloo gpu=NVIDIA RTX 4000 Ada Generation, 595.99.02 src=66e48e5a89a52dd014067b78123d68d20ff3f858
+2026-11-12T19:33:03+0100 start census
+census exit=0
+census fac-bwd4.cu sm 80 {'registers': 90, 'local': 0, 'instructions': 648, 'ffma': 247, 'ldl_stl': 0, 'error': None}
+census fac-bwd4.cu sm 89 {'registers': 92, 'local': 0, 'instructions': 648, 'ffma': 247, 'ldl_stl': 0, 'error': None}
+census fac-bwd4.cu sm 90 {'registers': 92, 'local': 0, 'instructions': 656, 'ffma': 247, 'ldl_stl': 0, 'error': None}
+census fac-bwd.cu sm 80 {'registers': 64, 'local': 0, 'instructions': 648, 'ffma': 247, 'ldl_stl': 0, 'error': None}
+census fac-bwd.cu sm 89 {'registers': 64, 'local': 0, 'instructions': 648, 'ffma': 247, 'ldl_stl': 0, 'error': None}
+census fac-bwd.cu sm 90 {'registers': 64, 'local': 0, 'instructions': 664, 'ffma': 247, 'ldl_stl': 0, 'error': None}
+census fac-fused.cu sm 80 {'registers': 48, 'local': 0, 'instructions': 336, 'ffma': 99, 'ldl_stl': 0, 'error': None}
+census fac-fused.cu sm 89 {'registers': 40, 'local': 0, 'instructions': 336, 'ffma': 99, 'ldl_stl': 0, 'error': None}
+census fac-fused.cu sm 90 {'registers': 40, 'local': 0, 'instructions': 344, 'ffma': 99, 'ldl_stl': 0, 'error': None}
+census gen-bwd.cu sm 80 {'registers': 64, 'local': 0, 'instructions': 640, 'ffma': 268, 'ldl_stl': 0, 'error': None}
+census gen-bwd.cu sm 89 {'registers': 64, 'local': 0, 'instructions': 640, 'ffma': 268, 'ldl_stl': 0, 'error': None}
+census gen-bwd.cu sm 90 {'registers': 64, 'local': 0, 'instructions': 656, 'ffma': 268, 'ldl_stl': 0, 'error': None}
+census gen.cu sm 80 {'registers': 39, 'local': 0, 'instructions': 312, 'ffma': 94, 'ldl_stl': 0, 'error': None}
+census gen.cu sm 89 {'registers': 40, 'local': 0, 'instructions': 312, 'ffma': 94, 'ldl_stl': 0, 'error': None}
+census gen.cu sm 90 {'registers': 32, 'local': 0, 'instructions': 320, 'ffma': 94, 'ldl_stl': 0, 'error': None}
+census gen-fused.cu sm 80 {'registers': 40, 'local': 0, 'instructions': 400, 'ffma': 103, 'ldl_stl': 0, 'error': None}
+census gen-fused.cu sm 89 {'registers': 40, 'local': 0, 'instructions': 400, 'ffma': 103, 'ldl_stl': 0, 'error': None}
+census gen-fused.cu sm 90 {'registers': 32, 'local': 0, 'instructions': 408, 'ffma': 103, 'ldl_stl': 0, 'error': None}
+2026-11-12T19:33:56+0100 end census
+2026-11-12T19:33:56+0100 done

@@ -1,0 +1,218 @@
+{
+ "structure": "SrTiO3",
+ "natoms": 5000,
+ "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+ "module": "products.1.symmetric_contractions",
+ "method": "uniform_1d",
+ "x_shape": [
+  5000,
+  2048
+ ],
+ "weight_shape": [
+  89,
+  1664
+ ],
+ "indices_dtype": "torch.int32",
+ "x_rms": 0.15984968841075897,
+ "irreps_in": "128x0e+128x1o+128x2e+128x3o",
+ "irreps_out": "128x0e",
+ "degree": 3,
+ "product": 1,
+ "segments": [
+  16,
+  13,
+  1
+ ],
+ "terms": 94,
+ "tool": "sc0_lab",
+ "created_utc": "2026-11-12T18:28:01.872447+00:00",
+ "host": "leeloo",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "66e48e5a89a52dd014067b78123d68d20ff3f858",
+ "rounds": 15,
+ "iterations": 20,
+ "counts": {
+  "gen": {
+   "terms": 94,
+   "monomials": 94,
+   "groups": 13,
+   "fmul_monomials": 149,
+   "fp32_per_channel": 256
+  },
+  "gen-fused": {
+   "terms": 94,
+   "monomials": 94,
+   "groups": 13,
+   "fmul_monomials": 149,
+   "fp32_per_channel": 272
+  },
+  "gen-bwd": {
+   "terms": 94,
+   "monomials": 94,
+   "groups": 13,
+   "fp32_per_channel": 525
+  },
+  "fac": {
+   "nodes": 100,
+   "ops": 177,
+   "by_kind": {
+    "mul": 68,
+    "lin": 89,
+    "dot": 20
+   },
+   "output_fma": 13,
+   "check": 7.626214712601333e-09
+  }
+ },
+ "registers": {
+  "gen": 40,
+  "gen-fused": 40,
+  "gen-bwd": 64,
+  "fac-fused": 40,
+  "fac-bwd": 64,
+  "fac-bwd4": 92
+ },
+ "local_bytes": {
+  "gen": 0,
+  "gen-fused": 0,
+  "gen-bwd": 0,
+  "fac-fused": 0,
+  "fac-bwd": 0,
+  "fac-bwd4": 0
+ },
+ "check": {
+  "gen_vs_cueq": {
+   "max_abs": 1.9371509552001953e-06,
+   "max_rel_to_max": 6.702774726363714e-07,
+   "rms_rel": 2.485177788003057e-07
+  },
+  "gen_fused_vs_cueq_div": {
+   "max_abs": 1.9371509552001953e-06,
+   "max_rel_to_max": 6.702774726363714e-07,
+   "rms_rel": 2.557060270191869e-07
+  },
+  "dm_vs_autograd": {
+   "max_abs": 9.5367431640625e-07,
+   "max_rel_to_max": 2.861737300463574e-07,
+   "rms_rel": 1.1581699510543331e-07
+  },
+  "dD_vs_autograd": {
+   "max_abs": 3.337860107421875e-06,
+   "max_rel_to_max": 3.8850868122608517e-07,
+   "rms_rel": 2.2034575408724777e-07
+  },
+  "fac_vs_cueq_div": {
+   "max_abs": 1.817941665649414e-06,
+   "max_rel_to_max": 6.290296141742147e-07,
+   "rms_rel": 2.544562960338226e-07
+  },
+  "fac_dm_vs_autograd": {
+   "max_abs": 1.0728836059570312e-06,
+   "max_rel_to_max": 3.21945435644011e-07,
+   "rms_rel": 1.4752274068996485e-07
+  },
+  "fac_dD_vs_autograd": {
+   "max_abs": 2.6226043701171875e-06,
+   "max_rel_to_max": 3.052568047223758e-07,
+   "rms_rel": 2.3574369834022946e-07
+  }
+ },
+ "us": {
+  "cueq": 177.85,
+  "cueq+div": 394.25,
+  "gen": 176.91,
+  "gen-fused": 178.25,
+  "proxy": 1092.93,
+  "gen-pair": 463.09,
+  "fac-fused": 177.5,
+  "fac-pair": 463.62,
+  "fac-pair4": 464.43
+ },
+ "us_spread": {
+  "cueq": [
+   177.51,
+   178.26
+  ],
+  "cueq+div": [
+   391.32,
+   397.0
+  ],
+  "gen": [
+   176.72,
+   177.22
+  ],
+  "gen-fused": [
+   177.64,
+   178.59
+  ],
+  "proxy": [
+   1089.41,
+   1094.94
+  ],
+  "gen-pair": [
+   460.85,
+   464.74
+  ],
+  "fac-fused": [
+   177.21,
+   177.81
+  ],
+  "fac-pair": [
+   462.03,
+   464.49
+  ],
+  "fac-pair4": [
+   462.99,
+   465.49
+  ]
+ },
+ "kernels_us": {
+  "cueq": {
+   "segmented_polynomial_algo1_1": 177.85
+  },
+  "cueq+div": {
+   "triton_poi_fused_add_div_0": 276.94,
+   "segmented_polynomial_algo1_1": 117.31
+  },
+  "gen": {
+   "sc0_fwd": 176.91
+  },
+  "gen-fused": {
+   "sc0_fwd": 178.25
+  },
+  "proxy": {
+   "triton_poi_fused_add_div_0": 277.4,
+   "segmented_polynomial_algo1_1": 139.07,
+   "segmented_polynomial_bwd_algo1_2": 294.6,
+   "triton_red_fused_add_div_mul_neg_sum_0": 381.66
+  },
+  "gen-pair": {
+   "sc0_fwd": 176.27,
+   "sc0_bwd": 286.3
+  },
+  "fac-fused": {
+   "sc0_fwd": 177.5
+  },
+  "fac-pair": {
+   "sc0_fwd": 176.66,
+   "sc0_bwd": 287.0
+  },
+  "fac-pair4": {
+   "sc0_fwd": 176.7,
+   "sc0_bwd": 287.49
+  }
+ },
+ "saving_us": 216.0,
+ "gen_over_cueq": 0.9947,
+ "backward_us": {
+  "proxy": 676.28,
+  "gen-pair": 286.3,
+  "fac-pair": 287.0,
+  "fac-pair4": 287.49
+ },
+ "bucket_saving_us": 629.84,
+ "fac_over_gen_fused": 0.9958,
+ "fac_pair_over_gen_pair": 1.0011,
+ "fac_pair4_over_gen_pair": 1.0029
+}

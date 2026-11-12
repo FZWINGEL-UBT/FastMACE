@@ -392,7 +392,9 @@ def test_h200_defaults():
     assert ada in species_rewrites.GENERIC_FOLD_READOUT_TAIL_GPUS
     assert ada in planner_fixed.DECISION_66_TF32X3_OMAT0_GPUS and ada not in planner_fixed.DECISION_66_TF32X3_GPUS
     assert ada not in wprime_backward.SPLINE_VECTOR_GPUS and ada in wprime_backward.STAGE_SH_GPUS
-    assert ada not in compose_skip.COUNT_PLAN_GPUS and ada not in compose_skip.JOINED_LAYOUT_GPUS
+    assert ada not in compose_skip.COUNT_PLAN_GPUS
+    # JOINED_LAYOUT on the Triton backend (step-layout-cleanup, 12 November 2026); the 8 November tie measured it inert
+    assert ada in compose_skip.JOINED_LAYOUT_GPUS
     assert ada not in cueq_projection.CUEQ_PROJECTED_GPUS
 
 
@@ -467,3 +469,17 @@ def test_recompute_conv_weights_beside_table_w():
     interaction.wprime_backward = types.SimpleNamespace(table_w=True, attach_rebuild=lambda *a: calls.append(a))
     names = radial.attach_recompute(types.SimpleNamespace(interactions=[interaction]))
     assert calls == [] and names == ["interactions.0 (TABLE_W: the forward stores no w)"]
+
+
+def test_the_ada_takes_the_cutlass_backend_with_linear_div():
+    """step-layout-cleanup item 5 (12 November 2026, decision 66): the RTX 4000 Ada's products on CUTLASS (the sm_80
+    cubin, by model: no other sm_89 GPU was measured) with LINEAR_DIV; MD step 0.9364 / 0.9335 SrTiO3 10x10x10,
+    0.8912 / 0.8887 NbCl5 3x3x3 against the Triton backend."""
+    from fastmace.kernels.cutlass import linear_div, tf32x3
+    from fastmace.kernels.triton import tf32x3_gemm
+
+    ada = "NVIDIA RTX 4000 Ada Generation"
+    assert ada in tf32x3_gemm.CUTLASS_GPUS and ada in tf32x3.FAMILY_GPUS and ada in linear_div.LINEAR_DIV_GPUS
+    for other in ("NVIDIA L4", "NVIDIA GeForce RTX 5060 Ti"):
+        assert other not in tf32x3_gemm.CUTLASS_GPUS and other not in tf32x3.FAMILY_GPUS
+    assert (8, 9) not in tf32x3_gemm.CUTLASS_CAPABILITIES and tf32x3.FAMILY_CAPABILITIES == ()
