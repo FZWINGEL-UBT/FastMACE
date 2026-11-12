@@ -3667,3 +3667,18 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Measured on OMAT-0 medium only; the GPU set turns it on for every H200 variant and every model whose w′ paths it covers (open cell in defaults-by-gpu). A100 off until its A/B (Alex 4988692).
 - Modal cost: lab $0.06 (second), gate + A/B $1.01 (fifth, owner override).
 - Suite on 082c656c (coraline, idle check incl. our jobs): 5,726 passed, 206 skipped, 0 failed; the tip 8ed2611d adds one line to test_wprime_pullback.py (standalone: 12 passed, 2 skipped). See `results/wprime-late-pullback-20261112/README.md`.
+
+**w′ WEIGHTED_VECTOR and SKIP_OUTSIDE + HOIST_DX on the A100 (12 November 2026; conductor, decision 66): on for the A100 family.**
+- `wprime_backward.WEIGHTED_VECTOR`: a path with more than 3 edge sums that is not on SCALAR_PATHS adds `s (w x_i)` per term to dsh, instead of summing v_j and adding `w v_j` (outside review idea 1). Rounding. The template equals the conductor's `wxin_variant.py` on the H200 and A100 renders.
+- MD step b/a on Alex A100-SXM4-80GB, the A100's own default plan, OMAT-0 medium, both build orders, SrTiO3 10³ / NbCl5 3³:
+  - SKIP_OUTSIDE + HOIST_DX + WEIGHTED_VECTOR: 0.9742 / 0.9730, 0.9710 / 0.9701
+  - SKIP_OUTSIDE + HOIST_DX: 0.9849 / 0.9828, 0.9751 / 0.9751
+  - WEIGHTED_VECTOR alone: 0.9950 / 0.9914, 0.9971 / 0.9950
+  - The 3-structure gate (SrTiO3 3³, NaCl, NbCl5) passes for each. Jobs 4988118 and 4988246.
+- Census correction: the A100's own plan (STAGE_EDGES on) already has skip+hoist at 96 registers on sm_80. The 128 → 96 drop applies only to the H200 plan's render. The A100 lab's skip+hoist 1.025 ran the H200 plan through the GPU alias. The A100 gain is therefore instruction count, not occupancy.
+- `SKIP_OUTSIDE_GPUS` (shared by `HOIST_DX_GPUS`) and `WEIGHTED_VECTOR_GPUS` gain the A100 family (SXM4-80GB, SXM4-40GB, PCIe through GPUModels' family match).
+- WEIGHTED_VECTOR is off whenever LATE_PULLBACK is on (`weighted_vector_on`): LP's block parser is not checked against weighted sources. The A100 is not in `LATE_PULLBACK_GPUS`, so this changes nothing today.
+- H200: census only (1,990 → 1,957 instructions per edge, about 0.5 % of the step); WEIGHTED_VECTOR stays off there.
+- Measured on OMAT-0 medium only. Other families on the A100 get the switches through the GPU sets; this is an open cell in defaults-by-gpu.
+- Suite on the branch tip e907e9dc (murphy, idle check incl. our jobs, 13:27 UTC): 5,730 passed, 206 skipped, 0 failed.
+- See `results/wprime-h200-20261111/README.md` Part 5.

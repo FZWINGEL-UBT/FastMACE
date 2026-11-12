@@ -151,7 +151,6 @@ extern "C" __global__ void oeq_projected_backward_wprime(
     // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.
     const bool inside = r < r_max;
     const scalar_t sc = sx_inv;
-
     if (!inside) {  // skip: at or beyond the cutoff (padding edges) w = 0: nothing but zeros
         for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[edge_base + c] = scalar_t(0);
         if (lane == 0) dr[e] = scalar_t(0);

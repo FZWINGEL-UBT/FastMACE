@@ -323,10 +323,19 @@ def test_skip_outside_lab_form_is_the_template():
     assert wt.variant(wp.render(_edge16(), "float", 4, **options), "skip+vec2").count("if (!inside) {") == 1
 
 
+A100_H200_FAMILIES = (("NVIDIA H200", True), ("NVIDIA H200 NVL", True), ("NVIDIA A100-SXM4-80GB", True),
+                      ("NVIDIA A100-SXM4-40GB", True), ("NVIDIA A100-PCIE-40GB", True), ("NVIDIA A100 80GB PCIe", True),
+                      ("NVIDIA GeForce RTX 5060 Ti", False), ("NVIDIA RTX 4000 Ada Generation", False))
+
+
 def test_skip_outside_default(monkeypatch):
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", None)
     assert not wp.skip_outside_default(torch.device("cpu"))
-    assert set(wp.SKIP_OUTSIDE_GPUS) == {"NVIDIA H200"}  # H200 MD step 0.9889 / 0.9926, 0.9823 / 0.9811 (12 Nov)
+    # H200 MD step 0.9889 / 0.9926, 0.9823 / 0.9811; the A100 plan 0.9849 / 0.9828, 0.9751 / 0.9751 (12 Nov)
+    assert set(wp.SKIP_OUTSIDE_GPUS) == {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"}
+    for name, on in A100_H200_FAMILIES:
+        monkeypatch.setattr(wp, "_device_name", lambda device, name=name: name)
+        assert wp.skip_outside_default(None) is on and wp.hoist_dx_default(None) is on, name
     monkeypatch.setattr(wp, "_device_name", lambda device: "NVIDIA H200")
     assert wp.skip_outside_default(None)
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", False)  # an A/B side's choice wins over the set
@@ -338,7 +347,6 @@ def test_skip_outside_default(monkeypatch):
 def test_skip_outside_and_hoist_dx_together_only():
     """SKIP_OUTSIDE and HOIST_DX win on the H200 together only (lab 0.973; alone 1.021 and 0.999): one GPU set."""
     assert wp.HOIST_DX_GPUS is wp.SKIP_OUTSIDE_GPUS
-    assert "NVIDIA A100-SXM4-80GB" not in wp.SKIP_OUTSIDE_GPUS  # A100 lab: both 1.025
 
 
 def test_skip_outside_compiles_with_nvrtc():
@@ -380,12 +388,98 @@ def test_hoist_dx_and_channel_vector_sources():
         wt.hoist("no channel loop here")
 
 
+def _quadrupole(channels=64):
+    """``_edge16`` plus a 0e x 2e -> 2e path: five edge sums v_j (WEIGHTED_VECTOR's J > 3)."""
+    schedule = _edge16()
+    slot = lambda name, start, component, dim: SimpleNamespace(name=name, start=start, component=component,  # noqa: E731
+                                                              irrep_dim=dim)
+    grad = slot("gx0", 0, 0, 1)
+    outs = [SimpleNamespace(accumulator=slot(f"o2{m}", 4 * channels, m, 5),
+                            terms=(SimpleNamespace(input_component=0, edge_component=m, coefficient=-0.25,
+                                                   input_accumulator=grad),)) for m in range(5)]
+    path = SimpleNamespace(input_start=0, input_irrep_dim=1, edge_start=4, edge_irrep_dim=5,
+                           weight_start=2 * channels, edge_mul=1, outputs=tuple(outs))
+    schedule.paths = (*schedule.paths, path)
+    schedule.output_slots = (*schedule.output_slots, *(o.accumulator for o in outs))
+    schedule.output_dim, schedule.weight_numel = 9 * channels, 3 * channels
+    return schedule
+
+
+def test_weighted_vector_source():
+    """WEIGHTED_VECTOR (12 November 2026): a path with more than 3 edge sums adds w x_i c g_o per term, without v_j;
+    paths with 3 or fewer, and SCALAR_PATHS' paths, keep their form."""
+    options = dict(vector=2, table_w=True, factored=True, horner=True)
+    plain = wp.render(_quadrupole(), "float", 4, **options)
+    source = wp.render(_quadrupole(), "float", 4, weighted_vector=True, **options)
+    flat, flat_plain = " ".join(source.split()), " ".join(plain.split())
+    assert "WEIGHTED_VECTOR" not in plain and flat.count("WEIGHTED_VECTOR:") == 1
+    for j in range(4, 9):  # the 2e path: per term, from radial_weight, no v_j
+        assert f"edge_gradient[{j}] += scaled * (radial_weight * input_value);" in flat
+        assert f"edge_gradient[{j}] += scaled_weight * v_" in flat_plain
+        assert f"edge_gradient[{j}] += scaled_weight * v_" not in flat
+    assert "edge_gradient[2] += scaled_weight * v_1;" in flat  # the 1o path (J = 3) keeps v_j
+    # with FACTORED_SCALE and without FOLD_ALPHA the path's alpha goes into the weight once
+    scaled = " ".join(wp.render(_quadrupole(), "float", 4, scale=True, weighted_vector=True, **options).split())
+    assert "const scalar_t vector_weight = radial_weight * static_cast<scalar_t>(0x1.0000000000000p-2f);" in scaled
+    assert "edge_gradient[4] -= scaled * (vector_weight * input_value);" in scaled
+    folded = " ".join(wp.render(_quadrupole(), "float", 4, scale=True, fold_alpha=True, weighted_vector=True,
+                                **options).split())
+    assert "vector_weight" not in folded and "edge_gradient[4] -= scaled * (radial_weight * input_value);" in folded
+    # SCALAR_PATHS takes the scalar-input 2e path first
+    both = wp.render(_quadrupole(), "float", 4, scalar_paths=True, weighted_vector=True, **options)
+    assert both == wp.render(_quadrupole(), "float", 4, scalar_paths=True, **options)
+    with pytest.raises(ValueError, match="weighted_vector"):
+        wp.render(_quadrupole(), "float", 4, vector=2, table_w=True, weighted_vector=True)  # no FACTORED
+
+
+def test_weighted_vector_default(monkeypatch):
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", None)
+    assert not wp.weighted_vector_default(torch.device("cpu"))
+    # the A100 family (decision 66, 12 Nov: with SKIP_OUTSIDE + HOIST_DX 0.9742 / 0.9730, 0.9710 / 0.9701); not the H200
+    assert set(wp.WEIGHTED_VECTOR_GPUS) == {"NVIDIA A100-SXM4-80GB"}
+    for name, on in A100_H200_FAMILIES:
+        monkeypatch.setattr(wp, "_device_name", lambda device, name=name: name)
+        assert wp.weighted_vector_default(None) is (on and "A100" in name), name
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", True)
+    assert wp.weighted_vector_default(torch.device("cpu"))
+
+
+def test_weighted_vector_yields_to_late_pullback(monkeypatch):
+    """WEIGHTED_VECTOR is off under LATE_PULLBACK (its block parser is not checked against weighted sources) and on
+    FACTORED kernels only; the A100 is not in LATE_PULLBACK_GPUS, so the guard changes nothing there today."""
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", None)
+    monkeypatch.setattr(wp, "_device_name", lambda device: "NVIDIA A100-SXM4-80GB")
+    assert wp.weighted_vector_on(None, True, False)
+    assert not wp.weighted_vector_on(None, True, True) and not wp.weighted_vector_on(None, False, False)
+    assert "NVIDIA A100-SXM4-80GB" not in wp.LATE_PULLBACK_GPUS
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", True)  # an A/B side's True still yields to LATE_PULLBACK
+    assert not wp.weighted_vector_on(None, True, True)
+    import inspect  # WPrimeBackward decides LATE_PULLBACK before the render and passes it to the guard
+    init = inspect.getsource(wp.WPrimeBackward.__init__)
+    assert init.index("self.late_pullback = (") < init.index("weighted_vector_on(device, self.factored, "
+                                                              "self.late_pullback)") < init.index("render(")
+
+
+def test_weighted_vector_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming import wprime_tuning as wt
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    options = dict(vector=2, table_w=True, factored=True, scale=True, horner=True, weighted_vector=True,
+                   blocks=[(1, [0]), (3, [64]), (5, [256])], stage_dout=True, stage_sh=4)
+    for capability in ((12, 0), (9, 0), (8, 0)):
+        source = wp.render(_quadrupole(), "float", 4, skip_outside=True, **options)
+        assert compile_cubin(source, capability) and compile_cubin(wt.hoist(source), capability)
+
+
 def test_hoist_dx_and_channel_vector_defaults(monkeypatch):
     cpu = torch.device("cpu")
     monkeypatch.setattr(wp, "HOIST_DX", None)
     monkeypatch.setattr(wp, "CHANNEL_VECTOR", None)
     assert not wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 0
-    assert set(wp.HOIST_DX_GPUS) == {"NVIDIA H200"} and len(wp.CHANNEL_VECTOR_GPUS) == 0
+    assert set(wp.HOIST_DX_GPUS) == {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} and len(wp.CHANNEL_VECTOR_GPUS) == 0
     monkeypatch.setattr(wp, "HOIST_DX", True)
     monkeypatch.setattr(wp, "CHANNEL_VECTOR", 2)
     assert wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 2
