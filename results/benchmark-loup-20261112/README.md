@@ -1,0 +1,121 @@
+# Benchmark_loup full suite, 12 November 2026
+
+The full suite of [MargrafGroup/Benchmark_loup](https://github.com/MargrafGroup/Benchmark_loup) (branch `develop`, commit
+`075bf48`) on RTX 4000 Ada workstations, run with **loupMD/FastMACE `c2ac5f53`** (main on 12 Nov 2026).
+
+**Status:** the workstation half is complete. The A100 half (Alex, A100-SXM4-80GB) is **postponed until the code is
+frozen for the paper** (owner, 12 Nov 2026: stop the Alex jobs while the code still changes). Jobs 4988574 and
+4988575 were cancelled while still queued and never ran. When the conductor names the frozen commit, both halves are
+rerun on it: Alex on that commit, and the workstation half again if the code changed in between.
+
+## What ran
+
+| item | value |
+|---|---|
+| suite | Benchmark_loup `develop` 075bf48ed9156d36e1e74154d4acbbf9f13f5c41, `reproduce/run_all.sh` per system and size |
+| FastMACE | c2ac5f535fbe0fc8db7d2539f2640f3b33a0fd6b (the suite pins 27b3982; installed from a git bundle of main) |
+| Symmetrix-XL | 93a747df7e34347cc20fc9655e23a87b4fcb915c (pinned), CUDA backend `cuda13-sm89` |
+| LAMMPS | stable_30Sep2026_update1, 098ffdefa525cabc82272925de02e9884f58c657 (pinned), Kokkos CUDA, `symmetrix/mace/float32/kk` |
+| model | MACE-OMAT-0 medium, sha256 d4b14be9… (pinned); Symmetrix-XL JSON 67c87dbe… (identical to the reference run) |
+| Python envs | the suite's own uv venvs, Python 3.12.16: torch 2.14.1+cu130, mace-torch 0.3.16, cuequivariance 0.12.0 (fastmace, mace-cueq); torch 2.14.1+cpu (symmetrix-xl). All pins match (`verify_install`). |
+| toolchain | conda-forge CUDA 13.2.86, gcc 13.4.0 (pinned list, sysroot changed; see deviations) |
+| GPU | NVIDIA RTX 4000 Ada Generation, 20 GB, sm89, driver 595.99.02 |
+| hosts | leto (Xeon w7-2595X), leeloo (Xeon w5-2565X), murphy; Ubuntu 22.04, glibc 2.35. All codes of one table row ran on the same host. |
+| protocol | the suite's: float32, 5 warm-up + 20 measured calls/steps, 3 fresh processes per implementation, one process at a time; errors against MACE + cuEquivariance float32 on the same structure |
+| idle check | right before every item (`_run/stage/idle.sh`): no process on the GPU and no other user's process above 50 % CPU |
+
+Install prefix, inputs and full raw output (including the `.npy`, `.extxyz`, `.dump`, PDF/SVG files left out here) are
+under `/mnt/homes/zwingel/benchmark-loup-20261112/` (`prefix/`, `results/`, `logs/`, `status/`).
+
+## Results: RTX 4000 Ada
+
+Median of 3 trials, µs per atom per call (ASE rows) or per MD step (MD rows). Throughput in million atom-steps per
+second is 1 / (µs per atom). `(x) r`: the suite rejected all three trials (see below); x is their raw median.
+OOM: out of GPU memory on the 20 GB card.
+
+| system | atoms | host | FM ASE | SXL ASE | SXL LMP static | MACE+cuEq | FM MD NVE | SXL LMP NVE | FM MD Langevin | SXL LMP Langevin |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| SrTiO3 | 5,000 | leto | 3.91 | 8.03 | 8.10 | 51.88 | 3.19 | 8.15 | 3.10 | 8.26 |
+| Cu(111)-H2O 1x1 | 272 | leto | 21.57 | 12.48 | 11.68 | 119.48 | 6.04 | (11.92) r | 5.77 | (11.89) r |
+| Cu(111)-H2O 2x2 | 1,088 | leto | 6.49 | 9.09 | 8.69 | 56.43 | 3.71 | (9.06) r | 3.63 | (8.92) r |
+| Cu(111)-H2O 3x3 | 2,448 | leto | 4.55 | 8.52 | 8.55 | 53.72 | 3.56 | (8.65) r | 3.50 | (8.62) r |
+| Cu(111)-H2O 4x4 | 4,352 | leto | 4.36 | 8.78 | 8.95 | 55.36 | 3.70 | (8.95) r | 3.57 | (9.01) r |
+| Cu(111)-H2O 4x5 | 5,440 | leto | 4.43 | 8.92 | 8.92 | 55.10 | 3.74 | (8.94) r | 3.62 | (8.97) r |
+| Cu(111)-H2O 6x6 | 9,792 | leeloo | 4.55 | 8.61 | 8.58 | 64.32 | 3.78 | (8.70) r | 3.63 | (8.71) r |
+| Cu(111)-H2O 8x8 | 17,408 | murphy | 4.30 | 8.89 | 8.75 | OOM | 3.89 | (8.89) r | 3.68 | (8.90) r |
+| Cu(111)-H2O 12x12 | 39,168 | leeloo | 4.36 | 9.04 | 8.89 | OOM | 3.95 | (8.96) r | 3.59 | (9.00) r |
+| Cu(111)-H2O 20x20 | 108,800 | murphy | 4.49 | 9.31 | 9.17 | OOM | 4.06 | (9.30) r | 3.69 | (9.34) r |
+
+FM = FastMACE (ASE: `fm.calc`, compiled, skin 0.5, float32 energy; MD: its own engine with CUDA graphs);
+SXL = Symmetrix-XL (ASE calculator, or the LAMMPS pair style). Cu(111)-H2O is the suite's `cu111_h2o_omat0` system
+(OMAT-0 on the Madsen structures, timestep 0.5 fs).
+
+Examples of step time and throughput: SrTiO3 FastMACE MD NVE 16.0 ms/step (62.7 steps/s, 0.31 M atom-steps/s) against
+Symmetrix-XL LAMMPS NVE 40.8 ms/step (24.5 steps/s, 0.12 M atom-steps/s); Cu(111)-H2O 20x20 FastMACE MD NVE 442 ms/step
+(2.3 steps/s) against Symmetrix-XL LAMMPS NVE (raw) 1,012 ms/step (1.0 steps/s).
+
+Errors against MACE + cuEquivariance (SrTiO3, median force RMSE): FastMACE 0.0055 meV/Å (ASE), 0.0056 (MD);
+Symmetrix-XL 0.0167 (ASE and LAMMPS static), 0.0177 (LAMMPS NVE). Cu(111)-H2O up to 6x6: FastMACE 0.005–0.006,
+Symmetrix-XL ASE 0.061–0.063 meV/Å. From 8x8 up there is no reference (MACE+cuEq OOM), so no error columns.
+
+The full tables per system and size, with min–max, errors, temperatures, neighbour rebuilds and peak memory, are in
+[tables_rtx4000ada.md](tables_rtx4000ada.md) (generated by [summarize.py](summarize.py) from `rtx4000ada/`). The suite's
+own tables are `rtx4000ada/[cu111_h2o_omat0/<size>/]results/comparison_*.csv`; the SrTiO3 plots are
+`rtx4000ada/results/comparison_{calc,md,all}.png`.
+
+## Failures and skipped rows
+
+| case | what happened |
+|---|---|
+| MACE + cuEq, Cu(111)-H2O 8x8, 12x12, 20x20 | `torch.OutOfMemoryError` in all 3 trials (the 8x8 cell needs a 6.5 GiB allocation on top of 17 GiB). Capacity limit of the 20 GB card; the suite's series script expects this. No reference, so no error columns at these sizes. |
+| Symmetrix-XL LAMMPS NVE and Langevin, all Cu(111)-H2O sizes | All trials ran (exit 0) but the suite rejects them: `lammps_md_post.py` accepts a trial only with 0 neighbour-list builds in the timed window, and every trial had 1 (water moves up to 0.37 Å in 25 steps at 0.5 fs; skin 0.5 Å). Their raw times are shown as `(x) r`. On SrTiO3 all trials were accepted (0 builds). |
+| `cu111_h2o` (Madsen MACE model) | Not run: `model checkpoint not found: …/iter10_0_swa.model`. The suite expects the model to be copied into the prefix by hand from `~/madsen_cu111/models/`; it is not on any of our NFS homes. |
+| `cantor` (CoCrFeMnNi) | Inputs only, as the suite allows (`SYSTEM_READY=0`): structure checksums extxyz 32ecedc7…, data 36f3f868…. No timed runs. |
+| Symmetrix-XL ASE, every size | Each trial's log ends with `Kokkos::Cuda ERROR: Failed to call Kokkos::Cuda::finalize()` at process exit; the trials exit 0 and their records are complete. |
+| `verify_install` | 13 PASS, 2 FAIL, both from the check script, not the install: "Symmetrix-XL doctor" looks for a `Selected backend:` line this Symmetrix-XL no longer prints (`backend list` shows `cuda13-sm89` usable, `doctor` exits 0); "codes agree" imports numpy in the system Python, which has none. Recomputed with the venv's numpy: FastMACE \|dE\| 1.0e-4 eV, max \|dF\| 1.9e-5 eV/Å; Symmetrix-XL 2.0e-4 eV, 4.8e-5 eV/Å (tolerances 5e-3 and 2e-3): PASS. |
+
+## Equilibration, temperatures, rebuilds, memory (for the paper's matched comparison)
+
+- **Equilibration before the timed window: none, in every row.** The suite does 5 warm-up calls/steps and then 20
+  measured ones, from the input structure.
+- **Temperature at start and end of the timed window:** recorded only by LAMMPS (thermo at steps 5 and 25), median of
+  3 trials:
+  - SrTiO3: NVE 3.0 → 7.9 K, Langevin 8.3 → 25.4 K. The LAMMPS NVE and Langevin inputs assign no initial velocities,
+    so they start from rest (0 K at step 0).
+  - Cu(111)-H2O, all sizes: NVE 45.5 → 113 K, Langevin 48 → 121 K.
+  - FastMACE MD rows: **not recorded** (the suite's `fastmace_md_bench.py` stores no temperature). On SrTiO3 its NVE run
+    ends with the same maximum displacement (0.081 Å) as LAMMPS NVE, which suggests the same start from rest.
+- **Neighbour rebuilds in the timed window:** LAMMPS SrTiO3 0 (all rows), LAMMPS Cu(111)-H2O 1 in every MD trial (and
+  0 in static). FastMACE (ASE and MD): **not recorded** by the suite.
+- **Peak GPU memory per engine:** FastMACE and MACE+cuEq record `torch.cuda.max_memory_allocated` (SrTiO3: FastMACE
+  1,961 MiB, MACE+cuEq 6,324 MiB; Cu(111)-H2O 20x20: FastMACE 6,361 MiB ASE, 6,291 MiB MD); Symmetrix-XL ASE records
+  only nvidia-smi memory after the run (SrTiO3 906 MiB, 20x20 7,002 MiB); LAMMPS: **not recorded** (`gpu_state.log`
+  samples only between blocks).
+
+## Deviations from the suite's pinned setup
+
+All were needed to run the suite at all on these machines; none changes a benchmark script.
+
+1. FastMACE commit c2ac5f53 instead of the pinned 27b3982 (task), from a git bundle (the repository is private).
+2. Toolchain sysroot glibc 2.34 (`sysroot_linux-64-2.34-h087de78_3`, `kernel-headers_linux-64-5.14.0-he073ed8_3`)
+   instead of 2.39: the pinned sysroot builds binaries that need `GLIBC_2.38`, and the workstations have 2.35.
+   (`_run/stage/sysroot_patch.sh`)
+3. `sxl_env` (Symmetrix-XL and LAMMPS processes only) puts the toolchain's `lib/` (conda-forge libstdc++) first on
+   `LD_LIBRARY_PATH`: the gcc 13 objects need `GLIBCXX_3.4.31`, Ubuntu 22.04's libstdc++ is older.
+   (`_run/stage/libstdcxx_patch.sh`)
+4. Symmetrix-XL JIT cache not in `/tmp`: Symmetrix-XL refuses a cache below a world-writable non-sticky directory, and
+   `/mnt/homes` and `/mnt/homes/zwingel` are 0777. With the conductor's approval it was a private directory (mode 700)
+   on each host's local disk, `/home/zwingel/benchmark-loup-20261112-jit`, used for the JIT cache only and **deleted
+   by each run job on exit; it is gone on leto, leeloo and murphy** (checked 12 Nov 12:57). Everything else
+   (HOME, TMPDIR, caches, prefix) was under `/mnt/homes/zwingel/benchmark-loup-20261112`.
+5. `git safe.directory '*'` in the run's own HOME (`benchmark-loup-20261112/home/.gitconfig`): NFS shows the owner of
+   the clones as UNKNOWN.
+
+## Files
+
+| path | content |
+|---|---|
+| `rtx4000ada/` | the suite's `--out` tree: SrTiO3 at the top, `cu111_h2o_omat0/<size>/`, `cantor/`, `cu111_h2o/`; per row `FastMACE/`, `MACE-cueq/`, `symmetrix-xl/` trial JSONs and logs, `logs/run_all.log`, `logs/gpu_state.log`, `logs/environment/` (host, nvidia-smi, pip freezes, commits, checksums), `results/comparison_*.csv` |
+| `rtx4000ada/_run/` | job scripts (`stage/`) and per-host status files (`status/`, CET) |
+| `tables_rtx4000ada.md` | full per-row tables |
+| `summarize.py` | builds `tables_*.md` from a results tree (stdlib only) |
