@@ -219,6 +219,13 @@ CUTLASS \cite{cutlass} and cuEquivariance \cite{cuequivariance} implement indivi
 differentiation connects custom reverse kernels to the rest. Appendix~\ref{app:records} lists versions and the
 studies that deviate from them.
 
+\paragraph{Supported domain.}
+The implementation enforces several limits, which are separate from the gaps in validation. Every path requires
+periodic boundaries in all three directions. The tiled path of Section~\ref{sec:tiled} accepts two-interaction
+MACE models of the standard scale-shift form only; it rejects models with joint embeddings and the polarisable
+family. Its per-tile neighbour lists need a cell at least three cutoff lengths wide along every lattice
+direction. The radial tables cover distances from 0.3\,\angstrom{} (Section~\ref{sec:tables}).
+
 \subsection{The acceptance rule}
 \label{sec:contract}
 
@@ -439,8 +446,9 @@ The kernels descend from the receiver-streaming convolution of Fuchs \cite{fuchs
 OpenEquivariance \cite{bharadwaj2025oeq}, which adapts the schedule of Sobek \cite{chorosajev2026sobek}; the
 adapted files keep the upstream licence. As there, the source of the forward and reverse kernels is rendered at
 setup from the model's coupling paths, tensor layout and spline grid and compiled at run time. The receiver-major layout with spline weights was taken from
-Symmetrix-XL after a profile on 6 November showed its forward at 952\us{} against 1{,}623\us{} for ours on the
-H200; with that layout ours takes 629\us{} (Table~\ref{tab:profile}).
+Symmetrix-XL after a profile on 6 November showed its forward at 952\us{} on the H200 against 1{,}713\us{} for
+ours, 1{,}623\us{} in the kernel and 90\us{} in the radial table that fed it; with that layout ours takes
+629\us{} (Table~\ref{tab:profile}).
 
 \paragraph{Reverse without stored weights.}
 For one edge, path and channel let $g_o$ be the adjoint of the receiver's message. With
@@ -486,15 +494,15 @@ the receiver's message is read from a row staged in shared memory.}
 
 \paragraph{What limits these kernels.}
 Table~\ref{tab:profile} shows that the second interaction is about 53\,\% of the kernel time of a force call. On
-the A100 both of its kernels are bound by the fused multiply-add units (84--85\,\% busy); on the H200 they are
-bound by instruction issue. This shapes what further changes can gain (Section~\ref{sec:limits}).
+the A100 (the PCIe board of the table) both of its kernels are bound by the fused multiply-add units
+(84--85\,\% busy); on the H200 they are bound by instruction issue. This shapes what further changes can gain (Section~\ref{sec:limits}).
 
 \begin{table}[t]
 \centering
 \small
 \begin{tabular}{lrrrr}
 \toprule
- & \multicolumn{2}{c}{H200} & \multicolumn{2}{c}{A100-SXM4-80GB} \\
+ & \multicolumn{2}{c}{H200} & \multicolumn{2}{c}{A100 80GB PCIe} \\
 Component & $\mu$s & share & $\mu$s & share \\
 \midrule
 Second interaction, reverse  & 1{,}089 & 33\,\% & 2{,}256 & 35\,\% \\
@@ -508,8 +516,9 @@ Total                        & 3{,}258 &  & 6{,}512 & \\
 \bottomrule
 \end{tabular}
 \caption{Kernel time of one force call (OMAT-0 medium, SrTiO$_3$, 5{,}000 atoms), from a hardware-counter
-profile of 9 November 2026. The profile predates the generated contraction on the H200 and the hybrid product on
-the A100.}
+profile of 9 November 2026 (revisions \texttt{c520e074} and \texttt{0df22417}). The A100 column is a PCIe
+board, not the SXM4 board of Table~\ref{tab:steps}, whose own profile totals 6{,}209\us{} in another
+configuration. The profiles predate the generated contraction on the H200 and the hybrid product on the A100.}
 \label{tab:profile}
 \end{table}
 
@@ -517,8 +526,8 @@ the A100.}
 \label{sec:gemm}
 
 After the edge work, dense per-atom products are the next largest cost. Tensor cores multiply at reduced
-precision, so a float32 operand is split into a high part and a residual, and three reduced-precision products
-recover the high--high term and the two cross terms \cite{ootomo2022tf32}. The residual--residual term is
+precision, so a float32 operand is split into a high part and a residual \cite{markidis2018tensorcores}, and
+three reduced-precision products recover the high--high term and the two cross terms \cite{ootomo2022tf32}. The residual--residual term is
 dropped. FastMACE uses the CUTLASS kernel for this \cite{cutlass}, with the division by the density and the
 species selection fused into its output stage. The same three-product method has been deployed for another
 family of potentials \cite{nvidia2026tf32x3}; what is specific here is its integration into MACE's linear maps
@@ -541,10 +550,19 @@ terms; it is scaled back and added with a fused multiply-add. All accumulation i
 kernel needs three TF32 instructions for the same step.
 
 Since $|A_l'| < 2|A|$ must be representable in half precision, operands must stay below 32{,}752 in magnitude,
-and below $2^{-14}$ the cross term loses bits. An offline probe of this model found the largest operand at 779,
-a factor 42 below the limit, but there is no run-time guard. Against float64, the relative error of the hybrid
-was $1.1$ to $2.7\times10^{-7}$ on nine representative shapes, the same range as the three-product kernel. It ran
-at 0.85 to 1.00 of that kernel's time per shape and 0.87 in the sum.
+and below $2^{-14}$ the cross term loses bits. There is no run-time guard, and the margin of the production
+graph is not established. An offline probe found the largest operand at 779, a factor 42 below the limit, but
+it ran the reference MACE model, whose intermediates are not the aggregated features, composed matrices and
+adjoints that the rewritten graph multiplies.
+
+The accuracy was measured on synthetic operands, Gaussian matrices with log-normal row scaling in nine
+representative shapes, as
+\begin{equation}
+\max_{ij}\; \frac{\bigl|\widehat C - C\bigr|_{ij}}{\bigl(|A|\,|B|\bigr)_{ij}}
+\end{equation}
+against a float64 product $C$. This bounds the error by the product of magnitudes; where terms cancel, the
+relative error of an output element can be much larger. The hybrid gave $1.1$ to $2.7\times10^{-7}$, the same
+range as the three-product kernel. It ran at 0.85 to 1.00 of that kernel's time per shape and 0.87 in the sum.
 
 \begin{table}[t]
 \centering
@@ -739,7 +757,8 @@ by spreading them over GPUs; FastMACE has no multi-GPU path and reaches them by 
 \paragraph{Precision of the stored state.}
 With host state and in-place rows, the default setting chooses the storage precision itself. It keeps float32
 while the state fits in host memory, then drops the kept neighbour lists, and if the state still does not fit it
-stores float16. Float16 state fails the acceptance rule by factors of 12 to 51. A caller who needs float32
+stores float16. With float16 state the force errors are 12 to 51 times the float32 reference error, which is 4
+to 17 times the limit, so it fails the acceptance rule. A caller who needs float32
 throughout has to switch this choice off.
 
 \subsection{Coordinates}
@@ -869,7 +888,7 @@ them.
 \cmidrule(lr){3-4}\cmidrule(lr){5-5}
 GPU & Date of record & ms per step & $\mu$s per atom and step & ms per step \\
 \midrule
-H200            & 9 Nov 2026      & 3.40 / 3.37   & 0.68 & 1.09 \\
+H200            & 9 Nov 2026      & 3.40 / 3.37   & 0.68 & 1.09$^{\dagger}$ \\
 A100-SXM4-80GB  & 11 Nov 2026     & 6.24 / 6.23   & 1.25 & 1.67$^{\ast}$ \\
 RTX 4000 Ada    & 10--11 Nov 2026 & 17.67 / 17.76 & 3.5  & 3.88 / 3.90 \\
 RTX 5060 Ti     & 10--11 Nov 2026 & $\approx 15.4$ & 3.1 & $\approx 3.42$ \\
@@ -878,14 +897,18 @@ RTX 5060 Ti     & 10--11 Nov 2026 & $\approx 15.4$ & 3.1 & $\approx 3.42$ \\
 \caption{Recorded MD step times under the paired protocol: medians of six block means, two build orders where
 both are on record. Each row comes from its own adoption study and source revision; this is not a controlled
 comparison of the GPUs. $^{\ast}$The mean over the window is 1.84\ms{}: the first block took 2.7\ms{} in both
-build orders and the other five 1.65 to 1.67\ms{}.}
+build orders and the other five 1.65 to 1.67\ms{}. $^{\dagger}$From the baseline side of a separate study at
+another revision, with eight blocks; the means over the window are 1.15 and 1.17\ms{}, the first block taking
+1.6\ms{}.}
 \label{tab:steps}
 \end{table}
 
 Table~\ref{tab:steps} gives the recorded times. For SrTiO$_3$ on the H200 and the A100 the median and the mean
-over the window agree to 0.25\,\%. For NbCl$_5$ on the A100 they do not: the first of the six blocks is 60\,\%
-slower than the rest, on both sides and in both orders, and the cause has not been examined. The median
-describes the steady state; a user's first 256 steps cost more. Block-level data for the RTX 4000 Ada and RTX
+over the window agree to 0.25\,\%. For NbCl$_5$ they do not, on either GPU: the first block is 60\,\% slower
+than the rest on the A100 and about 50\,\% slower on the H200, on both sides and in both orders, which puts the
+mean 10\,\% and 6 to 7\,\% above the median. The cause has not been examined. The median describes the steady
+state; a user's first 256 steps cost more. The H200 value for NbCl$_5$ also comes from another study and
+revision than the H200 value for SrTiO$_3$ (Appendix~\ref{app:records}). Block-level data for the RTX 4000 Ada and RTX
 5060 Ti rows is not on record. Appendix~\ref{app:history} shows how the A100's time fell between 3 and
 11 November.
 
@@ -1016,9 +1039,10 @@ intermediates that a hand-scheduled reverse pass does not.
 \fill[cdense] (11.23,2.4) rectangle (11.63,3.1);
 \fill[cother] (11.63,2.4) rectangle (14.20,3.1);
 \node[anchor=west] at (14.25,2.75) {14.2};
-% FastMACE, 6 Nov: 0.43 | 1.62 | 1.83 | 0.83 | 1.04 = 5.75 ms
-\fill[cfirst] (0,1.2) rectangle (0.43,1.9);
-\fill[cfwd]   (0.43,1.2) rectangle (2.05,1.9);
+% FastMACE, 6 Nov: 0.34 | 1.71 | 1.83 | 0.83 | 1.04 = 5.75 ms
+% (first interaction: 218 + 118 us; second forward: 1,623 us kernel + 90 us radial table that feeds it)
+\fill[cfirst] (0,1.2) rectangle (0.34,1.9);
+\fill[cfwd]   (0.34,1.2) rectangle (2.05,1.9);
 \fill[crev]   (2.05,1.2) rectangle (3.88,1.9);
 \fill[cdense] (3.88,1.2) rectangle (4.71,1.9);
 \fill[cother] (4.71,1.2) rectangle (5.75,1.9);
@@ -1044,17 +1068,18 @@ intermediates that a hand-scheduled reverse pass does not.
 \end{tikzpicture}
 \caption{Kernel time of one force call on the H200 by stage (SrTiO$_3$, 5{,}000 atoms), from three separate
 profiles: Symmetrix-XL~0.1.2 under a tracing profiler on 6 November, FastMACE on the same day, and FastMACE on
-9 November (Table~\ref{tab:profile}). ``Other'' includes the symmetric contractions.}
+9 November (Table~\ref{tab:profile}). ``Other'' includes the symmetric contractions. In the FastMACE profile of
+6 November a separate radial-table kernel (0.09\ms) fed the second interaction and is counted with its forward.}
 \label{fig:stages}
 \end{figure}
 
 \paragraph{Where the difference arose.}
 Figure~\ref{fig:stages} shows the stages of the force call in the configurations that were profiled. Geometry,
 edge counts and padded capacities change with the protocol, so these are the stage costs of those profiles, not
-of every run. On 6 November Symmetrix-XL spent 6.4\ms{} in the first interaction, which FastMACE had already reduced to 0.4\ms{}
-by the rewrite of Section~\ref{sec:first}, and 3.9\ms{} in the reverse of the second interaction against
-1.8\ms{}. Its forward of the second interaction was the faster one, 0.95 against 1.62\ms{}, and FastMACE adopted
-that layout two days later.
+of every run. On 6 November Symmetrix-XL spent 6.4\ms{} in the first interaction, which FastMACE had already
+reduced to 0.3\ms{} by the rewrite of Section~\ref{sec:first}, and 3.9\ms{} in the reverse of the second
+interaction against 1.8\ms{}. Its forward of the second interaction was the faster one, 0.95 against 1.71\ms{}
+with the radial table that fed ours, and FastMACE adopted that layout two days later.
 
 \paragraph{Since then.}
 FastMACE's step has fallen from 5.72 to 3.40\ms{} on the H200 and from 24.4 to about 15.4\ms{} on the RTX 5060
@@ -1274,9 +1299,12 @@ neuroevolution potentials of GPUMD \cite{fan2022gpumd}; FastMACE and Symmetrix-X
 and change its execution.
 
 \paragraph{Tables and tensor cores.}
-Tabulating embedding networks is used for Deep Potential models \cite{lu2022dpcompress}. Splitting float32
-operands to recover accuracy on tensor cores is due to Ootomo and Yokota \cite{ootomo2022tf32}, and the numerical
-behaviour of the hardware is analysed in \cite{fasi2021tensorcores}. NVIDIA has described the three-product
+Tabulating embedding networks is used for Deep Potential models \cite{lu2022dpcompress}. Splitting a float32
+operand into a reduced-precision part and a residual, with four tensor-core products, goes back to Markidis et
+al.\ \cite{markidis2018tensorcores}. Ootomo and Yokota \cite{ootomo2022tf32} refined it: they accumulate in
+float32 outside the tensor cores, scale the residual against underflow, use TF32, and drop the product of the
+two residuals, which leaves three products. The numerical behaviour of the hardware is analysed in
+\cite{fasi2021tensorcores}. NVIDIA has described the three-product
 method for the PET family of potentials through CUTLASS, and a variant with nine bfloat16 products on newer
 hardware \cite{nvidia2026tf32x3}; it reports force errors of about three times the run-to-run float32
 difference and energy conservation close to float32. Neither variant combines the two cross terms. Our hybrid
@@ -1304,7 +1332,7 @@ product replaces two of the three passes by one half-precision pass.
 \item \textbf{Memory.} FastMACE used 1.6 to 1.8 times the GPU memory of Symmetrix-XL in the runs of
       5 November.
 \item \textbf{No run-time guards} for the operand range of the hybrid product or for distances below
-      0.3\,\angstrom{}.
+      0.3\,\angstrom{}, and the operand range of the production graph has not been measured.
 \item \textbf{Start-up cost} is excluded from all timings. Recorded setup times for the benchmark were 33 to
       48\,s with warm caches and 94 to 110\,s on a first run; in the one record that separates it, fitting the
       radial tables took about 35\,s of a first build.
@@ -1483,6 +1511,8 @@ The paired protocol of Section~\ref{sec:protocols} is 200 warm-up steps and six 
 in one process. The following studies used another schedule:
 \begin{itemize}\setlength{\itemsep}{0.1em}
 \item \textbf{Radial tables, first evidence} (Table~\ref{tab:ab}, first row): eight blocks of 200 steps.
+\item \textbf{H200, NbCl$_5$} (Table~\ref{tab:steps}): eight blocks of 256 steps, the baseline side of a
+      separate study at revision \texttt{e3049399}; the H200 value for SrTiO$_3$ is from \texttt{5c5ade67}.
 \item \textbf{Cell-list screen} (Section~\ref{sec:large}; the 20{,}480- and 40{,}000-atom rows of
       Table~\ref{tab:size}): six blocks of 128 steps.
 \item \textbf{69{,}120 atoms} (Table~\ref{tab:size}): not paired. Separate processes, 600 timed steps after
@@ -1493,8 +1523,10 @@ in one process. The following studies used another schedule:
       MACE-POLAR-1 used the standard schedule.
 \item \textbf{OMAT-0 small} (Tables~\ref{tab:sx} and~\ref{tab:models}): not paired. One process from a thermal
       start, 200 timed steps after 100.
-\item \textbf{Tiled path} (Table~\ref{tab:tiledab}): alternating blocks of force calls, not MD steps; four
-      blocks of two calls for the captured graphs.
+\item \textbf{Tiled path} (Table~\ref{tab:tiledab}, and the device-state rows of Table~\ref{tab:capacity}):
+      alternating blocks of force calls, not MD steps; four blocks of two calls per side for the captured
+      graphs, from which the A100's 2.04\,s comes. The RTX 5060 Ti's 6.1\,s is the steady call of one profile
+      run. The host-state rows are one compiled call after one eager call.
 \end{itemize}
 
 \paragraph{Records.}
@@ -1510,15 +1542,17 @@ repository that holds the job scripts, logs and results of one study.
 \toprule
 Item & Record & Revision & Protocol \\
 \midrule
-Profile (Table~\ref{tab:profile}) & \texttt{step-limiters-20261109} & -- & counter profile \\
+Profile (Table~\ref{tab:profile}) & \texttt{step-limiters-20261109} & \texttt{c520e074}, \texttt{0df22417} & counter profile \\
 Accuracy (Table~\ref{tab:gate}) & \texttt{sc0-op-20261109}, \texttt{hybrid-gemm-20261111} & \texttt{5c5ade67}, \texttt{4195be0d} & 18 cells \\
-Step times (Table~\ref{tab:steps}) & \texttt{sc0-op-20261109}, \texttt{hybrid-gemm-20261111}, \texttt{ada-5060-screen-20261110}, \texttt{step-limiters-20261109} & \texttt{5c5ade67}, \texttt{4195be0d}, \texttt{edfc0115} & paired \\
+Step times (Table~\ref{tab:steps}) & \texttt{sc0-op-20261109}, \texttt{hybrid-gemm-20261111}, \texttt{ada-5060-screen-20261110}, \texttt{step-limiters-20261109} & \texttt{5c5ade67}, \texttt{4195be0d}, \texttt{edfc0115}, \texttt{e3049399} & paired; see above \\
 Paired ratios (Tables~\ref{tab:ab}, \ref{tab:tiledab}) & provenance note; \texttt{tiled-speed-20261110}, \texttt{tiled-speed-20261111} & several & paired; see above \\
 Symmetrix-XL runs (Table~\ref{tab:sx}) & \texttt{loup-a100} (note), \texttt{symmetrix-xl-h200-loup-20261105}, \texttt{sx012-profile-20261106}, \texttt{symmetrix-xl-h200-omat0-small-20261109}, \texttt{vram-compare-rtx5060ti-20261105}, \texttt{nacl-compare-rtx5060ti-20261105} & \texttt{7430fb51}, \texttt{d599cc70} (FastMACE, 3 and 6 Nov) & cold; thermal start; one mixed \\
 Stages (Figure~\ref{fig:stages}) & \texttt{sx012-profile-20261106}, \texttt{step-limiters-20261109} & \texttt{d599cc70} & profiles \\
 General engines (Table~\ref{tab:engines}) & phase-4 note; TorchSim and ALCHEMI comparison notes & \texttt{4c574d2}, \texttt{5a3166c}; see above & see above \\
 Size (Table~\ref{tab:size}) & \texttt{ada-5060-screen-20261110}, \texttt{binned-screen-5060ti-20261111}, \texttt{shuffled-order-5060ti-20261111}, \texttt{rung-b-20261109} & \texttt{b951e804}, \texttt{f31d4f50}, \texttt{cd56800c} & four schedules; see above \\
-Capacity (Table~\ref{tab:capacity}) & \texttt{rung-b-20261109}, \texttt{tiled-speed-20261111}, \texttt{tiled-capacity-20261109} & \texttt{cd56800c}, \texttt{d036568b}, \texttt{7e4fbf4c} & one compiled call after one eager call \\
+Capacity, whole system (Table~\ref{tab:capacity}) & \texttt{rung-b-20261109} & \texttt{cd56800c} & MD, 200 steps after 20 \\
+Capacity, device state & \texttt{tiled-speed-20261111} & \texttt{d7d9e7ce}, \texttt{d4014c75} & A100: paired; RTX 5060 Ti: one profile run \\
+Capacity, host state & \texttt{tiled-capacity-20261109} & \texttt{d036568b}, \texttt{7e4fbf4c} & one compiled call after one eager call \\
 Other models (Table~\ref{tab:models}) & \texttt{off-polar-a100-20261108}, \texttt{h200-omat0-small-20261108} & \texttt{b4ec7053}, \texttt{e2206bb6} & three schedules; see above \\
 Radial tables (Section~\ref{sec:tables}) & \texttt{packed-table-lab-20261109}, \texttt{first-interaction-20261111} & -- & offline \\
 \bottomrule

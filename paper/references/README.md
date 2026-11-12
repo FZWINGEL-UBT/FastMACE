@@ -41,6 +41,7 @@ terms. The README and citation snapshots come from repositories with open-source
 | `larsen2017ase` | `larsen2017ase.pdf` | Accepted manuscript from the DTU repository. | https://backend.orbit.dtu.dk/ws/files/130802447/main.pdf | 60 | 3.2 MB | `3f4ca575f299` |
 | `lee2025flashtp` | `lee2025flashtp.pdf` | Published paper (PMLR volume 267). | https://raw.githubusercontent.com/mlresearch/v267/main/assets/lee25l/lee25l.pdf | 14 | 1.3 MB | `daebd3d88061` |
 | `lu2022dpcompress` | `lu2022dpcompress.pdf` | arXiv preprint of the journal paper. | https://arxiv.org/abs/2107.02103v3 | 24 | 1.3 MB | `d0af46e38730` |
+| `markidis2018tensorcores` | `markidis2018tensorcores.pdf` | arXiv preprint of the IPDPS workshop paper, added on 12 November 2026. | https://arxiv.org/abs/1803.04014v1 | 12 | 716 kB | `1e8e2b40587d` |
 | `musaelian2023scaling` | `musaelian2023scaling.pdf` | arXiv preprint of the SC '23 paper. | https://arxiv.org/abs/2304.10061v1 | 11 | 2.1 MB | `d45e99ebe6d3` |
 | `ootomo2022tf32` | `ootomo2022tf32.pdf` | arXiv preprint of the journal paper. | https://arxiv.org/abs/2203.03341v3 | 27 | 1.2 MB | `b086fae03555` |
 | `park2024scalable` | `park2024scalable.pdf` | arXiv preprint of the journal paper. | https://arxiv.org/abs/2402.03789v1 | 36 | 3.8 MB | `4e67f95911c3` |
@@ -92,4 +93,4 @@ The helper and the check are not part of this folder, so that nothing here is ex
 download it from a source of the kinds named above, name it after its bibliography key, and add a row with its
 source, page count, size and SHA-256.
 
-Committed files in this folder: 162.2 MB in total.
+Committed files in this folder: 162.9 MB in total.

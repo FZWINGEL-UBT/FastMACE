@@ -84,6 +84,23 @@ now distinguish the synthesised contraction from the template-rendered streaming
 difference from Symmetrix-XL that does hold: FastMACE keeps PyTorch's execution of the model and its automatic
 differentiation.
 
+## The fifth pass (12 November 2026): eight more reporting findings
+
+A fifth review, of commit `ac3fb74f`, re-read unchanged sections against the raw records. Its six "unresolved
+earlier findings" are limitations the paper already states and need experiments, not edits. Its eight
+reporting findings were checked and all hold.
+
+| Finding | Check | Change in the paper |
+| --- | --- | --- |
+| Table 1 labels a PCIe profile as A100-SXM4 | True. `step-limiters-20261109/a100-packed8/gpu.txt` says A100 80GB PCIe (source `0df22417`); the SXM4 profile totals 6,208.5 µs in another configuration | Column relabelled; caption gives both revisions and the distinction |
+| The H200 NbCl5 time has another schedule and a mean-median gap | True. Baseline side of the butterfly study at `e3049399`, eight blocks; medians 1.087 / 1.093, means 1.150 / 1.174, first block 1.59 / 1.65 ms | Footnote in Table 4, text in Section 8.2, entry in Appendix C |
+| The hybrid paragraph overstates its probes | True. `range_probe.py` runs the reference MACE calculator, not the rewritten graph; `hybrid_lab.py` measures max \|Ĉ−C\| / (\|A\|\|B\|) on synthetic Gaussian operands | Section 5.3 says the production margin is not established, prints the error definition and names the operands |
+| Hard restrictions are missing | True: periodic boundaries in three directions (`forces.py`), two-interaction ScaleShiftMACE only and no joint embeddings or PolarMACE for the tiled path (`tiled.py`), three cutoff-wide bins per axis for per-tile lists (`tile_list.py`) | New paragraph "Supported domain" in Section 3 |
+| Figure 4 counts a second-interaction kernel with the first interaction | True. The 6 November profile's 90 µs `radial_table_forward` feeds the second interaction | Bar and prose changed to 0.34 ms and 1.71 ms; total unchanged |
+| Float16 "fails the rule by factors of 12 to 51" uses the wrong denominator | True. Those are ratios to the float32 reference error; against the limit they are 4 to 17 | Sentence corrected |
+| Operand splitting attributed to Ootomo and Yokota | True. Their paper credits Markidis et al. (2018) with the split and four products | Sections 5.3 and 9 credit Markidis et al. for the split and Ootomo and Yokota for the refinement to three products; the Markidis paper is cited and saved in `references/` |
+| Appendix C gives one protocol for all capacity rows | True. The A100's 2.04 s is from a paired study at `d7d9e7ce`, four blocks of two calls | The capacity row is split into whole-system MD, device state and host state, with revisions |
+
 ## Where the numbers come from
 
 Every number in the paper is taken from a record in this repository or from a cited paper. Nothing was measured
