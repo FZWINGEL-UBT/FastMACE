@@ -26,6 +26,7 @@ terms. The README and citation snapshots come from repositories with open-source
 | `batatia2022mace` | `batatia2022mace.pdf` | arXiv preprint. | https://arxiv.org/abs/2206.07697v2 | 18 | 579 kB | `3c4497aa9e90` |
 | `batatia2023foundation` | `batatia2023foundation.pdf` | arXiv preprint. | https://arxiv.org/abs/2401.00096v3 | 153 | 84.1 MB | `15665521b2cd` |
 | `batatia2025mh1` | `batatia2025mh1.pdf` | arXiv preprint. | https://arxiv.org/abs/2510.25380v1 | 22 | 1.7 MB | `8c25459b178d` |
+| `batatia2026macepolar` | `batatia2026macepolar.pdf` | arXiv preprint, added on 12 November 2026. | https://arxiv.org/abs/2602.19411v1 | 50 | 4.1 MB | `a6dbc99b6a29` |
 | `batzner2022nequip` | `batzner2022nequip.pdf` | arXiv preprint of the Nature Communications paper. | https://arxiv.org/abs/2101.03164v3 | 22 | 5.6 MB | `12221983e564` |
 | `bharadwaj2025oeq` | `bharadwaj2025oeq.pdf` | arXiv preprint. | https://arxiv.org/abs/2501.13986v4 | 15 | 1.9 MB | `2c2479c48e52` |
 | `chorosajev2026sobek` | `chorosajev2026sobek.pdf` | arXiv preprint. | https://arxiv.org/abs/2607.18074v1 | 17 | 478 kB | `f222ef66cf9f` |
@@ -74,6 +75,7 @@ version and the citation the project asks for.
 | --- | --- | --- |
 | `drautz2019ace` | Behind the publisher's paywall; no arXiv or repository copy was found. | https://doi.org/10.1103/PhysRevB.99.014104 |
 | `cudagraphs` | Vendor documentation, not openly licensed, so only the link is kept. | https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html |
+| `nvidia2026tf32x3` | A web page (NVIDIA Technical Blog, 29 October 2026), link only. | https://developer.nvidia.com/blog/unlocking-tensor-core-performance-for-machine-learning-interatomic-potentials/ |
 
 Two saved files are not the version the bibliography cites: `fasi2021tensorcores.pdf` is the authors' preprint
 and `larsen2017ase.pdf` the accepted manuscript. `trefethen2013atap.pdf` holds the first six chapters only; the
@@ -90,4 +92,4 @@ The helper and the check are not part of this folder, so that nothing here is ex
 download it from a source of the kinds named above, name it after its bibliography key, and add a row with its
 source, page count, size and SHA-256.
 
-Committed files in this folder: 158.1 MB in total.
+Committed files in this folder: 162.2 MB in total.

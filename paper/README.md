@@ -1,8 +1,9 @@
 # FastMACE preprint draft (arXiv style)
 
-Source: owner requests of 11 November 2026: a new paper in arXiv style on its own branch
-(`fastmace/paper-arxiv-20261111`), then a comparison with the Symmetrix-XL paper (arXiv 2610.01036), then
-"Update our paper and make it overall higher quality". It replaces the ChatGPT-written draft reviewed in
+Source: owner requests of 11 and 12 November 2026: a new paper in arXiv style on its own branch
+(`fastmace/paper-arxiv-20261111`); a comparison with the Symmetrix-XL paper (arXiv 2610.01036) and "Update our
+paper and make it overall higher quality"; copies of all references; and, on 12 November, "Review this review
+and edit the paper" for an outside review of commit `7a7a4fd`. It replaces the ChatGPT-written draft reviewed in
 `plans/notes/paper-review-20261111.md`.
 
 ## Build
@@ -18,76 +19,78 @@ The built `main.pdf` is committed (owner request, 11 November 2026), so the pape
 installation. Rebuild it and commit it together with any change to `main.tex` or `references.bib`. The other
 build outputs are ignored by `paper/.gitignore`.
 
-## What the second revision changed
+## The third revision (12 November 2026): answer to the outside review
 
-- **Symmetrix-XL.** The paper now says what Symmetrix-XL does and where it is ahead, in the introduction, in each
-  mechanism section, in the validation section and in a design table. Three statements were corrected: its
-  reverse pass also recomputes the radial factors, it also gates its splines, and it runs under ASE, on CPUs and
-  on many GPUs, not only under LAMMPS.
-- **Accuracy.** Table 3 gives absolute errors, with the energy. The energy passes through the absolute floor, not
-  through the factor of three; the paper says so.
-- **Comparisons.** Every same-machine run against Symmetrix-XL from November is in Table 6, with GPU memory, and
-  a stage breakdown is in Figure 5. The published Symmetrix-XL numbers are quoted with the caveat that the sizes
-  and protocols differ.
-- **New material from existing records.** NbCl5 step times, step time against system size, a 320-million-atom
-  float32 call, step times for other models, table sizes and test ratios, setup times, software versions.
-- **Presentation.** A contributions list, an algorithm listing for the reverse kernel, three new figures (MD step,
-  wavefront, stage breakdown), an expanded related-work section, an appendix of records.
-- **Bibliography.** 36 entries, each marked VERIFIED, SECONDARY or UNVERIFIED in `references.bib`. Copies of the
-  references were added afterwards in `references/` (owner request of 11 November 2026), and TorchSim and the
-  ALCHEMI Toolkit got the citations their projects ask for.
+The review made eight findings. All eight were checked against the code and the raw records and hold. The paper
+was changed as follows.
+
+| Finding | Check | Change in the paper |
+| --- | --- | --- |
+| 1. The setup test does not cover the packed forward table | True. `encode_packed8` runs no error check; the only fallback is for the exponent range; the 0.16 ratio is from an offline tool with Sr, Ti, O hard-coded; no self-check or test sees the packed table | Section 5.1 separates the two checks and says the packed values are unchecked for other checkpoints and species. Abstract and limitations say so |
+| 2. Today's default has no dynamics validation; the reverse uses the cubic for values and slopes | True (`wprime_backward.py:1414-1433`) | Section 5.1 states that all three adjoints use the cubic. Section 7 has its own paragraph on the missing energy-conservation record |
+| 3. The largest capacity runs predate the coordinate fix; `state_dtype="auto"` can pick float16 | True. The fix is commit `cf76159a` of 11 November; the capacity sources `7e4fbf4c` and `d036568b` do not contain it; their records show 1.3 meV/Å | Section 6.2 and Table 10 label the runs; Section 6.1 explains the automatic precision; Section 8.6 calls them capacity demonstrations |
+| 4. The Symmetrix-XL comparison is a cold run without rebuilds | True. The log goes from 0 to 18.26 K with 0 neighbour-list builds | Abstract, Section 8.1, Table 7, Section 8.4 and the conclusion name the protocol; cold and thermal runs are separated |
+| 5. Estimator and uncertainty | True. Table 4's A100 NbCl5 value is a median of block means (1.67 ms); the mean is 1.84 ms because the first block takes 2.7 ms | Sections 3.2, 8.1 and 8.2 define the estimator; Table 4 has a footnote; Section 8.3 says what "both orders" does not show |
+| 6. Validation details | True: mixed-precision energy yardstick; the spline is refined and scored on the same points; distances below 0.3 Å are clamped without warning; 18 configurations | Section 3.1 (yardstick, configurations), Section 5.1 (sample reuse, domain) |
+| 7. Configuration-specific provenance | True. The ALCHEMI study used Python 3.12.3, cuEquivariance 0.13.0, ASE 3.29.0; the 214,375-atom row predates the cell-list screen on that GPU | Appendix C lists the deviations and a protocol per record; Table 9 marks the row; the availability statement says what a public archive needs |
+| 8. Ablations and workload coverage | True | The contribution claim is narrowed; tiled paired ratios are added (Table 6); Sections 8.3 and 8.7 say what is missing |
+
+The checks also found three errors of the previous revision, now corrected: the FastMACE side of the 6 November
+comparison has two processes on file, not three; the records table gave commit `4c574d2` for the TorchSim and
+ALCHEMI comparisons (TorchSim is `5a3166c`, ALCHEMI is not recorded); and the protocol paragraph claimed one
+skin and start state for comparisons that used others.
+
+Further changes asked for by the review:
+
+- **Structure.** The paper is organised around three claims (reassociation, streamed execution, reduced-state
+  tiling). The adoption chronology and the origins table moved to Appendices A and B; attribution and the AI
+  disclosure stay.
+- **Methods.** A cost model for the first interaction; how the symmetric contraction is generated, with an
+  example and its checks; the definitions and instruction shapes of the hybrid product; the wavefront's
+  dependency construction, pseudocode, correctness argument, periodic boundaries and what still grows with size.
+- **Literature.** The NVIDIA TF32x3 blog and the MACE-POLAR-1 paper are cited; Symmetrix-XL's downstream
+  validation is attributed to MACE-MPA-0 in float64; the general-engine comparison is labelled unbatched; the
+  sentence that a native evaluator "inherits" back ends from LAMMPS is replaced.
+- **Open experiments.** Table 13 lists the five experiments the review ranks.
 
 ## Where the numbers come from
 
-Every number in the paper is taken from a record in this repository or from the Symmetrix-XL paper. Nothing was
-measured for the paper. Appendix A of the paper has the same list with source revisions.
+Every number in the paper is taken from a record in this repository or from a cited paper. Nothing was measured
+for the paper. Appendix C of the paper lists the record, revision and protocol behind each table and figure.
+Additional sources used for the third revision:
 
 | Paper item | Record |
 | --- | --- |
-| Kernel-time profile (Table 1) | `results/step-limiters-20261109/` (`h200/limiters.csv`, `a100-packed8/limiters.csv`) |
-| Routes per GPU (Table 2) | `docs/current/defaults-by-gpu.md` |
-| Absolute errors (Table 3) | `results/sc0-op-20261109/h200/gate.log` (H200), `results/hybrid-gemm-20261111/alex-gate/gate-hybrid.log` (A100); threshold history in `docs/current/omat0-a100.md` §3.7 and §3.8.3; protocol in `results/sc0-op-20261109/h200/gate-metadata.json` |
-| Step times (Table 4) | `results/sc0-op-20261109/README.md` (H200), `results/hybrid-gemm-20261111/README.md` (A100), `results/ada-5060-screen-20261110/` (Ada: `ada-lines.txt`, pack X10; 5060 Ti: `README.md`, stage 3), `results/step-limiters-20261109/h200-butterfly/run.log` (H200, NbCl5) |
-| A100 history (Figure 4) | `docs/validation/omat0/loup-a100.md` (3 Nov), `docs/current/omat0-a100.md` (4–8 Nov), `results/hybrid-gemm-20261111/README.md` (11 Nov) |
-| Paired ratios (Table 5) | `docs/current/omat0-a100.md` §3, `docs/current/defaults-by-gpu.md`, the ledger rows of 8–11 November |
-| Symmetrix-XL runs (Table 6) | `docs/validation/omat0/loup-a100.md`, `results/symmetrix-xl-h200-loup-20261105/`, `results/sx012-profile-20261106/`, `results/symmetrix-xl-h200-omat0-small-20261109/`, `results/vram-compare-rtx5060ti-20261105/`, `results/nacl-compare-rtx5060ti-20261105/` |
-| Stage breakdown (Figure 5) | `results/sx012-profile-20261106/README.md` §2, Table 1 |
-| General engines (Table 7) | `docs/validation/phases/phase-4.md` (ASE, the Langevin row; the model is MH-1 per `results/4-T13-local-20261024-speed/`), `docs/validation/comparisons/` (TorchSim, ALCHEMI) |
-| Neighbour search, size (Table 8) | `results/binned-screen-5060ti-20261111/README.md`, `results/shuffled-order-5060ti-20261111/README.md`, `results/rung-b-20261109/README.md` |
-| Capacity (Table 9) | `results/rung-b-20261109/README.md`, `results/tiled-speed-20261111/README.md`, `docs/validation/tiled/tiled-host-state-dtype.md` |
-| Other models (Table 10) | `results/off-polar-a100-20261108/README.md`, `docs/current/defaults-by-gpu.md` (OMAT-0 small) |
-| Design (Table 11) | `docs/current/omat0-a100.md` §6 and the Symmetrix-XL paper |
-| Origins (Table 12) | `docs/current/omat0-a100.md`; for 9–11 November the ledger and the result READMEs; `fastmace/kernels/oeq_streaming/wprime_backward.py` (the reverse kernel's vendored body) |
-| Radial tables (Section 5) | `fastmace/rewrites/radial/`, `results/first-interaction-20261111/README.md`, `results/packed-table-lab-20261109/packed_certificate.json`, `results/spline-w-h200-20261107/` |
-| Energy drift | `docs/validation/omat0/generic-radial-tables.md` §5, `docs/validation/tiled/tiled-host-state-dtype.md` |
-| Setup times | `results/spline-w-h200-20261107/loup-*.json`, `results/sx012-profile-20261106/fastmace-h200-breakdown/loup/`, `results/omat0-a100-profile-20261104-4b70e3f2/loup/` |
-| Symmetrix-XL's own numbers | arXiv 2610.01036, read as the arXiv HTML on 11 November 2026 (Table 1, Sections 3–7, Appendices A and B). The values of its Figure 2 exist only in the image and are not used. |
+| Cost model of the first interaction (Section 4.1) | `fastmace/rewrites/mh1/modules.py`, `results/first-interaction-20261111/README.md`; the operation counts are arithmetic on the model's sizes |
+| Generated contraction (Section 4.3) | `fastmace/kernels/cuda/sc_generated.py`, `sc_factored.py`, `results/sc0-bound-20261109/README.md`, `results/other-ways-20261109/README.md` |
+| Setup test, domain, packed table (Section 5.1) | `fastmace/rewrites/radial/__init__.py`, `spline.py`, `fastmace/kernels/triton/radial_table.py`, `fastmace/kernels/oeq_streaming/spline_forward.py`, `wprime_backward.py`, `tools/spline_packed_certificate.py` |
+| Hybrid product (Section 5.3) | `fastmace/kernels/cutlass/hybrid_f16.h`, `results/hybrid-gemm-20261111/README.md` |
+| Wavefront (Section 6.1) | `fastmace/model/tiled.py`, `docs/validation/tiled/tiled-host-state-dtype.md`, `results/tiled-speed-20261110/README.md`, `results/tiled-speed-20261111/README.md` |
+| Coordinates (Section 6.2) | `results/tiled-speed-20261111/README.md` |
+| Acceptance rule (Section 3.1) | `tools/force_stress_gate.py`, `fastmace/reference/calculators.py`, `results/sc0-op-20261109/h200/gate-metadata.json` |
+| Block statistics (Table 4) | `results/hybrid-gemm-20261111/alex-ab/*.json`, `results/sc0-op-20261109/h200/ab-*.json` |
+| Protocol of the comparisons (Table 7) | `results/sx012-profile-20261106/symmetrix-h200/work-langevin-*/log.lammps`, `tools/bench/loup_md.py`, the two RTX 5060 Ti comparison records |
+| Symmetrix-XL's own numbers | arXiv 2610.01036, read as the arXiv HTML on 11 November 2026; a copy of the PDF is in `references/` |
 
 ## Open items before submission
 
-- **A matched benchmark against Symmetrix-XL.** Both engines on one A100 at 5,000 and at about one million
-  atoms, with moving atoms, plus the LAMMPS interface with cuEquivariance as baseline. The paper names this as the
-  main missing experiment.
-- **A 100 ps NVE run on the 5,000-atom benchmark** with today's defaults, which include the packed forward
-  table. The only whole-system drift record is 216 atoms for 10 ps from 2 November.
-- **Downstream validation.** None exists. Symmetrix-XL reproduces Matbench Discovery and three other workflows.
-- **A consolidated benchmark** of one revision on all four GPUs.
-- **Author list, affiliation, acknowledgements, release plan.** Marked `TODO (owner)` in `main.tex`. The author
-  and affiliation there are taken from the commit identity and need confirming.
-- **Bibliography.** Titles and authors of all 36 entries are now confirmed, most of them from the downloaded
-  copies in `references/`. What is still unconfirmed are publication details whose publisher pages could not be
-  read: the proceedings names and DOIs of PyTorch 2, Triton and the SC '23 paper, the publisher and year of the
-  Trefethen book, and the journal fields of MACE-MP-0 (J. Chem. Phys.), MACE-OFF (JACS) and the NequIP
-  infrastructure paper (Digital Discovery).
-- **Reference copies.** `references/` holds 28 papers and one book excerpt, plus README and citation snapshots
-  of the software references; `references/README.md` lists the source and checksum of each. Only Drautz's Phys.
-  Rev. B paper is missing (paywalled). The folder is 158 MB, of which one PDF is 84 MB. Check the licences before
-  the repository becomes public.
-- **Provenance.** `docs/current/omat0-a100.md` stops at 8 November and lists eight parts with no recorded origin
-  (its §7). Table 12 marks three of them "not recorded". The LLM research reports are credited generically; decide
-  how to name them.
-- **Record inconsistencies found while checking.** Several READMEs label the gate's energy error "meV" or "eV"
-  where the tool reports meV/atom (for example `results/sc0-op-20261109/README.md`). The spline has 731 intervals
-  in the 7 November record and 736 in the 9 November one. `results/first-interaction-20261111/README.md` says the
-  packed table "takes the slope from" its quadratic, while the code and SPEC say the reverse pass keeps the
-  float32 cubic; the paper follows the code.
+- **The five experiments of Table 13.** None was run. The first two overlap with
+  `plans/notes/conductor-prompt-20261111-paper-measurements.md` in the main checkout, which predates the review
+  and should be extended by the review's items 1, 3, 4 and 5.
+- **A public repository or archive** with checkpoint and structure identities, resolved configurations and
+  commands. The availability statement says this is needed.
+- **Author list, affiliation, acknowledgements, release plan.** Marked `TODO (owner)` in `main.tex`.
+- **Bibliography.** Titles and authors of all 38 entries are confirmed. Still unconfirmed are publication
+  details whose publisher pages could not be read: the proceedings names and DOIs of PyTorch 2, Triton and the
+  SC '23 paper, the publisher and year of the Trefethen book, and the journal fields of MACE-MP-0, MACE-OFF and
+  the NequIP infrastructure paper.
+- **Reference copies.** `references/` holds 29 papers and one book excerpt, plus snapshots of the software
+  references; `references/README.md` lists source and checksum. Check the licences before the repository
+  becomes public.
+- **MACE-POLAR-1 settings.** The record summaries do not state the total charge and spin of the timed runs.
+- **Provenance.** `docs/current/omat0-a100.md` stops at 8 November and lists eight parts with no recorded origin.
+- **Inconsistencies found in the records and code comments** (not changed, they belong to the conductor):
+  several READMEs label the gate's energy error "meV" or "eV" where the tool reports meV/atom; comments in
+  `spline_forward.py`, SPEC.md and `defaults-by-gpu.md` say the reverse keeps the float32 table "for its slopes",
+  while it also takes its values from it; `spline_forward.py` calls the packed table "a certified
+  approximation" although no setup check exists; the spline has 731 intervals in one record and 736 in another.
