@@ -134,6 +134,15 @@ class FactoredRadialMLP(torch.nn.Module):
         self.register_buffer("folded_last", weight[:, -1].contiguous())
 
 
+# Proof counter (compose-outside-graph, 12 November 2026): binds inside a CUDA-graph capture that kept a table's cached
+# composed weights instead of composing them into the graph (``FirstInteractionReassociation.bind``).
+_CAPTURE_ADOPTS = [0]
+
+
+def CAPTURE_ADOPTS():  # noqa: N802 (the proof counter: --b-expect fastmace.rewrites.mh1.modules:CAPTURE_ADOPTS)
+    """Binds inside a capture so far that kept the cached composed weights."""
+    return _CAPTURE_ADOPTS[0]
+
 class FirstInteractionReassociation(torch.nn.Module):
     """First-interaction message without per-edge tensor-product weights (reassociate_first).
 
@@ -183,15 +192,23 @@ class FirstInteractionReassociation(torch.nn.Module):
             self.register_buffer("species_feats", species_feats, persistent=False)
         if species_feats is None or self.compose_skip is None or self.compose_radial is None:
             return
-        entry = self.refresh_composed(species_feats)
+        # Inside a capture, a table whose weights are cached keeps them although its version moved: the capture's
+        # snapshot restore copied the same values back (bumping the version), and the force field's derived-state
+        # registry restores the composed weights with the table (``composed_buffers``). Recomposing there put the four
+        # float64 GEMMs into the captured step, replayed every step for constant inputs (compose-outside-graph,
+        # 12 November 2026). A new table, new parameters or a nested change still compose.
+        entry = self.refresh_composed(species_feats, adopt=torch.cuda.is_available()
+                                      and torch.cuda.is_current_stream_capturing())
         for k, tensor in enumerate(entry[2]):
             if self._buffers.get(f"composed_{k}") is not tensor:
                 self.register_buffer(f"composed_{k}", tensor, persistent=False)
 
-    def refresh_composed(self, table):
+    def refresh_composed(self, table, adopt=False):
         """The composed weights of ``table`` (``compose_skip``), computed on first use and again in place (same
-        addresses) after the table changed (its version): ``[w_0, w_t_0, w_1, ...]`` per path, as the forward
-        would compose them from the same parameters. Returns the cache entry ``[table ref, version, weights]``."""
+        addresses) after the table or a composed parameter changed (their versions): ``[w_0, w_t_0, w_1, ...]`` per
+        path, as the forward would compose them from the same parameters. Returns the cache entry ``[table ref,
+        version, weights, parameter versions]``. ``adopt``: a cached entry whose parameters are unchanged takes the
+        table's new version without composing (``bind`` inside a capture: the caller keeps them consistent)."""
         import weakref
 
         cache = self.__dict__.setdefault("_composed_cache", {})
@@ -200,8 +217,14 @@ class FirstInteractionReassociation(torch.nn.Module):
             cache.clear()
             self.__dict__["_composed_nested"] = nested
         entry = cache.get(id(table))
-        if entry is not None and entry[0]() is table and entry[1] == table._version:
-            return entry
+        params = self._compose_versions()
+        if entry is not None and entry[0]() is table and entry[3] == params:
+            if entry[1] == table._version:
+                return entry
+            if adopt:
+                _CAPTURE_ADOPTS[0] += 1
+                entry[1] = table._version
+                return entry
         with torch.no_grad():
             weights = self._compose_weights(table, self._radial_weight())
             if self.nested_rotation is not None:  # the rotated set after the plain one (``_composed(nested=True)``)
@@ -211,13 +234,41 @@ class FirstInteractionReassociation(torch.nn.Module):
             # weights (two [3, 192, 128] float32 per path) held 64 GB of an A100 by the end of a 149M-atom call.
             for key in [key for key, held in cache.items() if held[0]() is None]:
                 del cache[key]
-            entry = [weakref.ref(table), table._version, weights]
+            entry = [weakref.ref(table), table._version, weights, params]
             cache[id(table)] = entry
         else:
             for dst, src in zip(entry[2], weights):
                 dst.copy_(src)
-            entry[1] = table._version
+            entry[1], entry[3] = table._version, params
         return entry
+
+    def composed_buffers(self, table):
+        """The cached composed weights of ``table`` (``refresh_composed``), or ``()`` when none are cached: the
+        force field registers them as derived state beside the table, so that a snapshot restore (a capture's
+        warm-up, a rejected transaction) brings both back together."""
+        entry = self.__dict__.get("_composed_cache", {}).get(id(table))
+        return tuple(entry[2]) if entry is not None and entry[0]() is table else ()
+
+    def _compose_versions(self):
+        """The versions of every tensor the composition reads besides the table: the radial last layer, the
+        interaction's linear and skip (``compose_skip``) and the nested rotation. A reload or an optimiser step
+        writes them in place and moves their versions; nothing in an MD step does."""
+        tensors = []
+        modules = [self.compose_radial] + ([self.compose_skip[0], self.compose_skip[2]] if self.compose_skip else [])
+        for module in modules:
+            if isinstance(module, torch.nn.Module):
+                tensors += list(module.parameters()) + list(module.buffers())
+            elif module is not None:  # a plain record of tensors (the CPU tests' radial layer)
+                tensors += [value for value in vars(module).values() if isinstance(value, torch.Tensor)]
+        if self.nested_rotation is not None:
+            tensors.append(self.nested_rotation)
+        versions = []
+        for tensor in tensors:
+            try:
+                versions.append(tensor._version)
+            except RuntimeError:  # an inference tensor has no version counter (and is never written in place)
+                versions.append(None)
+        return tuple(versions)
 
     def _radial_weight(self):
         """The radial last layer's matrix as the generic first interaction passes it (``_first_inputs``)."""

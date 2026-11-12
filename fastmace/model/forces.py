@@ -300,6 +300,11 @@ def host_batch(calc, atoms, one_hot=True):
     return batch
 
 
+def _composed_by_table():
+    """The refresh of a table's composed weights (``ForceField._derived``): none of its own, the table's refresh
+    (registered just before) recomposes them in place."""
+
+
 def _shape_only_one_hot(indices, num_classes):
     """A zero-width stand-in for ``mace.tools.torch_tools.to_one_hot`` (no storage), on the host: the batch derives
     its ``batch`` vector from it (on the meta device that vector was meta too and could not be read)."""
@@ -954,8 +959,13 @@ class MACEForceField:
             out.append(("total_charge", self.data["total_charge"], self._refresh_total_charge, ("charges",)))
         if self._has_total["total_spin"]:
             out.append(("total_spin", self.data["total_spin"], self._refresh_total_spin, ("charges",)))
-        out += [(f"species_feats.interactions.{index}", table, refresh, ("charges",))
-                for index, _, table, refresh in self._tables]
+        for index, reassociation, table, refresh in self._tables:
+            out.append((f"species_feats.interactions.{index}", table, refresh, ("charges",)))
+            # COMPOSE_FAST's composed weights of that table: the table's refresh recomposes them in place, and a
+            # snapshot (a capture's warm-up, a transaction) restores them with the table, so the captured step
+            # reads them without composing again (compose-outside-graph, 12 November 2026).
+            out += [(f"species_feats.interactions.{index}.composed_{k}", weights, _composed_by_table, ("charges",))
+                    for k, weights in enumerate(reassociation.composed_buffers(table))]
         return out
 
     def derived_buffers(self):
