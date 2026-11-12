@@ -4,6 +4,7 @@
 #           6 x 256 steps. Side a runs main's code: no bound species plan (every forward sorts, inside the capture),
 #           reshape_irreps as a copy, JOINED_LAYOUT off; side b the branch (plan bound, views, joined layout on the
 #           Triton backend).
+#   jl-ab / jl-ba  JOINED_LAYOUT alone (side a off, side b the Ada default on), the same protocol
 #   prof    the torch 2.15 attribution (t215 profile_point.py + attribution.py, PYSTACKS=1, cupti-python) of the
 #           new step, SrTiO3 10x10x10 and NbCl5 3x3x3
 # Usage: setsid nohup bash ada.sh SRC OUT JOB... > OUT.out 2>&1 < /dev/null &
@@ -51,6 +52,10 @@ for job in "$@"; do
               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
               --a-constant $A > $OUT/$job.log 2>&1 < /dev/null
             echo "$job exit=$? $(grep -h -E 'b/a|wrong side' $OUT/$job.log | tr '\n' ' ' | cut -c1-600)") | tee -a "$log" ;;
+    jl-ab|jl-ba) order=${job#jl-}; pattern=$([ $order = ab ] && echo abab || echo abba)
+           (prod_env; cd $SRC && $E/bin/python tools/ab_rewrites.py --output $OUT/$job --checkpoint $CK               --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5               --a-constant $A > $OUT/$job.log 2>&1 < /dev/null
+            echo "$job exit=$? $(grep -h -E 'b/a' $OUT/$job.log | tr '
+' ' ' | cut -c1-600)") | tee -a "$log" ;;
     prof) for st in SrTiO3:10x10x10 NbCl5:3x3x3; do s=${st%%:*}; c=$OUT/pcache-$s; rm -rf $c; mkdir -p $c
             (cd $SRC && export ENVROOT=$H/environments PYTHONPATH=$SRC FM_SRC=$SRC FASTMACE_MODELS=$H/ResearchModule/Models \
               FASTMACE_STRUCTURES=$H/ResearchModule TMPDIR=$OUT/tmp PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
