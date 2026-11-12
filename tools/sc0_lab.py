@@ -286,8 +286,7 @@ def main(argv=None):
     if factored is None:
         if args.sources_only:  # the monomial sources alone
             (args.output / "sources.json").write_text(json.dumps(dict(meta=meta, counts=counts, factored=None),
-                                                                 indent=1, default=str) + "
-")
+                                                                 indent=1, default=str) + "\n")
         raise SystemExit("sc_factored: the candidates do not span the descriptor's basis")
     prog, feats, basis_k = factored
     counts["fac"] = dict(sc_factored.counts(prog, feats), check=sc_factored.check(terms, prog, feats, basis_k, seg_in))
@@ -306,8 +305,7 @@ def main(argv=None):
     meta.update(product=args.product, segments=[seg_in, seg_w, seg_out], terms=len(terms))
     if args.sources_only:
         (args.output / "sources.json").write_text(json.dumps(dict(meta=meta, counts=counts), indent=1, default=str)
-                                                  + "
-")
+                                                  + "\n")
         print("sources written", args.output, flush=True)
         return
     gen = torch.Generator(device="cuda").manual_seed(0)
