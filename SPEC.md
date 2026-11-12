@@ -3657,3 +3657,4 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - A100 (Colab, H200 plan via the alias): skip+hoist 1.025, skip 0.997: off.
 - Measured on OMAT-0 medium only; the GPU set turns it on for every H200 w′ with TABLE_W (open cell in defaults-by-gpu).
 - Modal: one H200 job, 547 s, $0.79 metered. See `results/wprime-h200-20261111/README.md`.
+- Suite on the branch tip 45efd9de (murphy, idle check incl. our jobs): 5,714 passed, 204 skipped, 0 failed.

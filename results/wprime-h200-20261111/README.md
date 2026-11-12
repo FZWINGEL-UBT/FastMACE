@@ -120,3 +120,31 @@ The three switches were built off by default. After the H200 job, `SKIP_OUTSIDE`
 - Takeaway: on the H200 the instruction count only pays at the same occupancy class. skip alone cuts 7.8 % of the
   instructions but falls from 7 to 5 blocks per SM. With hoist on top, the cut is larger (9.5 %) at the same 96
   registers, and that wins.
+
+## Part 4: outside review ideas, census only (conductor, 12 November 2026)
+
+Offline sm_90 / sm_80 SASS census (`census_sass.py`) of the H200 default (skip+hoist) with source transforms, no GPU.
+Per edge and lane:
+
+| variant | script | sm_90 instr (regs) | sm_80 instr (regs) |
+|---|---|---:|---:|
+| skip+hoist (today's H200 default) | | 1,990 (96) | 1,976 (128) |
+| no dsh at all (tensor-core dsh bound) | `nodsh_variant.py` | 1,495 (56) | 1,456 (64) |
+| dsh only (second half of a split) | `dshonly_variant.py` | 1,198 (51) | 1,167 (66) |
+| weighted input on vector paths with J > 3 | `wxin_variant.py` | 1,957 (95) | 1,942 (96) |
+| the same on every vector path | `wxin_variant.py ... 0` | 1,967 (96) | 1,953 (96) |
+| skip+vec2 / with weighted input | `wxin_variant.py` | 1,864 / 1,835 (128 / 124) | 1,860 / 1,826 (128 / 128) |
+
+- Tensor cores for dsh: removing all dsh work saves 24.9 %, but a 3xTF32 rebuild costs about as much again (88 w x_i
+  products, their hi/lo split and stores, about 66 mma and 44 fragment loads per edge, output widths 1-7 padded to 8):
+  about 550 against 495. 1xTF32 would fail the gate (float16 already did, `half-far-edges`). Closed.
+- dx/dr + dsh split into two SIMT kernels: 1,495 + 1,198 = 2,693 against 1,990 (+35 %); each half re-evaluates w and
+  reloads x and dout. w' is issue-bound at 77 %, so occupancy buys at most 1.3x. Closed.
+- Weighted input (dy_j += s (w x_i) instead of the v_j sums and dy_j += w v_j; exact in real arithmetic): H200 -1.7 %
+  at the same register class (about 0.5 % of the step, under the bar). On sm_80, skip+hoist drops from 128 to 96
+  registers, which removes what kept SKIP_OUTSIDE off the A100. Queued as `wprime_backward.WEIGHTED_VECTOR` with an
+  A100 MD-step A/B (first-interaction).
+- Assessed without a build: the force-equivalent dsh rewrite of 1x2->1 (about 44 instructions per edge, about 0.7 % of
+  the step), the rank-9 CG factorisation (the 9 transformed input gradients need 27 FMAs per path to convert back or 9
+  atomics per path: net about zero), packed input components (at most about 24 per edge), component scaling (the same
+  as `outside-joint-rescaling`, stopped 11 November), an interior-only kernel (the channel loop already has one branch).
