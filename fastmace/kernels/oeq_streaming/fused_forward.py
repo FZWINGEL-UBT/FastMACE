@@ -223,7 +223,9 @@ LANE_INDICES_GPUS = GPUModels(("NVIDIA H200",))
 # A100-SXM4 MD-step A/Bs (6 November 2026, 8aa8c0e7): WFRAG_REGION alone 0.9871 / 0.9887, with W_GROUP (12 warps)
 # 0.9718 / 0.9734, both build orders; H200: WFRAG_REGION a tie (1.0014 / 1.0010; 12 warps there already).
 W_GROUP_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
-WFRAG_REGION_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# H200 (12 November 2026, results/h200-pack-20261111): re-screened against the current defaults (a tie on 6 November), bitwise:
+# MD step b/a SrTiO3 10^3 0.9877 / 0.9921, NbCl5 0.9695 / 0.9913.
+WFRAG_REGION_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDIA H200"))
 A_SPLIT_GPUS = GPUModels(())
 # MD-step A/Bs (6 November 2026, d74ca073; SrTiO3 10x10x10, both build orders): H200 0.9884 / 0.9882,
 # A100-SXM4-80GB 0.9937 / 0.9937; bitwise. With K_PIPE as well: H200 0.9934 / 0.9927, A100-SXM4 0.9910 / 0.9920.

@@ -31,7 +31,7 @@ def test_padded_products_equal_the_plain_ones(p):
 
 
 def test_the_default_is_the_a100_and_never_on_the_cpu(monkeypatch):
-    assert sl.RADIAL_TF32X3 is None and sl.RADIAL_TF32X3_GPUS == ("NVIDIA A100-SXM4-80GB",)
+    assert sl.RADIAL_TF32X3 is None and sl.RADIAL_TF32X3_GPUS == ("NVIDIA A100-SXM4-80GB", "NVIDIA H200")
     assert "NVIDIA A100 80GB PCIe" in sl.RADIAL_TF32X3_GPUS  # the family
     assert not sl.radial_tf32x3_default(torch.device("cpu"), True)
     monkeypatch.setattr(sl, "RADIAL_TF32X3", True)

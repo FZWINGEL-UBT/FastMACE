@@ -1,0 +1,595 @@
+{
+  "status": "running",
+  "created_utc": "2026-11-11T22:46:05.702401+00:00",
+  "host": "modal",
+  "engine": "fastmace",
+  "planner": "minimal",
+  "baseline": null,
+  "structures_root": "/data/baseline/1a-T18",
+  "fastmace_commit": null,
+  "python": "/usr/local/bin/python",
+  "checkpoint": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+  "checkpoint_sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+  "tf32": false,
+  "model": "off23-medium",
+  "backend": "auto",
+  "dtype": "auto",
+  "rule": {
+    "ratio": 3.0,
+    "floors": {
+      "energy": 0.01,
+      "forces": 1e-05,
+      "stress": 1e-07
+    },
+    "gated": [
+      "energy",
+      "forces",
+      "stress"
+    ],
+    "source": "fastmace.planner.selfcheck"
+  },
+  "energy_gated": true,
+  "references": "fastmace.reference (1b-T13): float64 reference, float32 yardstick with float64 energy",
+  "processes_rule": "every reference in a fresh process that builds no production engine, before the production process (scope 'calculator'); conductor decision after T10",
+  "protocol": "unrelaxed 3x3x3 supercells, symmetric strain +-0.02 (hydrostatic: isotropic; full: anisotropic and shear), Gaussian rattle 0.05 A; float64 reference; gate: max error <= max(3 x that of the float32 yardstick, floor), for energy, forces, stress",
+  "args": {
+    "output": "/tmp/fastmace-out/off-gate/gate-candidate",
+    "engine": "fastmace",
+    "planner": "minimal",
+    "baseline": null,
+    "structures_root": "/data/baseline/1a-T18",
+    "checkpoint": "/data/models/MACE-OFF23_medium.model",
+    "model": "off23-medium",
+    "structures": [
+      "/data/baseline/1a-T18/Structures/Organic/urea_cod1008787.cif",
+      "/data/baseline/1a-T18/Structures/Organic/naphthalene_cod2311090.cif",
+      "/data/baseline/1a-T18/Structures/Organic/paracetamol_cod2104364.cif",
+      "/data/baseline/1a-T18/Structures/Organic/water_216.extxyz@1x1x1"
+    ],
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "configs": 3,
+    "rattle_A": 0.05,
+    "strain": 0.02,
+    "backend": "auto",
+    "dtype": "auto",
+    "main_args": "",
+    "seed": 20261015,
+    "reference_scope": "calculator",
+    "rewrites": {
+      "radial_tables": "on"
+    },
+    "engine_config": {},
+    "production_expect": [],
+    "production_constant": [
+      "fastmace.rewrites.generic.modules:STOCK_FIRST_SKIP=True",
+      "fastmace.kernels.triton.skinny_linear:RADIAL_TF32X3=True"
+    ],
+    "production_tf32": false,
+    "tiled_receivers": 0,
+    "tiled_mode": "eager",
+    "tiled_config": {},
+    "reference_command": "/usr/local/bin/python",
+    "production_command": "/usr/local/bin/python"
+  },
+  "structures": {
+    "urea_cod1008787": {
+      "natoms": 432,
+      "source": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/baseline/1a-T18/Structures/Organic/urea_cod1008787.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "f95db254423e06ed6da2d013991b4967b1c78913bcaec85b7d1d2826fc92382f",
+      "configurations": "/tmp/fastmace-out/off-gate/gate-candidate/configs/urea_cod1008787.npz",
+      "configs": []
+    },
+    "naphthalene_cod2311090": {
+      "natoms": 972,
+      "source": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/baseline/1a-T18/Structures/Organic/naphthalene_cod2311090.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "fcfa0cc14c0ed167664be484bc38618f76a9b2a24084e63535821a635d377c85",
+      "configurations": "/tmp/fastmace-out/off-gate/gate-candidate/configs/naphthalene_cod2311090.npz",
+      "configs": []
+    },
+    "paracetamol_cod2104364": {
+      "natoms": 2160,
+      "source": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/baseline/1a-T18/Structures/Organic/paracetamol_cod2104364.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "3db1149c5f9d35d794f5cda8608b463cc7924f9c4d793eaf67d1cada5756d41a",
+      "configurations": "/tmp/fastmace-out/off-gate/gate-candidate/configs/paracetamol_cod2104364.npz",
+      "configs": []
+    },
+    "water_216": {
+      "natoms": 648,
+      "source": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/baseline/1a-T18/Structures/Organic/water_216.extxyz",
+      "repeat": [
+        1,
+        1,
+        1
+      ],
+      "source_sha256": "fb1dec83bfff0568a11d174c7785465be5cdff4361d96de7e314c07e331acc3a",
+      "configurations": "/tmp/fastmace-out/off-gate/gate-candidate/configs/water_216.npz",
+      "configs": []
+    }
+  },
+  "processes": [
+    {
+      "name": "reference-urea_cod1008787-f64",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-urea_cod1008787-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 22.24840351299997,
+      "result": {
+        "name": "reference-urea_cod1008787-f64",
+        "kind": "reference",
+        "pid": 1976,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:46:06.102059+00:00",
+        "hybrid_launcher": false,
+        "load_s": 9.828445901999999,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 2344615936,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 20.703111062000062
+      }
+    },
+    {
+      "name": "reference-urea_cod1008787-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-urea_cod1008787-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 24.33285494400002,
+      "result": {
+        "name": "reference-urea_cod1008787-ase_f32",
+        "kind": "reference",
+        "pid": 2060,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:46:28.517178+00:00",
+        "hybrid_launcher": false,
+        "load_s": 11.540459501999976,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 1214251008,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 22.894695490999993
+      }
+    },
+    {
+      "name": "reference-naphthalene_cod2311090-f64",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-naphthalene_cod2311090-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 23.49893710099991,
+      "result": {
+        "name": "reference-naphthalene_cod2311090-f64",
+        "kind": "reference",
+        "pid": 2144,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:46:52.893618+00:00",
+        "hybrid_launcher": false,
+        "load_s": 10.633001886999978,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 5119148032,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 21.897078127999976
+      }
+    },
+    {
+      "name": "reference-naphthalene_cod2311090-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-naphthalene_cod2311090-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 24.76879524200001,
+      "result": {
+        "name": "reference-naphthalene_cod2311090-ase_f32",
+        "kind": "reference",
+        "pid": 2228,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:47:16.680026+00:00",
+        "hybrid_launcher": false,
+        "load_s": 11.629682114000161,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 2577399808,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 23.235018149999974
+      }
+    },
+    {
+      "name": "reference-paracetamol_cod2104364-f64",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-paracetamol_cod2104364-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 24.371053000000074,
+      "result": {
+        "name": "reference-paracetamol_cod2104364-f64",
+        "kind": "reference",
+        "pid": 2312,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:47:41.554357+00:00",
+        "hybrid_launcher": false,
+        "load_s": 10.09763594900005,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 11402215424,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 22.7613630379999
+      }
+    },
+    {
+      "name": "reference-paracetamol_cod2104364-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-paracetamol_cod2104364-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 25.38169159400013,
+      "result": {
+        "name": "reference-paracetamol_cod2104364-ase_f32",
+        "kind": "reference",
+        "pid": 2396,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:48:05.970812+00:00",
+        "hybrid_launcher": false,
+        "load_s": 11.633606180000015,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 5723127808,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 23.811390702000153
+      }
+    },
+    {
+      "name": "reference-water_216-f64",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-water_216-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 21.637738248000005,
+      "result": {
+        "name": "reference-water_216-f64",
+        "kind": "reference",
+        "pid": 2480,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:48:31.427594+00:00",
+        "hybrid_launcher": false,
+        "load_s": 9.973322130000042,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 3313500160,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 20.135766360999924
+      }
+    },
+    {
+      "name": "reference-water_216-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/usr/local/bin/python",
+        "/tmp/fastmace-src/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/tmp/fastmace-out/off-gate/gate-candidate/jobs/reference-water_216-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 24.65614183400021,
+      "result": {
+        "name": "reference-water_216-ase_f32",
+        "kind": "reference",
+        "pid": 2564,
+        "host": "modal",
+        "python": "/usr/local/bin/python",
+        "started_utc": "2026-11-11T22:48:53.196574+00:00",
+        "hybrid_launcher": false,
+        "load_s": 11.268096385999797,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/__modal/volumes/vo-AFVkIzlekryiCwWCYFzPhr/models/MACE-OFF23_medium.model",
+            "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7",
+            "label": "off23-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA H200",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 1673527296,
+        "tf32_matmul": "none",
+        "status": "complete",
+        "wall_s": 22.768089746999976
+      }
+    }
+  ],
+  "summary": {}
+}

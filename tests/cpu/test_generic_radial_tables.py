@@ -145,7 +145,7 @@ def test_the_planner_keeps_stock_first_tables_off_until_measured(monkeypatch):
     from fastmace.planner import fixed
 
     assert fixed.DECISION_66_STOCK_FIRST_TABLES_GPUS == ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
-                                                           "NVIDIA RTX 4000 Ada Generation")
+                                                           "NVIDIA RTX 4000 Ada Generation", "NVIDIA H200")
     assert GPU.name in fixed.DECISION_66_STOCK_FIRST_TABLES_GPUS
     assert plan_for("off23-medium").rewrites.radial_tables == "on"
     monkeypatch.setattr(fixed, "DECISION_66_STOCK_FIRST_TABLES_GPUS", fixed.GPUModels(("NVIDIA A100-SXM4-80GB",)))
