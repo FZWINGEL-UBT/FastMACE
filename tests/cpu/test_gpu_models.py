@@ -374,7 +374,9 @@ def test_h200_defaults():
     assert ada in species_rewrites.GENERIC_FOLD_READOUT_TAIL_GPUS
     assert ada in planner_fixed.DECISION_66_TF32X3_OMAT0_GPUS and ada not in planner_fixed.DECISION_66_TF32X3_GPUS
     assert ada not in wprime_backward.SPLINE_VECTOR_GPUS and ada in wprime_backward.STAGE_SH_GPUS
-    assert ada not in compose_skip.COUNT_PLAN_GPUS and ada not in compose_skip.JOINED_LAYOUT_GPUS
+    assert ada not in compose_skip.COUNT_PLAN_GPUS
+    # JOINED_LAYOUT on the Triton backend (step-layout-cleanup, 12 November 2026); the 8 November tie measured it inert
+    assert ada in compose_skip.JOINED_LAYOUT_GPUS
     assert ada not in cueq_projection.CUEQ_PROJECTED_GPUS
 
 

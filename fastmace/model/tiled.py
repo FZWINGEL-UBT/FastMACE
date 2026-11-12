@@ -2309,7 +2309,7 @@ class TiledForceField:
         field = self.field
         # species tables; then every tile edge is a real edge. No whole-system BLOCK_ORDER order: a tile has
         # fewer rows than N, so its kernels never read it (they launch with their rows' identity)
-        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER))
+        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER), plans=False)
         saved = []
         for module in field._streaming:
             saved.append((module, module._buffers.get("streaming_count")))
