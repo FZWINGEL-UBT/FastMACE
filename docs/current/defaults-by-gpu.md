@@ -67,7 +67,7 @@ certificate). Commits are where the set last gained a family.
 | `generic_fused_folded_forward` + `generic_wprime_backward`, OMAT-0 medium (`DECISION_66_GENERIC_WPRIME_GPUS`) | on | on | on | on | rounding | `27d27f21` (H200) |
 | OMAT-0 small: the pair above + `tf32x3_gemms` (`DECISION_66_GENERIC_WPRIME_LABEL_GPUS`, `…_TF32X3_MODEL_GPUS["omat0-small"]`) | on | on | not measured | not measured | precision + rounding | `979785a7`, `5797d298` |
 | `generic_fold_product_linear` (`DECISION_66_GENERIC_FOLD_PRODUCT_GPUS`), with `FOLD_FIRST_DENSITY_LINEAR` | on | on | on | on (alone 0.9377 / 0.9348, 0.9222 / 0.9166) | rounding | `27d27f21` (H200), ada-5060-screen |
-| `tf32x3_gemms`, OMAT-0 medium (`DECISION_66_TF32X3_GPUS`, `…_OMAT0_GPUS`) | on | on | on (Triton backend, with the compose group) | off (Triton tf32x3 slower) | precision | `27d27f21`, `1cd369e4` |
+| `tf32x3_gemms`, OMAT-0 medium (`DECISION_66_TF32X3_GPUS`, `…_OMAT0_GPUS`) | on | on | on (CUTLASS backend since 12 Nov, the sm_80 cubin by model: `tf32x3_gemm.CUTLASS_GPUS`; with `LINEAR_DIV` 0.9364 / 0.9335 SrTiO3, 0.8912 / 0.8887 NbCl5 against the Triton backend; gate passes) | off (Triton tf32x3 slower) | precision | `27d27f21`, `1cd369e4`, step-layout-cleanup |
 | species GEMM (`generic.modules.SPECIES_GEMM_GPUS`) | off (with `species_gemm.CUTLASS` 1.0141 / 1.0175) | off (0.992 / 0.991; its skip runs as 3×TF32) | on | on | exact | `b48c10de` |
 | `FUSED_FIRST_BACKWARD` + `TABLED_FORWARD` | on | on | on | on | rounding | `27d27f21`, `5ddec837` |
 | `EDGE_SH`, generic (`EDGE_SH_GPUS`) | on | on | on | on | rounding | `27d27f21` |
@@ -104,9 +104,9 @@ certificate). Commits are where the set last gained a family.
 | fused forward `TP_NOFLUSH` | off (0.9992 / 1.0018) | on | not measured | not measured | bitwise | `31c394b4` |
 | fused forward `SH_LDS4` (needs `VEC_SH`) | off (1.0014 / 1.0027) | off (1.0008 / 0.9949) | n/a (`VEC_SH` off) | on | bitwise | `9a6df1f5` |
 | CUTLASS `tf32x3.HYBRID` (`cutlass.tf32x3.HYBRID_GPUS`; TF32 big·big + one FP16 cross mma in every 3×TF32 entry) | on (12 Nov: 0.9909 / 0.9940 SrTiO3, 0.9892 / 0.9885 NbCl5; gate passes) | on (0.9896 / 0.9877 SrTiO3, 0.9832 / 0.9846 NbCl5) | n/a | n/a | rounding (gate passes) | review-retries 2026-11-11 |
-| CUTLASS `LINEAR_DIV` (`cutlass.linear_div.LINEAR_DIV_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `5dc5d799` |
+| CUTLASS `LINEAR_DIV` (`cutlass.linear_div.LINEAR_DIV_GPUS`) | on | on | on (12 Nov, with the CUTLASS backend; see `tf32x3_gemms`) | not measured | bitwise (kernel) | `5dc5d799`, step-layout-cleanup |
 | CUTLASS `SKIP_SELECT` (`cutlass.skip_select.SKIP_SELECT_GPUS`) | on | on | not measured | not measured | bitwise (kernel) | `6561cc13` |
-| `SEGMENT_ROWS` (`cutlass.segment_rows.SEGMENT_ROWS_GPUS`) | off (1.0006 / 1.0000) | on | off (tie with the CUTLASS backend on sm_89: 0.9967 / 0.9981, 0.9984 / 1.0016) | n/a (CUTLASS cubins for sm_80 / sm_90 only) | rounding (3×TF32) | `6c2f2967` |
+| `SEGMENT_ROWS` (`cutlass.segment_rows.SEGMENT_ROWS_GPUS`) | off (1.0006 / 1.0000) | on | off (12 Nov on the real CUTLASS backend with LINEAR_DIV: 0.9421 / 0.9374 SrTiO3, 0.8986 / 0.8999 NbCl5 against Triton, slower than without it; the 10 Nov tie ran on Triton, see step-layout-cleanup) | n/a (CUTLASS cubins for sm_80 / sm_90 only) | rounding (3×TF32) | `6c2f2967` |
 | tabled `POWER_BACKWARD` | on | off (tie 1.0020 / 0.9977; 1.0006 / 1.0028 on the 8 Nov defaults) | on (alone 0.9935 / 0.9929, 0.9935 / 0.9933) | on (alone 0.9917 / 0.9946, 0.9944 / 0.9941) | rounding | `8a1ed833`, `ec25c9c4`, ada-5060-screen |
 | `RECEIVER_SUM` (`receiver_sum.RECEIVER_SUM_GPUS`) | off (tie 0.9992 / 1.0012) | on | off (mixed by structure: removing it from the Ada set 0.9967 / 0.9964 SrTiO3, 1.0087 / 1.0068 NbCl5) | on (removing it from the candidate set 1.0041 / 1.0006, 1.0034 / 1.0049) | rounding | `7a2f6b6f`, ada-5060-screen |
 | `BACKWARD_WALK` (`edge_outer_sum.BACKWARD_WALK_GPUS`) | off (1.0000 / 1.0001) | on | off (kernel 1.03–1.11) | off (kernel 0.94, near the DRAM floor) | rounding | `03125b0c` |
@@ -122,7 +122,7 @@ certificate). Commits are where the set last gained a family.
 | `COMPOSE_SKIP` | on | on | on (with OMAT-0 tf32x3) | off (needs `tf32x3_gemms`: tf32x3 + compose NbCl5 1.0412 / 1.0396) | rounding | `b8d977f4`, `1cd369e4` |
 | `COMPOSE_FAST` | on | on | on | n/a (with `COMPOSE_SKIP`, off) | bitwise | `b8d977f4`, `1cd369e4` |
 | `COUNT_PLAN` | on | on | off (tie 1.0000 / 1.0004) | n/a (with `COMPOSE_SKIP`, off) | bitwise | `b8d977f4` |
-| `JOINED_LAYOUT` | on | on | off (tie 1.0006 / 0.9986) | n/a (with `COMPOSE_SKIP`, off) | bitwise | `8aaace6b` |
+| `JOINED_LAYOUT` | on | on | on (12 Nov: the Triton backend joined too, 0.9586 / 0.9532, 0.9697 / 0.9729; the 8 Nov tie ran per path) | n/a (with `COMPOSE_SKIP`, off) | bitwise | `8aaace6b`, step-layout-cleanup |
 | `GENERIC_FOLD_READOUT_TAIL` (`species.GENERIC_FOLD_READOUT_TAIL_GPUS`) | on | on | on | on (removing it from the candidate set 1.0037 / 1.0048, 1.0071 / 1.0097) | rounding | `b8d977f4`, `1cd369e4`, ada-5060-screen |
 | `SORT_BY_LENGTH` (`neighbors.skin.SORT_BY_LENGTH_GPUS`) | on | on (not OFF23-small, -large) | on (0.9794 / 0.9815, 0.9890 / 0.9908) | on (0.9860 / 0.9868, 0.9967 / 0.9887) | rounding | `ec716912`, `ec25c9c4`, ada-5060-screen |
 | `SC_GENERATED` (`sc_generated.SC_GENERATED_GPUS`) | on | on | on (0.9785 / 0.9775, 0.9738 / 0.9749) | off (routed only under `tf32x3_gemms`, off on the 5060 Ti; with SC_FACTORED a tie in the adopted set 0.9995 / 0.9998, 0.9994 / 1.0026) | rounding | `9225793e`, `ec25c9c4` |
@@ -192,7 +192,7 @@ switches and the POLAR / OFF cells named there. A cell needs:
 | fused forward `LANE_INDICES` | A100, Ada, 5060 Ti | A/B only (bitwise) |
 | fused forward `WFRAG_REGION`, `TP_NOFLUSH` | Ada, 5060 Ti | A/B only (bitwise) |
 | fused forward `CG_FOLD` | Ada, 5060 Ti | A/B + gate |
-| CUTLASS `LINEAR_DIV`, `SKIP_SELECT` | Ada, 5060 Ti | A/B only (bitwise at kernel level) |
+| CUTLASS `SKIP_SELECT` (Ada: on the CUTLASS backend since 12 Nov), `LINEAR_DIV` (Ada on 12 Nov) | Ada (`SKIP_SELECT`), 5060 Ti (no CUTLASS cubin for sm_120) | A/B only (bitwise at kernel level) |
 | `R128` `MIN_BLOCKS` 8 for omat0-small | A100, Ada, 5060 Ti | A/B only (bitwise) |
 | spline `GEOM` | 5060 Ti (H200 measured 12 Nov: on) (now that SPLINE_W + STAGE_EDGES are on there) | A/B + gate |
 | `SC_FACTORED` | 5060 Ti only once SC_GENERATED is on there (it needs `tf32x3_gemms`; H200: lab bound under 1 %, no MD A/B) | A/B + gate |
