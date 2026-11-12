@@ -5,7 +5,7 @@ set -u
 RUN=${RUN:?set RUN}; SRC=${SRC:?set SRC}; OUT=${OUT:?set OUT}
 mkdir -p $OUT $RUN/tmp
 E=$HOME/environments/mace_cueq_oeq; SITE=$E/lib/python3.10/site-packages; C=$HOME/fastmace-cache/paper-exp1
-export PATH=$E/bin:/usr/lib/wsl/lib:$PATH PYTHONPATH=$SRC PYTHONDONTWRITEBYTECODE=1 FASTMACE_MODELS=$HOME/models \
+export PATH=$E/bin:/usr/lib/wsl/lib:$PATH PYTHONPATH=$SRC PYTHONDONTWRITEBYTECODE=1 FASTMACE_MODELS=$HOME/models FASTMACE_STRUCTURES=$HOME/fastmace-baseline/1a-T18 \
   FASTMACE_CACHE=$C TORCHINDUCTOR_CACHE_DIR=$C/inductor TRITON_CACHE_DIR=$C/triton MACE_COMPILE_CACHE=$C/compile \
   XDG_CACHE_HOME=$C/xdg TMPDIR=$RUN/tmp TORCHINDUCTOR_COMPILE_THREADS=4 CUDA_CACHE_DISABLE=1 \
   FASTMACE_HYBRID_PYTHON=$E/bin/python FASTMACE_SOURCE_COMMIT=$(cat $SRC/.source_commit) \
