@@ -63,6 +63,9 @@ def _decided(monkeypatch, name, capability, label="polar1-m", **constants):
     pytest.importorskip("cuda.bindings.driver")
     from fastmace.kernels.oeq_streaming import runtime
 
+    # every call starts from the defaults (a monkeypatch from an earlier call in the same test stays set)
+    constants = dict(SKIP_OUTSIDE=None, HOIST_DX=None, LATE_PULLBACK=None, WEIGHTED_VECTOR=None,
+                     SCALAR_PATHS=None) | constants
     for key, value in constants.items():
         monkeypatch.setattr(wp, key, value)
     monkeypatch.setattr(wp, "_device_name", lambda device: name)
