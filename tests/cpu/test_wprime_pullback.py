@@ -100,9 +100,9 @@ def test_transform_of_the_omat0_render():
     from fastmace.kernels.oeq_streaming import wprime_tuning as wt
     assert "dx_lane" in wt.hoist(out)  # HOIST_DX after it, or before it (the lab's captured H200 source):
     assert wpb.apply(wt.hoist(source), schedule, blocks, True).count("// LATE_PULLBACK path") == 10
-    applied = wpb.APPLIED
+    applied = wpb.APPLIED()
     wpb.apply(source, schedule, blocks, True)
-    assert wpb.APPLIED == applied + 1
+    assert wpb.APPLIED() == applied + 1
     with pytest.raises(ValueError):  # not with CHANNEL_VECTOR (its loop runs over cbase)
         wpb.apply(source.replace("const int lane =", "const int cbase = 0; const int lane =", 1), schedule, blocks,
                   True)

@@ -29,7 +29,12 @@ PROLOGUE_END = "    __syncthreads();\n    for (int64_t e = stage_s"
 SQRT3_INV = "0.57735026918962576451f"
 BLOCK_START = r"\{\s*\n\s*const int weight_index ="
 _FITS = {}
-APPLIED = 0  # sources transformed in this process (force_stress_gate --production-expect proof counter)
+_APPLIED = [0]  # sources transformed in this process
+
+
+def APPLIED():  # noqa: N802 (the proof counter: --production-expect / --b-expect wprime_pullback:APPLIED)
+    """Sources transformed in this process (force_stress_gate and ab_rewrites accept a function returning an int)."""
+    return _APPLIED[0]
 
 
 # --------------------------------------------------------------------------------------------- algebra (float64)
@@ -381,8 +386,7 @@ def apply(source, schedule, blocks, fold_alpha, direct=(0, 1, 2, 3)):
     # the prologue
     first, after = new.split(PROLOGUE_START, 1)
     after = after[after.index(PROLOGUE_END):]
-    global APPLIED
-    APPLIED += 1
+    _APPLIED[0] += 1
     return first + _prologue(path_list, channels) + after
 
 
