@@ -337,10 +337,14 @@ SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # prologue stages q = M g; per lane G = sum w grad phi (3) and R = sum dw/dt phi; G / sqrt(3) goes into the l = 1 dsh
 # slots and R into dr, so the outputs and the autograd graph are unchanged. Rounding. sm_90 census (OMAT-0 medium,
 # prologue included): 2,026 -> 1,826 instructions per edge, 96 -> 56 registers; sm_80 2,010 -> 1,799, 128 -> 64.
-# None: on for LATE_PULLBACK_GPUS (none yet); True / False: an A/B side's choice (float32 FACTORED kernels with
-# STAGE_DOUT, BLOCK_MESSAGE, HORNER and covered paths only; without CHANNEL_VECTOR, STAGE_QUADS and EDGE_FORCE).
+# None: on for LATE_PULLBACK_GPUS; True / False: an A/B side's choice (float32 FACTORED kernels with STAGE_DOUT,
+# BLOCK_MESSAGE, HORNER and covered paths only; without CHANNEL_VECTOR, STAGE_QUADS and EDGE_FORCE).
+# NVIDIA H200 (decision 66, 12 November 2026; OMAT-0 medium only, on top of SKIP_OUTSIDE + HOIST_DX): lab 0.859
+# (1,010.9 -> 868.9 us, 96 -> 56 registers); MD step b/a SrTiO3 10x10x10 0.9597 / 0.9612, NbCl5 0.9848 / 0.9825;
+# force/stress gate passed (NaCl, NbCl5, SrTiO3 3x3x3). Other H200 variants get it through GPUModels' family match.
+# A100: open (Alex job 4988692).
 LATE_PULLBACK = None
-LATE_PULLBACK_GPUS = GPUModels(())
+LATE_PULLBACK_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def spline_vector_default(device):

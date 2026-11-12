@@ -33,10 +33,19 @@ def test_forms_it_covers():
             wpb.form(*bad)
 
 
-def test_default_is_off(monkeypatch):
+def test_default_on_the_h200_only(monkeypatch):
+    """Decision 66 (12 November 2026): on for the H200 family (MD step SrTiO3 10x10x10 0.9597 / 0.9612, NbCl5
+    0.9848 / 0.9825; gate passed); the A100 stays off until its own A/B."""
     cpu = torch.device("cpu")
     monkeypatch.setattr(wp, "LATE_PULLBACK", None)
-    assert not wp.late_pullback_default(cpu) and len(wp.LATE_PULLBACK_GPUS) == 0
+    assert not wp.late_pullback_default(cpu) and set(wp.LATE_PULLBACK_GPUS) == {"NVIDIA H200"}
+    for name, on in (("NVIDIA H200", True), ("NVIDIA H200 NVL", True), ("NVIDIA A100-SXM4-80GB", False),
+                     ("NVIDIA GeForce RTX 5060 Ti", False), ("NVIDIA RTX 4000 Ada Generation", False)):
+        monkeypatch.setattr(wp, "_device_name", lambda device, name=name: name)
+        assert wp.late_pullback_default(None) is on, name
+    monkeypatch.setattr(wp, "_device_name", lambda device: "NVIDIA H200")
+    monkeypatch.setattr(wp, "LATE_PULLBACK", False)  # an A/B side's choice wins over the set
+    assert not wp.late_pullback_default(None)
     monkeypatch.setattr(wp, "LATE_PULLBACK", True)
     assert wp.late_pullback_default(cpu)
 

@@ -114,7 +114,7 @@ proof counter, 0 expect failures):
 (profile second) and $1.01 for the gate and A/B (profile fifth, metered).
 
 Still pending: the A100 (Alex job 4988692: lab, gate and A/B on the A100 plan) and the local 5060 Ti lab and gate with
-the H200 alias. Default unchanged until the conductor decides (`LATE_PULLBACK_GPUS` empty).
+the H200 alias. Conductor, 12 November 2026 (decision 66): on for the H200 (`LATE_PULLBACK_GPUS = ("NVIDIA H200",)`); the A100 waits for Alex 4988692.
 
 ## Design 2: per-degree hybrids (`masks.py`, `census_masks.py` → `census_masks.json`)
 
