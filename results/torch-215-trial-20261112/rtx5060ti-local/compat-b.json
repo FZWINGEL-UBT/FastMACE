@@ -1,0 +1,103 @@
+{
+ "checks": {
+  "import": {
+   "status": "ok",
+   "seconds": 18.747,
+   "value": {
+    "python": "3.11.16",
+    "torch": "2.15.0+cu132",
+    "cuda": "13.2",
+    "triton": "3.9.0",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "openequivariance": "0.7.0",
+    "nvrtc": "13.2",
+    "device": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+     12,
+     0
+    ],
+    "cudnn": 92600,
+    "oeq_runtime": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: built"
+   }
+  },
+  "nvrtc": {
+   "status": "ok",
+   "seconds": 0.252,
+   "value": {
+    "cubin_bytes": 5584,
+    "max_error": 0.0,
+    "np": "2.2.6"
+   }
+  },
+  "cutlass": {
+   "status": "ok",
+   "seconds": 0.003,
+   "value": {
+    "tf32x3-sm80": "<CUresult.CUDA_ERROR_NO_BINARY_FOR_GPU: 209>",
+    "tf32x3-sm90": "<CUresult.CUDA_ERROR_NO_BINARY_FOR_GPU: 209>",
+    "hybrid-sm80": "<CUresult.CUDA_ERROR_NO_BINARY_FOR_GPU: 209>",
+    "hybrid-sm90": "<CUresult.CUDA_ERROR_NO_BINARY_FOR_GPU: 209>",
+    "available_here": false
+   }
+  },
+  "compile": {
+   "status": "ok",
+   "seconds": 2.851,
+   "value": {
+    "first_call_s": 1.817,
+    "max_error": 7.62939453125e-06
+   }
+  },
+  "graph": {
+   "status": "ok",
+   "seconds": 0.027,
+   "value": {
+    "max_error": 7.62939453125e-06
+   }
+  },
+  "force": {
+   "status": "ok",
+   "seconds": 47.356,
+   "value": {
+    "build_s": 0.143,
+    "first_eval_s": 47.199,
+    "second_eval_s": 0.013,
+    "energy": -1076.7307161351812,
+    "fmax": 1.6768381595611572,
+    "stress": [
+     [
+      -0.03248465433716774,
+      0.00010738943092292175,
+      0.0002090016787406057
+     ],
+     [
+      0.00010738943092292175,
+      -0.03254321217536926,
+      6.569563993252814e-06
+     ],
+     [
+      0.0002090016787406057,
+      6.569563993252814e-06,
+      -0.032520879060029984
+     ]
+    ],
+    "repeat_force_diff": 1.430511474609375e-06,
+    "plan": null
+   }
+  },
+  "simulation": {
+   "status": "ok",
+   "seconds": 19.775,
+   "value": {
+    "build_s": 19.58,
+    "engine": "GraphEngine",
+    "plan_head": [
+     "Plan revision 0, tier graph (molecular dynamics on the graph tier)",
+     "  backend hybrid | force float32 | MC energy none (no MC) | runner in-process",
+     "  rewrites on (16): reassociate_first, fused_folded_backward, segmented_first_sum, streaming_conv,"
+    ]
+   }
+  }
+ }
+}

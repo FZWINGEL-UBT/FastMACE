@@ -1,0 +1,127 @@
+{
+ "checks": {
+  "import": {
+   "status": "ok",
+   "seconds": 27.718,
+   "value": {
+    "python": "3.11.16",
+    "torch": "2.15.0+cu132",
+    "cuda": "13.2",
+    "triton": "3.9.0",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "openequivariance": "0.7.0",
+    "nvrtc": "13.2",
+    "device": "NVIDIA RTX 4000 Ada Generation",
+    "capability": [
+     8,
+     9
+    ],
+    "cudnn": 92600,
+    "oeq_runtime": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: built"
+   }
+  },
+  "nvrtc": {
+   "status": "ok",
+   "seconds": 0.168,
+   "value": {
+    "cubin_bytes": 3240,
+    "max_error": 0.0,
+    "np": "2.2.6"
+   }
+  },
+  "cutlass": {
+   "status": "ok",
+   "seconds": 0.004,
+   "value": {
+    "tf32x3-sm80": "loaded",
+    "tf32x3-sm90": "<CUresult.CUDA_ERROR_NO_BINARY_FOR_GPU: 209>",
+    "hybrid-sm80": "loaded",
+    "hybrid-sm90": "<CUresult.CUDA_ERROR_NO_BINARY_FOR_GPU: 209>",
+    "available_here": false
+   }
+  },
+  "compile": {
+   "status": "ok",
+   "seconds": 3.47,
+   "value": {
+    "first_call_s": 1.999,
+    "max_error": 7.62939453125e-06
+   }
+  },
+  "graph": {
+   "status": "ok",
+   "seconds": 0.008,
+   "value": {
+    "max_error": 7.62939453125e-06
+   }
+  },
+  "force": {
+   "status": "ok",
+   "seconds": 50.63,
+   "value": {
+    "build_s": 0.168,
+    "first_eval_s": 50.449,
+    "second_eval_s": 0.01,
+    "energy": -1076.730646755375,
+    "fmax": 1.6768367290496826,
+    "stress": [
+     [
+      -0.03248459845781326,
+      0.00010738883429439738,
+      0.00020899211813230067
+     ],
+     [
+      0.00010738883429439738,
+      -0.03254314512014389,
+      6.566449883393943e-06
+     ],
+     [
+      0.00020899211813230067,
+      6.566449883393943e-06,
+      -0.0325208343565464
+     ]
+    ],
+    "repeat_force_diff": 1.6689300537109375e-06,
+    "plan": null
+   }
+  },
+  "simulation": {
+   "status": "error",
+   "seconds": 10.894,
+   "error": "ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 47 of 47 allocator segments are not expandable. Call configure_allocator before anything touches CUDA\nNext: Run this plan in a separate process (a fresh Python process or the subprocess runner).\nEnvironment: run `fastmace doctor` to check this installation.",
+   "frames": [
+    "    failure = self._build_and_prepare(planner, ff, atoms, stored, setup)",
+    "              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/simulation.py\", line 726, in _build_and_prepare",
+    "    failure = self._tagged(\"build\", error, stored)",
+    "              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/simulation.py\", line 745, in _tagged",
+    "    return self._failure(step, error, stored)",
+    "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/simulation.py\", line 776, in _failure",
+    "    raise error",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/simulation.py\", line 724, in _build_and_prepare",
+    "    self._engine = planner.build(self._plan, ff, atoms)",
+    "                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/planner/minimal.py\", line 1228, in build",
+    "    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(",
+    "             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/planner/fixed.py\", line 1880, in build",
+    "    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,",
+    "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/engine/graph.py\", line 223, in __init__",
+    "    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,",
+    "                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/engine/constraints.py\", line 198, in check_engine",
+    "    facts = {\"allocator\": check_allocator(config, segments),",
+    "                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+    "  File \"/mnt/homes/zwingel/t215/runs/leeloo/src/fastmace/engine/constraints.py\", line 142, in check_allocator",
+    "    raise ProcessConstraintError(",
+    "fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 47 of 47 allocator segments are not expandable. Call configure_allocator before anything touches CUDA",
+    "Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).",
+    "Environment: run `fastmace doctor` to check this installation."
+   ]
+  }
+ }
+}
