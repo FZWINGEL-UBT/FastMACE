@@ -53,6 +53,22 @@ Further changes asked for by the review:
   sentence that a native evaluator "inherits" back ends from LAMMPS is replaced.
 - **Open experiments.** Table 13 lists the five experiments the review ranks.
 
+## The fourth revision (12 November 2026): answer to the second review
+
+A second outside review, of commit `399069ec`, closed most reporting findings and raised six new ones. All six
+were checked and hold.
+
+| Finding | Check | Change in the paper |
+| --- | --- | --- |
+| 1. The packed-path forces are not "the gradient of the cubic model" | True. The reverse applies cubic Jacobians to adjoints from the packed forward | Section 5.1 gives the force as −J_c^T ∇φ(m_p) and says it is the gradient of neither energy; reporting the cubic energy would not help |
+| 2. The OMAT-0 small comparison mixes protocols | True. FastMACE's 2.12 ms is from a thermal start, 200 steps after 100, with 13 and 14 rebuilds (`results/h200-omat0-small-20261108/defaults2/breakdown/summary.json`) | Table 7 labels the row "mixed" and brackets the quotient; Section 8.4 no longer uses it |
+| 3. The wavefront storage account omits the partial-adjoint accumulator | True (`tiled.py` `_window`, `_close_now`) | Algorithm 2 names the accumulator; Section 6.1 gives M = 2,560 N_live + 2,048 N_open and the census values; "halves" is qualified |
+| 4. "Thermalised" overstates the RTX 5060 Ti runs | True. The Symmetrix-XL run moves from 187 to 233 K in its timed window | Abstract, Sections 8.1 and 8.4 and the conclusion say "thermal initial velocities and neighbour rebuilds"; the sentence that the force call does not depend on the protocol is replaced |
+| 5. Dates do not identify the coordinate path | True. `git merge-base` shows that no source revision in Table 10 contains the fix, including the two rows dated 11 November | Table 10's caption and Section 6.2 say that every row used float32 coordinates; the corrected path's paired cost on the A100 (1.028 / 1.029) is given |
+| 6. Appendix C assigns the paired protocol too broadly | True for all four named studies, and also for OMAT-0 small and the tiled path | Appendix C lists seven deviations; Tables 5, 9 and 11 point to them |
+
+Also repaired: the NVIDIA blog entry now links to the article itself.
+
 ## Where the numbers come from
 
 Every number in the paper is taken from a record in this repository or from a cited paper. Nothing was measured

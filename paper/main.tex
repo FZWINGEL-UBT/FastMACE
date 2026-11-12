@@ -22,6 +22,7 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,decorations.pathreplacing}
+\usepackage{xurl}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
 
 \captionsetup{font=small,labelfont=bf}
@@ -61,8 +62,8 @@ tensors, dense products run on tensor cores, and complete MD steps run on the GP
 storing only what the second interaction reads, and releasing it along a wavefront, lets a tiled evaluator
 handle systems far beyond device memory. For the OMAT-0 medium model on 5{,}000 atoms of SrTiO$_3$, recorded
 Langevin steps take 3.4\ms{} on an NVIDIA H200 and 6.2\ms{} on an A100. In a short benchmark that starts from
-rest, a step took 5.7\ms{} on the H200 against 14.6\ms{} for Symmetrix-XL~0.1.2; thermalised runs on a smaller
-GPU gave ratios of 2.1 and 3.1. On 18 rattled and strained test cells, force and stress errors stay within 1.3
+rest, a step took 5.7\ms{} on the H200 against 14.6\ms{} for Symmetrix-XL~0.1.2; runs with thermal initial
+velocities and neighbour rebuilds on a smaller GPU gave ratios of 2.1 and 3.1. On 18 rattled and strained test cells, force and stress errors stay within 1.3
 times the float32 error of the reference implementation, under an acceptance limit of three. The evidence has
 gaps, which we state: the default configuration has no energy-conservation record, its packed forward table is
 qualified offline only, the largest capacity runs predate a coordinate fix, and no downstream property has
@@ -399,13 +400,20 @@ Its qualification is offline and narrower: a test of the kind above for the thre
 value ratio of 0.16, and the acceptance rule passed on the three test crystals when the packed table was
 adopted. For another checkpoint or other species the packed values are unchecked.
 
-\paragraph{Energy and forces are then inconsistent.}
-The slopes of the packed quadratic would fail the test by three orders of magnitude, so the reverse pass reads
+\paragraph{The forces are then not the gradient of an energy.}
+The slopes of the packed quadratic would fail the test by three orders of magnitude, so the reverse kernel reads
 the float32 cubic, for the weight values in the adjoints of the features and the harmonics as well as for the
-slopes in the distance derivative. \emph{The forces are then the gradient of the cubic model, while the reported
-energy comes from the quadratic.} Both remain within the acceptance rule, but they are not consistent to
-round-off, and no energy-conservation run exists for this configuration (Section~\ref{sec:validation}).
-Symmetrix-XL does not have this problem: its forces are the derivative of the same spline that gives its energy.
+slopes in the distance derivative. The adjoint it receives, however, comes from a forward pass with the packed
+weights. Let $m_p(R)$ and $m_c(R)$ be the messages with packed and with cubic weights, $J_p$ and $J_c$ their
+Jacobians, and $\phi$ everything after the message. The returned force is
+\begin{equation}
+F \;=\; -J_c(R)^{\top}\,\nabla\phi\bigl(m_p(R)\bigr),
+\end{equation}
+whereas the gradient of the reported energy is $-J_p^{\top}\nabla\phi(m_p)$ and that of an all-cubic evaluation
+is $-J_c^{\top}\nabla\phi(m_c)$. \emph{The forces are therefore not, in general, the gradient of either
+energy}, and reporting the cubic energy instead would not make them so. They remain within the acceptance rule,
+but no energy-conservation run exists for this configuration (Section~\ref{sec:validation}). Symmetrix-XL does
+not have this problem: its forces are the derivative of the same spline that gives its energy.
 
 \subsection{Streaming the second interaction}
 \label{sec:conv}
@@ -645,8 +653,10 @@ call.
   \EndFor
   \For{$t \in G$}
     \State sweep 2 on $t$: read $x$ of its atoms and $s$ of its receivers
-    \State \hspace{1.5em} add $g^x$ to the open rows of its atoms; write $g^s$ over $s$ of its receivers
-    \State close every atom $a$ with $\mathrm{last}(a) = t$: its $g^x$ is complete and replaces its $x$
+    \State \hspace{1.5em} add $g^x$ to the accumulator (a row opens at an atom's first reader)
+    \State \hspace{1.5em} write $g^s$ over $s$ of its receivers
+    \State close every atom $a$ with $\mathrm{last}(a) = t$: copy its completed $g^x$ from the accumulator
+    \Statex \hspace{3em} over its $x$ and free the accumulator row
   \EndFor
   \For{each tile $u$ with $\mathrm{ready}(u) \le \max G$ whose sweep 3 has not run}
     \State sweep 3 on $u$: read $g^x$ and $g^s$ of its receivers, differentiate, return their rows
@@ -659,10 +669,11 @@ call.
 Sweep 2 of a tile reads $x$ for all atoms of its graph; they are owned by tiles in $\mathrm{needs}(t)$, whose
 sweep 1 has run (line 2). A receiver's $s$ is read only by its own tile's sweep 2, and afterwards only $g^s$ is
 read, so $g^s$ may overwrite $s$ in place. An atom's $x$ is read, and its $g^x$ added to, only by the sweep 2 of
-tiles whose graph contains it; after $\mathrm{last}(a)$ the sum is complete and $x$ is no longer needed, so the
-completed $g^x$ may take its row. Sweep 3 of a tile needs complete adjoints for its receivers, which holds once
-$\mathrm{ready}(u)$ has run (line 10). Every tile therefore computes what it computes in the plain schedule; only
-the order of the additions into the forces changes.
+tiles whose graph contains it. Between the first and the last of these tiles the original $x$ and the partial
+$g^x$ are both needed, so the partial sum lives in a separate accumulator; after $\mathrm{last}(a)$ the sum is
+complete, $x$ is no longer needed, and the completed $g^x$ takes its row. Sweep 3 of a tile needs complete
+adjoints for its receivers, which holds once $\mathrm{ready}(u)$ has run (line 11). Every tile therefore computes
+what it computes in the plain schedule; only the order of the additions into the forces changes.
 
 \paragraph{Periodic boundaries.}
 A halo atom across the boundary is owned by a tile at the other end of the sweep axis, so it enters
@@ -693,12 +704,21 @@ one axis, so state is held only for the tiles between the last and the first swe
 \end{figure}
 
 \paragraph{What is bounded and what still grows.}
-The workspace of a tile depends on the tile caps only, about 0.5\,MB per receiver. Three things still grow with
+The workspace of a tile depends on the tile caps only, about 0.5\,MB per receiver. Four things still grow with
 the atom count. The state rows: 2{,}560 bytes per atom that holds a row, and the share of atoms holding one at
 the same time falls with size, from 74--91\,\% at one million atoms to 30\,\% at ten million and 12\,\% at 149
-million. Per-atom arrays on the device for forces, energies and index maps, 60 to 100 bytes per atom. And the
-neighbour lists kept between calls, about 3 bytes per edge on the host. Overwriting in place halves the state:
-at 975{,}560 atoms it takes 2.5\,GB against 5.0\,GB. The state can live on the device or in host memory. With
+million. The accumulator for partial $g^x$: 2{,}048 bytes per atom between its first and its last reader. In
+float32 these two arrays take
+\begin{equation}
+M_{\text{state}} \;=\; 2{,}560\,N_{\text{live}} \;+\; 2{,}048\,N_{\text{open}} \quad\text{bytes},
+\end{equation}
+with $N_{\text{live}}$ the atoms holding a row and $N_{\text{open}}$ those with an open accumulator; in a census
+at ten million atoms the rows took 770 bytes and the accumulator 92 bytes per atom of the system. Per-atom
+arrays on the device for forces, energies and index maps, 60 to 100 bytes per atom. And the neighbour lists
+kept between calls, about 3 bytes per edge on the host. Reusing the rows for the adjoints removes the separate
+arrays for $g^x$ and $g^s$ of the plain schedule: at 975{,}560 atoms the rows take 2.5\,GB where separate
+arrays take 5.0\,GB, to which the accumulator has to be added. The state can live on the device or in host
+memory. With
 host state, copies cost about 5\,\% of a call at the largest sizes; at 975{,}560 atoms on an RTX 5060 Ti they
 took 1.0\,s of a 7.2\,s call. Symmetrix-XL keeps its inter-layer state on the device and reaches larger systems
 by spreading them over GPUs; FastMACE has no multi-GPU path and reaches them by moving the state to the host.
@@ -717,8 +737,10 @@ errors on a perfect crystal: $1.6\times10^{-4}$\,eV/\angstrom{} at 975{,}560 ato
 $1.3\times10^{-3}$\,eV/\angstrom{} at 149 million atoms and beyond. Since 11 November 2026 edge vectors are
 formed from float64 positions in a tile-local frame once the structure's extent reaches 64\,\angstrom{}, which
 reduces the residual to $3$--$4\times10^{-6}$\,eV/\angstrom{}. The corrected path has been run up to 975{,}560
-atoms. \emph{The capacity runs of Section~\ref{sec:large} were made before it}; their own records show the
-$1.3\times10^{-3}$\,eV/\angstrom{} residual.
+atoms, where it cost 2.8 to 2.9\,\% more than the float32 path on the A100 in a paired comparison. \emph{None of
+the runs in Table~\ref{tab:capacity} contains it}, including the two dated 11 November, whose revisions predate
+the fix: their own records show residuals of $1.7\times10^{-4}$\,eV/\angstrom{} at 975{,}560 atoms and
+$1.3\times10^{-3}$\,eV/\angstrom{} for the largest runs.
 
 \section{Numerical validation}
 \label{sec:validation}
@@ -773,7 +795,7 @@ The one whole-system record is an NVE run of NaCl (216 atoms, 10\,ps) from 2 Nov
 $-4\times10^{-6}$\,meV/ps with the Chebyshev tables and $9\times10^{-7}$\,meV/ps without them. It predates the
 spline weights and the packed forward table. The configuration that produced the step times of
 Section~\ref{sec:performance} has therefore never been run for energy conservation, although it is the one in
-which forces and energy are not consistent (Section~\ref{sec:tables}). Symmetrix-XL reports
+which the forces are not the gradient of an energy (Section~\ref{sec:tables}). Symmetrix-XL reports
 $-9\times10^{-7}$\,meV/ps per atom over 100\,ps on the 5{,}000-atom benchmark \cite{fu2026symmetrixxl}. For the
 tiled path the only record is a 1\,ps run of 40{,}000 atoms at 600\,K (0.002\,meV/ps per atom), too short to
 separate drift from fluctuation.
@@ -814,9 +836,13 @@ and warm-up are not. Three protocols appear.
       for Symmetrix-XL and two or three for FastMACE. In 25 steps under the thermostat the system reaches 18\,K,
       and \emph{the timed window contains no neighbour rebuild}. It measures the force call and the integrator,
       not sustained MD at 300\,K.
-\item The \textbf{thermal protocol} starts from a Maxwell--Boltzmann draw at 300\,K and times 300 steps after
-      100, or 3{,}000 after 500. Neighbour rebuilds occur.
+\item The \textbf{thermal-start protocol} starts from a Maxwell--Boltzmann draw at 300\,K and times 300 steps
+      after 100, or 3{,}000 after 500. Neighbour rebuilds occur. Equilibration is not established: starting
+      from the perfect lattice, the Symmetrix-XL run on SrTiO$_3$ moved from 187 to 233\,K during its timed
+      window, and FastMACE's temperatures were not logged.
 \end{itemize}
+Several adoption studies used other block counts or separate processes; Appendix~\ref{app:records} lists
+them.
 
 \subsection{Step times}
 
@@ -874,7 +900,9 @@ Hybrid TF32 / FP16 product                      & A100      & 11 Nov & 0.990 / 0
 \bottomrule
 \end{tabularx}
 \caption{Paired step-time ratios (new over old, below 1 is faster; medians of block means) from the studies on
-which each change was adopted. The baselines differ from row to row, so the ratios do not multiply to a total.}
+which each change was adopted. The baselines differ from row to row, so the ratios do not multiply to a total.
+The first row used eight blocks of 200 steps; the note behind the rows of 4 and 5 November does not state
+their schedule.}
 \label{tab:ab}
 \end{table}
 
@@ -920,19 +948,21 @@ GPU & Date & Run & Version, model, system & S-XL & FastMACE & Ratio & S-XL / Fas
 A100 PCIe   & 3 Nov & cold    & OMAT-0 medium, SrTiO$_3$ (5{,}000)        & 25.0  & 26.5 & 0.95 & 1.2 / 5.4\,GB \\
 H200        & 5 Nov & cold    & 0.1.1, same                               & 14.86 & 5.66 & 2.63 & -- \\
 H200        & 6 Nov & cold    & 0.1.2, same                               & 14.57 & 5.72 & 2.54 & -- \\
-H200        & 9 Nov & cold    & 0.1.2, OMAT-0 small, SrTiO$_3$ (5{,}000)  & 11.48 & 2.12 & 5.4  & -- \\
+H200        & 9 Nov & mixed   & 0.1.2, OMAT-0 small, SrTiO$_3$ (5{,}000)  & 11.48 & 2.12 & (5.4) & -- \\
 RTX 5060 Ti & 5 Nov & thermal & 0.1.1, OMAT-0 medium, SrTiO$_3$ (5{,}000) & 50.8  & 24.4 & 2.1  & 767 / 1{,}381\,MiB \\
 RTX 5060 Ti & 5 Nov & thermal & 0.1.1, OMAT-0 medium, NaCl (216)          & 3.58  & 1.15 & 3.1  & 455 / 720\,MiB \\
 \bottomrule
 \end{tabularx}
 \caption{Same-machine Langevin runs of Symmetrix-XL (``S-XL'', under LAMMPS) and FastMACE, each with the
 FastMACE defaults of its date. The ratio is the Symmetrix-XL time over the FastMACE time. ``Cold'' and
-``thermal'' are the protocols of Section~\ref{sec:protocols}: the cold runs contain no neighbour rebuild, the
-thermal runs 19 (SrTiO$_3$) and about 150 (NaCl) on the Symmetrix-XL side; FastMACE's rebuild counts and
-temperatures were not logged. The first row is from an external benchmark that does not state the version. In
-the H200 row of 5 November FastMACE ran with its A100 settings, which became its H200 defaults afterwards; with
-the generic settings it had until then the step took 13.1\ms{} (ratio 1.13). In the OMAT-0 small row the
-FastMACE time comes from a separate run of 8--9 November.}
+``thermal'' are the cold and the thermal-start protocols of Section~\ref{sec:protocols}: the cold runs contain
+no neighbour rebuild, the thermal-start runs 19 (SrTiO$_3$) and about 150 (NaCl) on the Symmetrix-XL side;
+FastMACE's rebuild counts and temperatures were not logged in these runs. The first row is from an external
+benchmark that does not state the version. In the H200 row of 5 November FastMACE ran with its A100 settings,
+which became its H200 defaults afterwards; with the generic settings it had until then the step took 13.1\ms{}
+(ratio 1.13). The OMAT-0 small row mixes protocols and is not a matched ratio: Symmetrix-XL ran cold, while the
+FastMACE time is from a separate run of 8--9 November with a thermal start, 200 steps after 100, and 13 to 14
+rebuilds in the timed window.}
 \label{tab:sx}
 \end{table}
 
@@ -941,16 +971,21 @@ of run have to be kept apart.
 
 \paragraph{Cold runs on the main benchmark.}
 On 3 November FastMACE was 6\,\% slower on an A100; its radial tables were not yet enabled on that GPU. On the
-H200 two days later it was 2.6 times faster, and the ratio held for version 0.1.2. With the smaller model of the
-same family the ratio was 5.4, because Symmetrix-XL gained only a factor 1.27 from the smaller model where
-FastMACE gained 2.7. These ratios hold for the cold protocol: 25 steps from rest, 5 to 18\,K, no rebuild. They
-say nothing about the overlapped neighbour rebuild of Section~\ref{sec:engine}, and they are not a ratio for
-equilibrated MD at 300\,K. A longer Symmetrix-XL run on the H200 (300 steps after 100, heating to 171\,K, with
-rebuilds) took 15.7\ms{} per step, 6\,\% more than its cold time; no matching FastMACE run exists.
+H200 two days later it was 2.6 times faster, and the ratio held for version 0.1.2. These ratios hold for the
+cold protocol: 25 steps from rest, 5 to 18\,K, no rebuild. They say nothing about the overlapped neighbour
+rebuild of Section~\ref{sec:engine}, and they are not a ratio for equilibrated MD at 300\,K. A longer
+Symmetrix-XL run on the H200 (300 steps after 100, heating to 171\,K, with rebuilds) took 15.7\ms{} per step,
+6\,\% more than its cold time; no matching FastMACE run exists.
 
-\paragraph{Thermal runs.}
-The two runs on the RTX 5060 Ti start at 300\,K and include rebuilds. There FastMACE was 2.1 and 3.1 times
-faster. They are the only comparisons under MD conditions, on one consumer GPU and on one date.
+\paragraph{The smaller model.}
+For OMAT-0 small the two times on record were taken under different protocols (Table~\ref{tab:sx}), so their
+quotient of 5.4 is not a matched ratio and is not used further. What the records do show is that Symmetrix-XL
+gained a factor 1.27 from the smaller model, both of its runs being cold.
+
+\paragraph{Runs with thermal initial velocities.}
+The two runs on the RTX 5060 Ti start from thermal velocities and include rebuilds. There FastMACE was 2.1 and
+3.1 times faster. They are closer to MD conditions than the cold runs but not equilibrated
+(Section~\ref{sec:protocols}), and they are on one consumer GPU and one date.
 
 \paragraph{Memory.}
 FastMACE used more GPU memory in every run: 1.6 to 1.8 times on the RTX 5060 Ti, and 4.5 times in the A100 run of
@@ -1000,8 +1035,9 @@ profiles: Symmetrix-XL~0.1.2 under a tracing profiler on 6 November, FastMACE on
 \end{figure}
 
 \paragraph{Where the difference arose.}
-The force call itself does not depend on the protocol, and Figure~\ref{fig:stages} shows its stages. On
-6 November Symmetrix-XL spent 6.4\ms{} in the first interaction, which FastMACE had already reduced to 0.4\ms{}
+Figure~\ref{fig:stages} shows the stages of the force call in the configurations that were profiled. Geometry,
+edge counts and padded capacities change with the protocol, so these are the stage costs of those profiles, not
+of every run. On 6 November Symmetrix-XL spent 6.4\ms{} in the first interaction, which FastMACE had already reduced to 0.4\ms{}
 by the rewrite of Section~\ref{sec:first}, and 3.9\ms{} in the reverse of the second interaction against
 1.8\ms{}. Its forward of the second interaction was the faster one, 0.95 against 1.62\ms{}, and FastMACE adopted
 that layout two days later.
@@ -1082,9 +1118,10 @@ Atoms & ms per step & $\mu$s per atom and step & Date of record \\
 214{,}375$^{\ast}$ & 1{,}526  & 7.1 & 9--10 Nov \\
 \bottomrule
 \end{tabular}
-\caption{MD step time of the whole-system path against system size on an RTX 5060 Ti (16\,GB), SrTiO$_3$.
-$^{\ast}$A different configuration from the rows above: memory-saving rewrites are active and the neighbour
-rebuild still uses the pairwise screen.}
+\caption{MD step time of the whole-system path against system size on an RTX 5060 Ti (16\,GB), SrTiO$_3$. The
+rows come from four studies with different timing schedules (Appendix~\ref{app:records}); the 69{,}120-atom
+values are from separate processes. $^{\ast}$A different configuration from the rows above: memory-saving
+rewrites are active and the neighbour rebuild still uses the pairwise screen.}
 \label{tab:size}
 \end{table}
 
@@ -1097,8 +1134,9 @@ device was the limit and the host held 129\,GB, or 0.7\,kB per atom; in the seco
 the constraint.
 
 These are \emph{capacity demonstrations, not accuracy-qualified results}. They are single force calls, not MD.
-They used the earlier coordinate path, so the forces carry the $1.3\times10^{-3}$\,eV/\angstrom{} error of
-Section~\ref{sec:coords}; whether the corrected path reaches the same sizes at the same cost has not been run.
+Like every row of the table they used the earlier coordinate path, so the forces of the largest runs carry the
+$1.3\times10^{-3}$\,eV/\angstrom{} error of Section~\ref{sec:coords}; whether the corrected path reaches the same
+sizes at the same cost has not been run.
 And the storage precision was left to the automatic choice of Section~\ref{sec:wavefront}, which kept float32 at
 180 and 320 million atoms and stored float16 at 398 million. Symmetrix-XL reports 11.2 million atoms on one A100
 with all state on the device, and 703 million atoms in MD on 64 GPUs \cite{fu2026symmetrixxl}.
@@ -1123,8 +1161,9 @@ Tiled, wavefront, host state in float16 (fails the rule) & A100-SXM4-80GB & 9--1
 \bottomrule
 \end{tabularx}
 \caption{Largest completed runs per path. The tiled rows are single force calls, not MD steps; 975{,}560 atoms
-is the largest device-state size on record, not a limit. All rows dated before 11 November, which include the
-three wavefront rows, used the float32 coordinate path that Section~\ref{sec:coords} replaces.}
+is the largest device-state size on record, not a limit. Every row used the float32 coordinate path that
+Section~\ref{sec:coords} replaces: the source revision of each run, including the two dated 11 November,
+predates the fix.}
 \label{tab:capacity}
 \end{table}
 
@@ -1158,7 +1197,8 @@ MACE-POLAR-1 S / M / L                    & A100-SXM4 & NbCl$_5$ (1{,}944)  & 7.
 \caption{Recorded MD step times for other models with their own defaults: OMAT-0 small, the organic force
 fields MACE-OFF23 \cite{kovacs2025maceoff} in three sizes (S, M, L), and the polarisable MACE-POLAR-1 models
 \cite{batatia2026macepolar}, whose long-range part runs in reciprocal space. The record summaries do not state
-the total charge and spin used for MACE-POLAR-1.}
+the total charge and spin used for MACE-POLAR-1. The timing schedules differ between the three groups
+(Appendix~\ref{app:records}).}
 \label{tab:models}
 \end{table}
 
@@ -1290,7 +1330,7 @@ remove the per-edge weight tensors of the second, and a reduced inter-layer stat
 the tiled path to hundreds of millions of atoms on one GPU. For the model studied here the recorded step time on
 an A100 is 6.2\ms{} and on an H200 3.4\ms{}, with static force and stress errors at the level of the float32
 reference. In a cold 25-step benchmark FastMACE was 2.5 to 2.6 times faster than Symmetrix-XL on the main
-benchmark, and 2.1 and 3.1 times in two thermalised runs. Symmetrix-XL remains ahead in validation, in memory
+benchmark, and 2.1 and 3.1 times in two runs with thermal initial velocities and neighbour rebuilds. Symmetrix-XL remains ahead in validation, in memory
 use and in reach across hardware and system size. What the paper does not yet have is one configuration whose
 speed, accuracy, dynamics and capacity are shown together; the experiments of Table~\ref{tab:experiments} are
 aimed at that.
@@ -1424,6 +1464,25 @@ comparisons of Table~\ref{tab:engines} deviate:
       after 300. The FastMACE revision is not recorded.
 \end{itemize}
 
+\paragraph{Deviations from the paired protocol.}
+The paired protocol of Section~\ref{sec:protocols} is 200 warm-up steps and six alternating blocks of 256 steps
+in one process. The following studies used another schedule:
+\begin{itemize}\setlength{\itemsep}{0.1em}
+\item \textbf{Radial tables, first evidence} (Table~\ref{tab:ab}, first row): eight blocks of 200 steps.
+\item \textbf{Cell-list screen} (Section~\ref{sec:large}; the 20{,}480- and 40{,}000-atom rows of
+      Table~\ref{tab:size}): six blocks of 128 steps.
+\item \textbf{69{,}120 atoms} (Table~\ref{tab:size}): not paired. Separate processes, 600 timed steps after
+      100, in the order ordered, shuffled, shuffled, ordered; the table gives the two ordered runs.
+\item \textbf{214{,}375 atoms and the whole-system capacity rows} (Tables~\ref{tab:size}
+      and~\ref{tab:capacity}): one process, 200 timed steps after 20.
+\item \textbf{MACE-OFF23} (Table~\ref{tab:models}): eight blocks of 1{,}000 steps after 500 warm-up steps.
+      MACE-POLAR-1 used the standard schedule.
+\item \textbf{OMAT-0 small} (Tables~\ref{tab:sx} and~\ref{tab:models}): not paired. One process from a thermal
+      start, 200 timed steps after 100.
+\item \textbf{Tiled path} (Table~\ref{tab:tiledab}): alternating blocks of force calls, not MD steps; four
+      blocks of two calls for the captured graphs.
+\end{itemize}
+
 \paragraph{Records.}
 Table~\ref{tab:records} names the record behind each table and figure. A record is a directory of the project
 repository that holds the job scripts, logs and results of one study.
@@ -1440,13 +1499,13 @@ Item & Record & Revision & Protocol \\
 Profile (Table~\ref{tab:profile}) & \texttt{step-limiters-20261109} & -- & counter profile \\
 Accuracy (Table~\ref{tab:gate}) & \texttt{sc0-op-20261109}, \texttt{hybrid-gemm-20261111} & \texttt{5c5ade67}, \texttt{4195be0d} & 18 cells \\
 Step times (Table~\ref{tab:steps}) & \texttt{sc0-op-20261109}, \texttt{hybrid-gemm-20261111}, \texttt{ada-5060-screen-20261110}, \texttt{step-limiters-20261109} & \texttt{5c5ade67}, \texttt{4195be0d}, \texttt{edfc0115} & paired \\
-Paired ratios (Tables~\ref{tab:ab}, \ref{tab:tiledab}) & provenance note; \texttt{tiled-speed-20261110}, \texttt{tiled-speed-20261111} & several & paired \\
-Symmetrix-XL runs (Table~\ref{tab:sx}) & \texttt{loup-a100} (note), \texttt{symmetrix-xl-h200-loup-20261105}, \texttt{sx012-profile-20261106}, \texttt{symmetrix-xl-h200-omat0-small-20261109}, \texttt{vram-compare-rtx5060ti-20261105}, \texttt{nacl-compare-rtx5060ti-20261105} & \texttt{7430fb51}, \texttt{d599cc70} (FastMACE, 3 and 6 Nov) & cold; thermal on the RTX 5060 Ti \\
+Paired ratios (Tables~\ref{tab:ab}, \ref{tab:tiledab}) & provenance note; \texttt{tiled-speed-20261110}, \texttt{tiled-speed-20261111} & several & paired; see above \\
+Symmetrix-XL runs (Table~\ref{tab:sx}) & \texttt{loup-a100} (note), \texttt{symmetrix-xl-h200-loup-20261105}, \texttt{sx012-profile-20261106}, \texttt{symmetrix-xl-h200-omat0-small-20261109}, \texttt{vram-compare-rtx5060ti-20261105}, \texttt{nacl-compare-rtx5060ti-20261105} & \texttt{7430fb51}, \texttt{d599cc70} (FastMACE, 3 and 6 Nov) & cold; thermal start; one mixed \\
 Stages (Figure~\ref{fig:stages}) & \texttt{sx012-profile-20261106}, \texttt{step-limiters-20261109} & \texttt{d599cc70} & profiles \\
 General engines (Table~\ref{tab:engines}) & phase-4 note; TorchSim and ALCHEMI comparison notes & \texttt{4c574d2}, \texttt{5a3166c}; see above & see above \\
-Size (Table~\ref{tab:size}) & \texttt{ada-5060-screen-20261110}, \texttt{binned-screen-5060ti-20261111}, \texttt{shuffled-order-5060ti-20261111}, \texttt{rung-b-20261109} & \texttt{b951e804}, \texttt{f31d4f50}, \texttt{cd56800c} & paired; 200 steps after 20 for the last row \\
+Size (Table~\ref{tab:size}) & \texttt{ada-5060-screen-20261110}, \texttt{binned-screen-5060ti-20261111}, \texttt{shuffled-order-5060ti-20261111}, \texttt{rung-b-20261109} & \texttt{b951e804}, \texttt{f31d4f50}, \texttt{cd56800c} & four schedules; see above \\
 Capacity (Table~\ref{tab:capacity}) & \texttt{rung-b-20261109}, \texttt{tiled-speed-20261111}, \texttt{tiled-capacity-20261109} & \texttt{cd56800c}, \texttt{d036568b}, \texttt{7e4fbf4c} & one compiled call after one eager call \\
-Other models (Table~\ref{tab:models}) & \texttt{off-polar-a100-20261108}, \texttt{h200-omat0-small-20261108} & \texttt{b4ec7053} & paired \\
+Other models (Table~\ref{tab:models}) & \texttt{off-polar-a100-20261108}, \texttt{h200-omat0-small-20261108} & \texttt{b4ec7053}, \texttt{e2206bb6} & three schedules; see above \\
 Radial tables (Section~\ref{sec:tables}) & \texttt{packed-table-lab-20261109}, \texttt{first-interaction-20261111} & -- & offline \\
 \bottomrule
 \end{tabularx}
