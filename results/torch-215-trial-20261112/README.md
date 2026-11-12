@@ -250,6 +250,54 @@ What this means:
 A100 (Alex job 4990485, cupti-python on native Linux): pending; it is queued and expected to start about
 21:47 CET.
 
+## 6b. Falsifier: Triton 3.9's tf32x3 gain on Triton 3.8 by an explicit register split (Ada, closed)
+
+Idea (conductor, owner-approved): split a and b in registers, then run three `tl.dot(..., "tf32")`.
+- The split rounds hi to nearest-even TF32 by an integer add and mask:
+  hi = (u + 0x0FFF + ((u >> 13) & 1)) & 0xFFFFE000, and lo = x − hi.
+- The three products run lo·hi first, then hi·lo, then hi·hi.
+- The aim was to stay on torch 2.14.1 + Triton 3.8 and drop the two extra shared-memory buffers of Triton 3.8's
+  `tf32x3` lowering.
+
+**Is the gain in these GEMMs?** Yes. All of Triton 3.9's gain on the Ada is in our `gemm` kernels (22 launches per
+step on SrTiO3 10³; matrix profiles):
+
+| | `gemm` kernels | Total kernel time |
+| --- | --- | --- |
+| Production (Triton 3.8) | 3324 µs | 17,326 µs |
+| t9 (Triton 3.9) | 2607 µs | 16,609 µs |
+| Difference | −717 µs | −717 µs |
+
+The CUTLASS sm_89 backend tied Triton 3.8 (ledger `ada-omat0-best`), so Triton 3.9 beats it too.
+
+**Falsifier.** Run: `jobs/split_lab.py` via `jobs/splitlab.sh`, on leto, CPU only (`triton.compile` for sm_89 and
+sm_120); records in `splitlab-leto/`. Setup:
+- the production tile: 64×64×32, 4 warps, 3 stages;
+- registers and spills from `ptxas -v`.
+
+| Triton | Kernel | Mode | Shared | `local_alloc` / `local_load` | Registers | Spill stores / loads |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3.8.0 | tf32x3_gemm | tf32x3 (production) | 48 KiB | 4 / 6 | 255 | 8 / 4 |
+| 3.8.0 | tf32x3_gemm | **register split** | **48 KiB** | **4 / 6** | 255 | 0 / 0 |
+| 3.8.0 | species_gemm | tf32x3 (production) | 48 KiB | 4 / 6 | 255 | 60 / 60 |
+| 3.8.0 | species_gemm | **register split** | **48 KiB** | **4 / 6** | 255 | **48 / 48** |
+| 3.8.0 | either | one tf32 dot (floor) | 32 KiB | 2 / 10 | 162 / 254 | 0 |
+| 3.9.0 | tf32x3_gemm | tf32x3 | 32 KiB | 2 / 2 | 255 | 0 |
+| 3.9.0 | tf32x3_gemm | register split | 32 KiB | 2 / 2 | 190 | 0 |
+| 3.9.0 | species_gemm | tf32x3 / register split | 32 KiB | 2 / 2 | 255 | 0 |
+
+**Verdict: stop.** Both conditions fail on sm_89: shared memory stays at 48 KiB, and species_gemm spills.
+- The extra buffers come from Triton 3.8's layout handling, not from its split. The split runs on the loaded tile
+  (blocked layout). Each of the four parts then goes through shared memory to reach the MMA operand layout.
+- Triton 3.9 keeps the conversion in registers, for its own `tf32x3` and for the explicit split alike.
+- No PTX `cvt.rna.tf32` in the split, so the opt5-T01 double-rounding trap does not arise. The question is moot
+  anyway.
+- Not tested, a different idea: Triton 3.8 `tf32x3` with 2 stages (32 KiB). It would need its own lab.
+
+The ways to get the 717 µs remain:
+- Triton 3.9 itself (t9: torch 2.14.1 + Triton 3.9 on Python 3.11);
+- a hand-written MMA kernel, such as `species_gemm`'s NVRTC tensor-core path.
+
 ## 7. Recommendations
 
 1. **Stay on 2.14.1.**
