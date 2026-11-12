@@ -7,7 +7,7 @@ Branch `fastmace/wprime-late-pullback`.
 
 | Design | What | Result | Verdict |
 |---|---|---|---|
-| 1 | Four-component backward: per lane only G = Σ w ∇φ (3) and R = Σ w′ φ, geometry once per edge | CPU algebra exact; sm_90 census 0.901 of skip+hoist at 56 regs (stop rule: ≤ 0.933 at ≤ 96) | **passes the census; GPU checks below** |
+| 1 | Four-component backward: per lane only G = Σ w ∇φ (3) and R = Σ w′ φ, geometry once per edge | CPU algebra exact; sm_90 census 0.901 at 56 regs; H200 kernel 0.859, gate passes, MD step 0.960 (SrTiO3 10³) / 0.984 (NbCl5) | **H200 win; A100 pending** |
 | 2 | Per edge degree l spherical or direct (16 masks) | every hybrid dominated by all-direct | closed |
 | 3 | Irrep-first loop nest (one harmonic block live), compile-only | 64 regs, but +31 % instructions | rejected |
 
@@ -84,8 +84,37 @@ the copy loops weighted by their trip counts, and there are 1.41 receiver runs p
 
 ### Step 3: GPU checks
 
-(in progress: the local 5060 Ti with the H200 plan alias for the kernel lab and the 3× float32 gate, and Alex A100
-job 4988692 for the lab, gate and MD-step A/B in both orders. Results go here.)
+**H200** (Modal, source `ca0b04b1`, `tools/modal/late_pullback_h200.sh`; the owner launched the lab, the gate and
+A/B ran as one `--owner-override` job, owner via conductor: "i approve"). Records: `h200-lab/`, `h200-job/`.
+
+Isolated kernel (`tools/omat0_kernel_lab.py`, SrTiO3 10³ capture, 21 rounds; base = today's default skip+hoist):
+
+| variant | time | ratio | regs | vs base |
+|---|---:|---:|---:|---|
+| base (skip+hoist) | 1,010.9 µs | 1.000 | 96 | |
+| lp (LATE_PULLBACK) | 868.9 µs | **0.859** | 56 | dL/dv max 7.6e-7 (median edge 4.7e-7), dx 2.8e-7 |
+
+The census predicted 0.901. The measured kernel gains more, probably because 56 registers allow higher occupancy
+than 96.
+
+3× float32 gate (`tools/force_stress_gate.py`, LATE_PULLBACK=True, proof counter APPLIED, 0 expect failures): passes on
+NaCl, NbCl5 and SrTiO3 3×3×3 (forces ratio to the ASE float32 spread 0.87 / 0.94 / 0.88; energy and stress pass).
+
+MD-step A/B (`tools/ab_rewrites.py`, same process, 1 fs, skin 0.5, 200 warm-up, 8 × 256 steps; b = LATE_PULLBACK on,
+proof counter, 0 expect failures):
+
+| structure | order | a (default) | b (lp) | b/a |
+|---|---|---:|---:|---:|
+| SrTiO3 10³ | ab | 3.2041 ms | 3.0748 ms | 0.9597 |
+| SrTiO3 10³ | ba | 3.1991 ms | 3.0749 ms | 0.9612 |
+| NbCl5 | ab | 1.0354 ms | 1.0197 ms | 0.9848 |
+| NbCl5 | ba | 1.0363 ms | 1.0182 ms | 0.9825 |
+
+**H200: about 4 % off the MD step on SrTiO3 10³ (3.20 → 3.07 ms) and 1.6 % on NbCl5, in both orders.** The H200 cost was $0.06 for the lab
+(profile second) and $1.01 for the gate and A/B (profile fifth, metered).
+
+Still pending: the A100 (Alex job 4988692: lab, gate and A/B on the A100 plan) and the local 5060 Ti lab and gate with
+the H200 alias. Default unchanged until the conductor decides (`LATE_PULLBACK_GPUS` empty).
 
 ## Design 2: per-degree hybrids (`masks.py`, `census_masks.py` → `census_masks.json`)
 
