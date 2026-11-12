@@ -5,7 +5,8 @@ compose_in_graph_bind``: the capture composes the weights, the graph replays the
 with the library's (composed once, outside the capture). Per engine: the Python calls of ``compose_skip.composed``
 inside and outside a capture (graph replays make none: a call inside a capture is a composition in the graph), the
 library's ``CAPTURE_ADOPTS``, and after the steps the forces, positions, velocities and every composed weight on the
-host. ``b`` against ``b2`` is the run-to-run control; ``a`` against ``b`` is the claim (bitwise where the control is).
+host, plus the build's forces (identical positions on every engine) and the state after one step. ``b`` against ``b2``
+is the run-to-run control; ``a`` against ``b`` is the claim (bitwise where the control is).
 
 Usage: python gpu_smoke.py --checkpoint CK --structure SrTiO3.cif@3x3x3 --steps 200 --output out.json
 """
@@ -71,7 +72,12 @@ def main(argv=None):
         plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
         engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
         built = dict(calls)
-        for _ in range(args.steps):
+        torch.cuda.synchronize()
+        first = engine.state.forces.detach().cpu().clone()  # the build's forces: the same positions on every engine
+        engine.step()
+        torch.cuda.synchronize()
+        one = {key: getattr(engine.state, key).detach().cpu().clone() for key in ("positions", "velocities", "forces")}
+        for _ in range(args.steps - 1):
             engine.step()
         torch.cuda.synchronize()
         ff = engine.force_field
@@ -80,7 +86,7 @@ def main(argv=None):
         runs[name] = dict(
             state={key: getattr(engine.state, key).detach().cpu().clone() for key in ("positions", "velocities",
                                                                                        "forces")},
-            weights=weights,
+            weights=weights, first=first, one=one,
             counts=dict(build_in_capture=built["in_capture"] - before["in_capture"],
                         build_outside=built["outside"] - before["outside"],
                         steps_in_capture=calls["in_capture"] - built["in_capture"],
@@ -96,6 +102,11 @@ def main(argv=None):
         for key in x["state"]:
             a, b = x["state"][key], y["state"][key]
             out[key] = dict(bitwise=bool(torch.equal(a, b)), max_abs=float((a - b).abs().max()))
+        out["build_forces"] = dict(bitwise=bool(torch.equal(x["first"], y["first"])),
+                                   max_abs=float((x["first"] - y["first"]).abs().max()))
+        for key in x["one"]:
+            a, b = x["one"][key], y["one"][key]
+            out[f"step1_{key}"] = dict(bitwise=bool(torch.equal(a, b)), max_abs=float((a - b).abs().max()))
         out["weights_bitwise"] = (len(x["weights"]) == len(y["weights"])
                                   and all(torch.equal(a, b) for a, b in zip(x["weights"], y["weights"])))
         return out

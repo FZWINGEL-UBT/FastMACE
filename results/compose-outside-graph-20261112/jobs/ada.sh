@@ -33,19 +33,24 @@ prod_env() {
     MACE_COMPILE_CACHE=$OUT/cache/compile XDG_CACHE_HOME=$OUT/cache/xdg
 }
 note "host=$(hostname) gpu=$(LC_ALL=C nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) src=$(cat $SRC/.source_commit)"
+# SrTiO3 (cubic, a = 3.905 A) as a file for read_structure (tools/bench/capacity_scan.py's cell)
+[ -f $OUT/SrTiO3.cif ] || (prod_env; cd $SRC && $E/bin/python -c "
+import sys; sys.path.insert(0, 'tools/bench'); import capacity_scan as cs; from ase.io import write
+write('$OUT/SrTiO3.cif', cs.base_cell('SrTiO3')[1])" >> $OUT/cif.log 2>&1)
+ST=$OUT/SrTiO3.cif
 K="fastmace.rewrites.mh1.modules:FirstInteractionReassociation.bind=compose_in_graph_bind"
 X=fastmace.rewrites.mh1.modules:CAPTURE_ADOPTS
 for job in "$@"; do
   idle "$job" || exit 3
   note "start $job"
   case $job in
-    smoke) (prod_env; cd $SRC && for st in NbCl5 SrTiO3@4x4x4; do
+    smoke) (prod_env; cd $SRC && for st in NbCl5 $ST@4x4x4; do
               $E/bin/python results/compose-outside-graph-20261112/gpu_smoke.py --checkpoint $CK --structure $st \
-                --steps 300 --output $OUT/smoke-${st%%@*}.json > $OUT/smoke-${st%%@*}.log 2>&1 < /dev/null
-              echo "smoke $st exit=$? $(grep -h '\"ok\"' $OUT/smoke-${st%%@*}.json)"; done) | tee -a "$log" ;;
+                --steps 300 --output $OUT/smoke-$(basename ${st%%@*} .cif).json > $OUT/smoke-$(basename ${st%%@*} .cif).log 2>&1 < /dev/null
+              echo "smoke $st exit=$? $(grep -h '\"ok\"' $OUT/smoke-$(basename ${st%%@*} .cif).json)"; done) | tee -a "$log" ;;
     ab-ab|ab-ba) order=${job#ab-}; pattern=$([ $order = ab ] && echo abab || echo abba)
            (prod_env; cd $SRC && $E/bin/python tools/bench/ab_swap.py --swap $K --output $OUT/$job --checkpoint $CK \
-              --model omat0-medium --structures SrTiO3@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6 \
+              --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6 \
               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5 \
               --b-expect $X > $OUT/$job.log 2>&1 < /dev/null
             echo "$job exit=$? $(grep -h -E 'b/a|wrong side' $OUT/$job.log | tr '\n' ' ' | cut -c1-600)") | tee -a "$log" ;;
