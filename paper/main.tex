@@ -400,18 +400,21 @@ Its qualification is offline and narrower: a test of the kind above for the thre
 value ratio of 0.16, and the acceptance rule passed on the three test crystals when the packed table was
 adopted. For another checkpoint or other species the packed values are unchecked.
 
-\paragraph{The forces are then not the gradient of an energy.}
+\paragraph{The reverse is no longer consistent with the evaluated energy.}
 The slopes of the packed quadratic would fail the test by three orders of magnitude, so the reverse kernel reads
 the float32 cubic, for the weight values in the adjoints of the features and the harmonics as well as for the
 slopes in the distance derivative. The adjoint it receives, however, comes from a forward pass with the packed
-weights. Let $m_p(R)$ and $m_c(R)$ be the messages with packed and with cubic weights, $J_p$ and $J_c$ their
-Jacobians, and $\phi$ everything after the message. The returned force is
+weights. Schematically, let $m_p(R)$ and $m_c(R)$ be this interaction's messages with packed and with cubic
+weights, $J_p$ and $J_c$ their Jacobians, and $\phi(R,m)$ the rest of the model, which also depends on the
+positions directly: through the first interaction's readout, the skip features, the density and the pair
+energy. The returned force is
 \begin{equation}
-F \;=\; -J_c(R)^{\top}\,\nabla\phi\bigl(m_p(R)\bigr),
+F \;=\; -\,\partial_R\phi(R,m_p) \;-\; J_c(R)^{\top}\,\partial_m\phi(R,m_p),
 \end{equation}
-whereas the gradient of the reported energy is $-J_p^{\top}\nabla\phi(m_p)$ and that of an all-cubic evaluation
-is $-J_c^{\top}\nabla\phi(m_c)$. \emph{The forces are therefore not, in general, the gradient of either
-energy}, and reporting the cubic energy instead would not make them so. They remain within the acceptance rule,
+whereas the gradient of the reported energy has $J_p$ in place of $J_c$, and that of an all-cubic evaluation
+has $m_c$ in place of $m_p$. \emph{The forces therefore match, in general, the energy gradient of neither
+evaluator}, and reporting the cubic energy instead would not change that. Whether they derive from some other
+potential is not established. They remain within the acceptance rule,
 but no energy-conservation run exists for this configuration (Section~\ref{sec:validation}). Symmetrix-XL does
 not have this problem: its forces are the derivative of the same spline that gives its energy.
 
@@ -712,8 +715,10 @@ float32 these two arrays take
 \begin{equation}
 M_{\text{state}} \;=\; 2{,}560\,N_{\text{live}} \;+\; 2{,}048\,N_{\text{open}} \quad\text{bytes},
 \end{equation}
-with $N_{\text{live}}$ the atoms holding a row and $N_{\text{open}}$ those with an open accumulator; in a census
-at ten million atoms the rows took 770 bytes and the accumulator 92 bytes per atom of the system. Per-atom
+with $N_{\text{live}}$ and $N_{\text{open}}$ the peak numbers of atoms that hold a row and that have an open
+accumulator. Both pools are allocated at their peak size for the whole call, so the memory does not fall when
+the occupancy does. In a census at ten million atoms the rows took 770 bytes and the accumulator 92 bytes per
+atom of the system. Per-atom
 arrays on the device for forces, energies and index maps, 60 to 100 bytes per atom. And the neighbour lists
 kept between calls, about 3 bytes per edge on the host. Reusing the rows for the adjoints removes the separate
 arrays for $g^x$ and $g^s$ of the plain schedule: at 975{,}560 atoms the rows take 2.5\,GB where separate
@@ -795,7 +800,8 @@ The one whole-system record is an NVE run of NaCl (216 atoms, 10\,ps) from 2 Nov
 $-4\times10^{-6}$\,meV/ps with the Chebyshev tables and $9\times10^{-7}$\,meV/ps without them. It predates the
 spline weights and the packed forward table. The configuration that produced the step times of
 Section~\ref{sec:performance} has therefore never been run for energy conservation, although it is the one in
-which the forces are not the gradient of an energy (Section~\ref{sec:tables}). Symmetrix-XL reports
+which the reverse pass is not consistent with the evaluated energy (Section~\ref{sec:tables}). Symmetrix-XL
+reports
 $-9\times10^{-7}$\,meV/ps per atom over 100\,ps on the 5{,}000-atom benchmark \cite{fu2026symmetrixxl}. For the
 tiled path the only record is a 1\,ps run of 40{,}000 atoms at 600\,K (0.002\,meV/ps per atom), too short to
 separate drift from fluctuation.

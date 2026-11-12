@@ -69,6 +69,13 @@ were checked and hold.
 
 Also repaired: the NVIDIA blog entry now links to the article itself.
 
+A third review, of commit `f25e81be`, found the six findings resolved and no new substantive issue. It asked
+for two clarifications, both made: the force expression in Section 5.1 is scoped to this message's
+contribution, with the direct term written out, and its heading says only that the reverse is not consistent
+with the evaluated energy; and the memory formula in Section 6.1 counts allocated peak capacities, since both
+pools are preallocated. Its recommendation: put further effort into the experiments of Table 13, not into
+another wording revision.
+
 ## Where the numbers come from
 
 Every number in the paper is taken from a record in this repository or from a cited paper. Nothing was measured
