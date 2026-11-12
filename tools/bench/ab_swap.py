@@ -92,7 +92,14 @@ def main(argv=None):
         swaps.append((module, attr, name))
     ab_step_time.prepare_fastmace_hybrid()  # before anything imports MACE
     install(swaps)
-    result = ab_rewrites.main([*rest, "--a-constant", "ab_swap:SIDE='a'"])
+    # One --a-constant list: argparse keeps only the last occurrence, so a caller's own side-a constants join this one
+    # (before 12 November 2026 they were dropped; step-layout-cleanup).
+    if "--a-constant" in rest:
+        rest = list(rest)
+        rest.insert(rest.index("--a-constant") + 1, "ab_swap:SIDE='a'")
+    else:
+        rest = [*rest, "--a-constant", "ab_swap:SIDE='a'"]
+    result = ab_rewrites.main(rest)
     trace = [dict(side=side, phase=phase, code=code, attribute=attr, calls=n)
              for (side, phase, code, attr), n in sorted(CALLS.items())]
     wrong = [t for t in trace if (t["side"] == "a") != (t["code"] == "reference")]

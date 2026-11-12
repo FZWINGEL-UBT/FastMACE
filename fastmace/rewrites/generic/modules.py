@@ -502,7 +502,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
     if kind == "residual":
         sc = self.truncate_ghosts(sc, n_real)
         message = self.linear(message) / self.avg_num_neighbors
-        return self.reshape(message), sc
+        return _reshaped(self.reshape, message), sc
     # kernels.triton.compose_skip: the reassociation composed its products with the linear and the skip where it ran
     # on every row (no tiles, or first_table_region, which always does); only the division is left
     if (kind == "density" and getattr(reassociation, "compose_skip", None) is not None
@@ -517,7 +517,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             view = reshape_view(self.reshape, message)
             if view is not None:
                 return view, divisor
-        return self.reshape(message), divisor
+        return _reshaped(self.reshape, message), divisor
     divided = None
     if early_density is not None and isinstance(message, tuple):
         pass  # first_div: the blocks are divided already (the linear is the identity)
@@ -536,7 +536,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
             view = reshape_view(self.reshape, message)
             if view is not None:
                 return view, None
-        return self.reshape(message), None
+        return _reshaped(self.reshape, message), None
     sc = self.truncate_ghosts(sc, n_real)
     if divided is not None:  # the epilogue's output is reshape_irreps' [n, irreps, mul] tensor already
         from fastmace.rewrites.linear.modules import reshape_view
@@ -544,7 +544,19 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         view = reshape_view(self.reshape, message)
         if view is not None:
             return view, sc
-    return self.reshape(message), sc
+    return _reshaped(self.reshape, message), sc
+
+
+def _reshaped(reshape, message):
+    """MACE's ``reshape_irreps(message)``, as a view of ``message`` where that is its value (``reshape_view``:
+    cuEquivariance's ir_mul layout with one multiplicity), else reshape's own copy. The copy was an Inductor cat of
+    the whole message per interaction, fused with the density division (step-layout-cleanup, 12 November 2026: Ada
+    attribution 481 µs forward and 313 µs backward of a 16.9 ms SrTiO3 10³ step at ``generic/modules.py:530``);
+    the view holds the same values in the same (contiguous) order, so every consumer reads bitwise the same."""
+    from fastmace.rewrites.linear.modules import reshape_view
+
+    view = reshape_view(reshape, message) if isinstance(message, torch.Tensor) else None
+    return view if view is not None else reshape(message)
 
 
 class GenericFoldedRadial(torch.nn.Module):
@@ -742,6 +754,12 @@ class SpeciesSkip(torch.nn.Module):
         # SPECIES_GEMM None: the device's default, fixed when the module is built on it
         self.species_gemm_gpu = (columns.is_cuda and torch.cuda.get_device_name(columns.device) in SPECIES_GEMM_GPUS)
 
+    def plan_columns(self):
+        """The node_attrs columns of the species plan the grouped forward builds (``SPECIES_GEMM``), or None where it
+        builds none: the force field builds the plan outside the step and binds it (``species_gemm.bind_plan``)."""
+        on = self.species_gemm_gpu if SPECIES_GEMM is None else SPECIES_GEMM
+        return self.columns if on else None
+
     def _view(self, x, segment):
         offset, mul, dim = segment
         block = x[:, offset:offset + dim]
@@ -792,10 +810,14 @@ class SpeciesSkip(torch.nn.Module):
             if selected is not None:
                 return selected
         if grouped:
-            from fastmace.kernels.triton.species_gemm import species_mm, species_plan
-            kind = onehot.argmax(dim=1)
+            from fastmace.kernels.triton.species_gemm import bound_plan, species_mm, species_plan
             precision = "tf32x3" if self.tf32x3 else "ieee"
-            order, counts = species_plan(kind, species)
+            plan = bound_plan(self, atoms)  # the force field's, built outside the step (species_gemm.bind_plan)
+            if plan is not None:
+                kind, order, counts = plan
+            else:
+                kind = onehot.argmax(dim=1)
+                order, counts = species_plan(kind, species)
         for index, (i, j) in enumerate(self.pairs):
             weight = getattr(self, f"w{index}")
             xi = blocks_in[i] if blocks_in is not None else self._view(x1, self.segments_in[i])  # [atoms, size, mul]
