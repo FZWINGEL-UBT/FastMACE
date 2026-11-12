@@ -64,7 +64,8 @@ The spline grid is the same in (a) and (b), certificate 0.48:
     manifest).
   - `nve` starts from a saved state and logs E_pot + E_kin and E_kin every 100 steps (CSV).
   - The drift is a least-squares slope with its ordinary standard error. The ± values quoted here are the standard
-    error inflated for the residuals' lag-1 autocorrelation.
+    error inflated for the residuals' lag-1 autocorrelation. Even so, they understate run-to-run scatter by about
+    4×; see §4.
 - Job scripts and helpers are in `jobs/`:
   - `local_common.sh` holds the local guards: `wrap_frac.py` (memory fraction 0.9 after FastMACE's allocator
     settings), and a watchdog on GPU-process memory > 14.8 GiB, card > 16,000 MiB, new soft-lockup or RCU-stall
@@ -178,11 +179,12 @@ Protocol:
 | A100 | c-1500K | +1.54e-05 ± 1.1e-05 | 3.58e-03 | 2.49e-02 | 1510.6 | 1510.4 / 1510.6 | 13802 | 24.33 | 5be2c22c |
 
 How to read the table:
-- **The fitted standard error understates the run-to-run scatter.** The seven 300 K drifts have a standard deviation
-  of 3.7e-6 meV/atom/ps, about four times their standard errors. The autograd control (c), consistent by
-  construction, lands 5 SE from zero on the A100.
-- So the drift floor of float32 MD here is a few 1e-6 meV/atom/ps at 300 K. Both (a) and (b) sit at that floor on
-  every GPU, with no consistent sign.
+- **The AR(1) standard errors understate run-to-run scatter.** Do not read a drift as significant from its ± alone.
+  The seven 300 K drifts (all GPUs, a, b and c) have a standard deviation of **3.7e-6 meV/atom/ps**, about four
+  times their standard errors. The autograd control (c), consistent by construction, lands 5 SE from zero on the
+  A100.
+- **The drift floor is 3.7e-6 meV/atom/ps at 300 K**, the 7-run SD (mean +1.2e-6). Every (a) and (b) lies within
+  ±1.6 SD of zero, with no consistent sign.
 - At 1,500 K four runs scatter within ±1.5e-5. The Ada (a), at −4.8e-5, is the one outlier: −2.4e-3 meV/atom over
   50 ps, 0.7× its own RMS. That is about what the 300 K scatter-to-SE ratio predicts for 1,500 K (about 4e-5), but the
   A100's (a) on its own state is +6e-6. The replicate below settles it.
