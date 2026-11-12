@@ -65,6 +65,11 @@ for job in "$@"; do
            (prod_env; cd $SRC && $E/bin/python tools/ab_rewrites.py --output $OUT/$job --checkpoint $CK               --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5               --b-constant $B5 > $OUT/$job.log 2>&1 < /dev/null
             echo "$job exit=$? $(grep -h -E 'b/a' $OUT/$job.log | tr '
 ' ' ' | cut -c1-600)") | tee -a "$log" ;;
+    gate) # the 3x float32 force / stress gate of side b's constants (GATEC), as ada-5060-screen's gate.sh: OMAT-0
+          # medium, NaCl and NbCl5 3x3x3, against the float64 reference
+          (prod_env; export FASTMACE_STRUCTURES=$H/ResearchModule; cd $SRC && $E/bin/python tools/force_stress_gate.py               --output $OUT/gate --engine fastmace --model omat0-medium --checkpoint $CK               --structures-root $FASTMACE_STRUCTURES --structures NaCl NbCl5 --repeat 3 3 3               --production-constant ${GATEC:?set GATEC} > $OUT/gate.log 2>&1 < /dev/null
+           echo "gate exit=$? $(grep -hiE 'verdict|passed|failed|ratio' $OUT/gate.log | tail -n 8 | tr '
+' ';' | cut -c1-700)") | tee -a "$log" ;;
     prof) for st in SrTiO3:10x10x10 NbCl5:3x3x3; do s=${st%%:*}; c=$OUT/pcache-$s; rm -rf $c; mkdir -p $c
             (cd $SRC && export ENVROOT=$H/environments PYTHONPATH=$SRC FM_SRC=$SRC FASTMACE_MODELS=$H/ResearchModule/Models \
               FASTMACE_STRUCTURES=$H/ResearchModule TMPDIR=$OUT/tmp PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
