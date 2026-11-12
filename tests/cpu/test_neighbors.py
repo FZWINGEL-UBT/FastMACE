@@ -703,3 +703,27 @@ def test_the_planner_turns_edge_index_int32_on_on_measured_gpus_only():
     other = planner().plan(traits("omat0-medium"), nacl(), fixed.IntegratorConfig(), h200, model_label="omat0-medium")
     _, choice, why = other.decision("NeighbourConfig.edge_index_int32")
     assert other.neighbours.edge_index_int32 == choice == "off" and "not a measured GPU" in str(why)
+
+
+def test_edge_index_int32_stays_off_for_mh1_on_the_a100():
+    """Decision 66 per-model off-list (fastmace/mh1-catchup, 13 November 2026): int64 indices were faster for MH-1 on
+    the A100 in both orders and both cells, so "auto" stays off for its three heads there; OMAT-0 keeps int32, and
+    MH-1 keeps it on the Ada."""
+    import dataclasses
+
+    from test_planner import GPU, planner, traits
+
+    from fastmace.planner import fixed
+
+    assert set(fixed.DECISION_66_EDGE_INDEX_INT32_MODEL_OFF_GPUS) == {"mh1-r2scan", "mh1-omat", "mh1-mp"}
+    for name in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"):
+        a100 = dataclasses.replace(GPU, name=name, compute_capability=(8, 0))
+        plan = planner().plan(traits("mh1-r2scan"), nacl(), fixed.IntegratorConfig(), a100, model_label="mh1-r2scan")
+        _, choice, why = plan.decision("NeighbourConfig.edge_index_int32")
+        assert choice == "off" and "per-model off-list" in str(why), name
+        omat = planner().plan(traits("omat0-medium"), nacl(), fixed.IntegratorConfig(), a100,
+                              model_label="omat0-medium")
+        assert omat.neighbours.edge_index_int32 == "on"
+    ada = dataclasses.replace(GPU, name="NVIDIA RTX 4000 Ada Generation", compute_capability=(8, 9))
+    plan = planner().plan(traits("mh1-r2scan"), nacl(), fixed.IntegratorConfig(), ada, model_label="mh1-r2scan")
+    assert plan.neighbours.edge_index_int32 == "on"

@@ -254,6 +254,13 @@ def test_segment_rows_default(monkeypatch):
                      ("NVIDIA GeForce RTX 5060 Ti", False), ("NVIDIA RTX 4000 Ada Generation", False)):
         monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
         assert segment_rows.segment_rows_default(torch.device("cuda", 0)) is on, name
+    # MH-1's off-list (fastmace/mh1-catchup): off on every A100 for its three heads, on for OMAT-0
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA A100 80GB PCIe")
+    assert set(segment_rows.SEGMENT_ROWS_MODEL_OFF_GPUS) == {"mh1-r2scan", "mh1-omat", "mh1-mp"}
+    assert not segment_rows.segment_rows_default(torch.device("cuda", 0), "mh1-omat")
+    assert segment_rows.segment_rows_default(torch.device("cuda", 0), "omat0-medium")
+    monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", True)
+    assert segment_rows.segment_rows_default(torch.device("cuda", 0), "mh1-r2scan")
     monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", False)
     assert not segment_rows.segment_rows_default(torch.device("cuda", 0))
     assert segment_rows.SEGMENT_GROUPED is None and not segment_rows.segment_grouped_default("cpu")

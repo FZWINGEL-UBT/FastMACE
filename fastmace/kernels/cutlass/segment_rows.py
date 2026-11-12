@@ -33,6 +33,7 @@ True / False: an A/B side's choice.
 from __future__ import annotations
 
 import math
+from types import MappingProxyType
 
 import torch
 
@@ -42,6 +43,12 @@ from fastmace.kernels.gpu_models import GPUModels
 # 0.988; the gate passes.
 SEGMENT_ROWS = None
 SEGMENT_ROWS_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
+# Per-model exclusions (decision 66 per-model off-lists): model label -> GPUs where SEGMENT_ROWS stays off. MH-1
+# (fastmace/mh1-catchup, results/mh1-catchup-20261112), A100-SXM4-80GB, b = off against the defaults, both build
+# orders: Alex 4990788 NaCl 3x3x3 0.9524 / 0.9534, NbCl5 0.9914 / 0.9896; on the TABLE_W base (Alex 4991719) 0.9642 /
+# 0.9605, 0.9936 / 0.9938; the 3x float32 gate passes off (forces 0.92 / 1.05 / 1.00).
+SEGMENT_ROWS_MODEL_OFF_GPUS = MappingProxyType({
+    label: GPUModels(("NVIDIA A100-SXM4-80GB",)) for label in ("mh1-r2scan", "mh1-omat", "mh1-mp")})
 SEGMENT_GROUPED = None
 SEGMENT_GROUPED_GPUS = GPUModels(())
 
@@ -56,12 +63,16 @@ _CAPTURED = set()  # keys whose cached tensor a capture has read
 _RETIRED = []
 
 
-def segment_rows_default(device) -> bool:
-    """``SEGMENT_ROWS`` for ``device``: the constant when set, else on for a ``SEGMENT_ROWS_GPUS`` CUDA device."""
+def segment_rows_default(device, model_label=None) -> bool:
+    """``SEGMENT_ROWS`` for ``device``: the constant when set, else on for a ``SEGMENT_ROWS_GPUS`` CUDA device unless
+    ``SEGMENT_ROWS_MODEL_OFF_GPUS`` lists it for ``model_label``."""
     if SEGMENT_ROWS is not None:
         return bool(SEGMENT_ROWS)
     device = torch.device(device)
-    return device.type == "cuda" and torch.cuda.get_device_name(device) in SEGMENT_ROWS_GPUS
+    if device.type != "cuda":
+        return False
+    name = torch.cuda.get_device_name(device)
+    return name in SEGMENT_ROWS_GPUS and name not in SEGMENT_ROWS_MODEL_OFF_GPUS.get(model_label, ())
 
 
 def segment_grouped_default(device) -> bool:
@@ -274,5 +285,6 @@ def _backward(ctx, grad):
 
 segment_rows.register_autograd(_backward, setup_context=_setup_context)
 
-__all__ = ["SEGMENT_GROUPED", "SEGMENT_GROUPED_GPUS", "SEGMENT_ROWS", "SEGMENT_ROWS_GPUS", "plan_of", "reversed_plan",
+__all__ = ["SEGMENT_GROUPED", "SEGMENT_GROUPED_GPUS", "SEGMENT_ROWS", "SEGMENT_ROWS_GPUS",
+           "SEGMENT_ROWS_MODEL_OFF_GPUS", "plan_of", "reversed_plan",
            "segment_grouped_default", "segment_rows", "segment_rows_default"]

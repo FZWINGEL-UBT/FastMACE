@@ -107,7 +107,7 @@ that on the A100. The A100 pack carries `TABLE_W` both with and without `SKIP_OU
   - cost: about $5 expected, about $11 worst case reserved.
   - The gate needs `tools/jobs/gate_pack.sh` v2, which passes `--rewrites` bodies and takes comma-separated STRUCTURES.
 
-- Alex 4991719 (`jobs/alex_mh1_round2.sh`, source `62536879`): round 2, see section 6.
+- Alex 4991719 (`jobs/alex_mh1_round2.sh`, source `62536879`, done): round 2, see section 6.
 
 ## 5. Round 1 on the A100 (Alex 4990788, A100-SXM4-80GB, driver 615.71.10, 12 November 2026)
 
@@ -177,15 +177,47 @@ Adopted: `TABLE_W_MH1_GPUS` now lists the A100 (every A100 model; commit `625368
 `TABLE_W=True` against the Ada's MH-1 defaults: NaCl 0.9640 / 0.9663, NbCl5 0.9694 / 0.9669; the gate passes
 (forces 0.95 / 1.00 / 1.00). Adopted for the Ada in `257f3985`.
 
-## 6. Round 2 (Alex 4991719, source `62536879`, pending)
+## 6. Round 2 (Alex 4991719, A100-SXM4-80GB, source `62536879`, 12–13 November 2026)
 
-Source `62536879` is main `53666e77` plus TABLE_W for MH-1 on the A100. The job runs:
+Source `62536879` is main `53666e77` plus TABLE_W for MH-1 on the A100. Records: `a100-r2-4991719/`. This is the
+last A100 job of this branch (owner: one bundled Alex job per session; then no new Alex jobs on FastMACE).
 
-- MD step times on the new defaults: MH-1 NaCl, NaNbO3, NbCl5 3×3×3 and NbCl5 6×6×6, plus OMAT-0 medium NbCl5 3×3×3.
-- The source-line attribution with CUPTI 13.3 or later pinned (`jobs/alex_mh1_base2.sh`): MH-1 NbCl5, NaCl and
-  NaNbO3, and OMAT-0 medium NbCl5.
-- One A/B pack against the new defaults: `nosegrows`, `noweighted`, both together, `noint32` and `nosort`.
-- The gates of `nosegrows`, `noweighted`, both together, and `nosort`.
+### 6.1 MD step times with TABLE_W
+
+| Structure | ms/step (round 1, before TABLE_W) | Peak reserved |
+| --- | --- | --- |
+| NaCl 3×3×3 | 2.60 (2.69) | 0.31 GiB (0.39) |
+| NaNbO3 3×3×3 | 6.63 (7.25) | 0.75 GiB (1.16) |
+| NbCl5 3×3×3 | 8.33 (8.68) | 0.85 GiB (1.12) |
+| NbCl5 6×6×6 | 56.21 (58.41) | 4.54 GiB (6.71) |
+
+These come from different processes and jobs, so they are not an A/B. The A/B is in section 5.3. The peak falls by
+a quarter to a third because the forward no longer stores w.
+
+### 6.2 A/Bs on the TABLE_W base, and the gates
+
+| Switch (b) | NaCl ab / ba | NbCl5 ab / ba | Gate (forces NaCl / NaNbO3 / NbCl5) | Outcome |
+| --- | --- | --- | --- | --- |
+| `SEGMENT_ROWS=False` | 0.9642 / 0.9605 | 0.9936 / 0.9938 | 0.92 / 1.05 / 1.00, passes | **adopted** for MH-1 (`SEGMENT_ROWS_MODEL_OFF_GPUS`) |
+| `WEIGHTED_VECTOR=False` | 0.9965 / 0.9933 | 1.0058 / 1.0086 | 0.89 / 1.04 / 1.00, passes | mixed: WEIGHTED_VECTOR stays on |
+| both | 0.9636 / 0.9611 | 1.0025 / 1.0004 | 0.87 / 1.05 / 0.99, passes | SEGMENT_ROWS alone is better |
+| `EDGE_INDEX_INT32=False` | 0.9819 / 0.9857 | 0.9985 / 0.9961 | exact (indices) | **adopted** for MH-1 (`DECISION_66_EDGE_INDEX_INT32_MODEL_OFF_GPUS`); faster in both rounds |
+| `SORT_BY_LENGTH=False` | 0.9912 / 0.9897 | 0.9999 / 0.9966 | 0.89 / 1.06 / 0.99, passes | not adopted: a tie on NbCl5 (ab 0.9999) |
+
+SEGMENT_ROWS off and int32 off were adopted separately; they were not measured together. Each was faster in both
+orders on both cells in both rounds. The 18 % of NaCl's step in IEEE cuBLAS SGEMMs (section 5.2) fits SEGMENT_ROWS's
+fallback: products the CUTLASS kernel refuses run as cuBLAS IEEE into a temporary. The attribution that would
+confirm this failed (6.3).
+
+### 6.3 What round 2 did not deliver
+
+- **Source-line attribution: failed again.** The env now had cupti-python 13.4.0 and nvidia-cuda-cupti 13.4.92, yet
+  `record_py_stacks` still could not register CUPTI's node-creation callbacks on Alex (driver 615.71.10, CUDA 13.4).
+  The CUPTI version is therefore not the only cause. The Ada recipe (CUPTI 13.5) works on leeloo. With no new Alex
+  jobs allowed, the A100 ranking stays at kernel level (section 5.2).
+- **OMAT-0 medium comparison: void.** `profile_point.py` ignored `--model` and profiled mh1-r2scan again (the point
+  JSON says `model: mh1-r2scan`, at the same 8.33 ms). That is a bug in the job script. No OMAT-0 medium A100 kernel
+  table exists yet.
 
 ### H200
 
