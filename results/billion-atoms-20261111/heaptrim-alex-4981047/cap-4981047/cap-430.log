@@ -1,0 +1,1082 @@
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Timeout (0:10:00)!
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/selectors.py", line 416 in select
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py", line 2021 in _communicate
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py", line 1154 in communicate
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py", line 505 in run
+  File "/tmp/4981047.alex/src/fastmace/kernels/_oeq_runtime.py", line 312 in build
+  File "/tmp/4981047.alex/src/fastmace/kernels/_oeq_runtime.py", line 281 in reuse_extension
+  File "/tmp/4981047.alex/src/fastmace/kernels/_oeq_runtime.py", line 577 in prepare_in_process
+  File "/tmp/4981047.alex/src/fastmace/_patches.py", line 449 in prepare_oeq_runtime
+  File "/tmp/4981047.alex/src/fastmace/model/loading.py", line 430 in prepare_hybrid
+  File "/tmp/4981047.alex/src/fastmace/model/loading.py", line 465 in prepare_hybrid_if_possible
+  File "/tmp/4981047.alex/src/fastmace/model/loading.py", line 765 in load_pristine
+  File "tools/bench/tiled_capacity.py", line 353 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+/tmp/4981047.alex/src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/tmp/4981047.alex/src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/tmp/4981047.alex/src/fastmace/model/loading.py:766: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/tmp/4981047.alex/src/fastmace/model/loading.py:582: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/triton/language/semantic.py:1640: UserWarning: tl.where with a non-boolean condition is deprecated and will error out in a future triton release. Got int32
+  warnings.warn(
+Timeout (0:10:00)!
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/rewrites/species/__init__.py", line 179 in _distinct_rows
+  File "/tmp/4981047.alex/src/fastmace/rewrites/species/__init__.py", line 203 in _probe_attrs
+  File "/tmp/4981047.alex/src/fastmace/rewrites/species/__init__.py", line 606 in _generic_product_selfcheck
+  File "/tmp/4981047.alex/src/fastmace/rewrites/registry.py", line 662 in selfcheck
+  File "/tmp/4981047.alex/src/fastmace/rewrites/registry.py", line 689 in apply
+  File "/tmp/4981047.alex/src/fastmace/model/forces.py", line 541 in prepare
+  File "/tmp/4981047.alex/src/fastmace/model/compile.py", line 295 in compile_model
+  File "/tmp/4981047.alex/src/fastmace/model/forces.py", line 569 in __init__
+  File "/tmp/4981047.alex/src/fastmace/planner/minimal.py", line 1349 in build_evaluation
+  File "tools/bench/tiled_capacity.py", line 371 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Timeout (0:10:00)!
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 936 in _pack_units
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1458 in within
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1499 in tiles
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1297 in _tile_graph
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1319 in _piece
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2603 in _wavefront
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2051 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/triton/language/semantic.py:1640: UserWarning: tl.where with a non-boolean condition is deprecated and will error out in a future triton release. Got int32
+  warnings.warn(
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 1350 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 55 in uniform_1d
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 294 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/rewrites/cueq_projection.py", line 45 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/blocks.py", line 500 in forward
+  File "/tmp/4981047.alex/src/fastmace/rewrites/sc_generated.py", line 68 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1611 in _layer
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1713 in _first_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1733 in _first_forward_masked
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1650 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2690 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 1350 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 55 in uniform_1d
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 294 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/rewrites/cueq_projection.py", line 45 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/blocks.py", line 500 in forward
+  File "/tmp/4981047.alex/src/fastmace/rewrites/sc_generated.py", line 68 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1611 in _layer
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1713 in _first_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1733 in _first_forward_masked
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1650 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2690 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/triton/runtime/jit.py", line 1160 in __call__
+  File "/tmp/4981047.alex/src/fastmace/kernels/triton/edge_sh.py", line 130 in _grid
+  File "/tmp/4981047.alex/src/fastmace/kernels/triton/edge_sh.py", line 139 in edge_sh3
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 503 in wrapped_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_compile.py", line 54 in inner
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 475 in backend_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 925 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 50 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 148 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 866 in __call__
+  File "/tmp/4981047.alex/src/fastmace/rewrites/generic/modules.py", line 660 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1607 in _layer
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1726 in _second_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1694 in _second
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2697 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1300 in _tile_graph
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1319 in _piece
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2156 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1116 in read
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1149 in _cgroup_room
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1095 in _host_available
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1561 in _host_keeps_cache
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1503 in tiles
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1297 in _tile_graph
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1319 in _piece
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2156 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1116 in read
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1122 in inactive_file
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1149 in _cgroup_room
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1095 in _host_available
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1548 in _host_allows
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1461 in within
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1499 in tiles
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1297 in _tile_graph
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1319 in _piece
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2156 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_native/registry.py", line 958 in eager_router
+  File "/tmp/4981047.alex/src/fastmace/kernels/triton/compose_skip.py", line 115 in composed
+  File "/tmp/4981047.alex/src/fastmace/rewrites/mh1/modules.py", line 229 in _compose_weights
+  File "/tmp/4981047.alex/src/fastmace/rewrites/mh1/modules.py", line 198 in refresh_composed
+  File "/tmp/4981047.alex/src/fastmace/rewrites/mh1/modules.py", line 185 in bind
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2676 in _bind_tables
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2684 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 1350 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 55 in uniform_1d
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 294 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/rewrites/cueq_projection.py", line 45 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/blocks.py", line 500 in forward
+  File "/tmp/4981047.alex/src/fastmace/rewrites/sc_generated.py", line 68 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1611 in _layer
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1713 in _first_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1733 in _first_forward_masked
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1650 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2690 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/kernels/triton/tf32x3_gemm.py", line 106 in _launch
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/segment_rows.py", line 162 in _product
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/segment_rows.py", line 230 in _apply
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/segment_rows.py", line 250 in segment_rows
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 503 in wrapped_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1555 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_compile.py", line 54 in inner
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 483 in backend_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 925 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 42 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 148 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 866 in __call__
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/segment_rows.py", line 272 in _backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 110 in backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 217 in new_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/function.py", line 366 in apply
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072 in _engine_run_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594 in grad
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1663 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2702 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 642 in _close_now
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 510 in _apply
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 58 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 83 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 320 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/_base.py", line 453 in result
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 529 in settle
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 456 in rows
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1686 in _second
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2697 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/radial.py", line 142 in calculate_envelope
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/radial.py", line 215 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1717 in _first_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1733 in _first_forward_masked
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1650 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2690 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 1350 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 55 in uniform_1d
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 294 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/rewrites/cueq_projection.py", line 45 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/blocks.py", line 500 in forward
+  File "/tmp/4981047.alex/src/fastmace/rewrites/sc_generated.py", line 68 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1611 in _layer
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1713 in _first_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1733 in _first_forward_masked
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1650 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2690 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 457 in rows
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1687 in _second
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2697 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 53 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 180 in new_forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 242 in new_apply
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 145 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 1350 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 55 in uniform_1d
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial_uniform_1d.py", line 294 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/rewrites/cueq_projection.py", line 45 in _forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/mace/modules/blocks.py", line 500 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794 in _call_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783 in _wrapped_call_impl
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1611 in _layer
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1726 in _second_forward
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1694 in _second
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2697 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 382 in _rows_of
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 457 in rows
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1653 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2702 in _eager_tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2209 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0ddee640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/timer.py", line 42 in check
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0dbed640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 387 in _health_monitor
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0d9ec640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 106 in _recv_msg
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 323 in _read_thread
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 598 in _add_now
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 514 in _apply
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 58 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 83 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/tmp/4981047.alex/inductor/vw/cvwynl5jofeulxaqwhzuya5cmwytpw3f5vx7f63abtugko5venwq.py", line 666 in call
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/output_code.py", line 828 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py", line 151 in call_func_at_runtime_with_args
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3613 in _backward_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 10 in impl_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 16 in _compiled_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3532 in backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/function.py", line 374 in apply_boxed
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072 in _engine_run_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594 in grad
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1699 in _second
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1852 in _body
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1921 in _run_slot
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2181 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0dbed640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 387 in _health_monitor
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0d9ec640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 106 in _recv_msg
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 323 in _read_thread
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 598 in _add_now
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 514 in _apply
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 58 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 83 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/tf32x3.py", line 124 in _layout
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/tf32x3.py", line 224 in remap_div_into
+  File "/tmp/4981047.alex/src/fastmace/kernels/cutlass/linear_div.py", line 95 in tf32x3_linear_div
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 503 in wrapped_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1555 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_compile.py", line 54 in inner
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 483 in backend_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 925 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 42 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 148 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/tmp/4981047.alex/inductor/ov/covstulfdla3q6xd4sp6td6efmnlr44uruc3errlhonbqkklauc3.py", line 797 in call
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/output_code.py", line 828 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_forward)", line 2 in _compiled_forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3521 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py", line 118 in g
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(runtime_wrapper_orchestration)", line 11 in _runtime_wrapper
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 1189 in runtime_wrapper
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/aot_autograd.py", line 1289 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1721 in _second_forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1261 in compile_wrapper
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1694 in _second
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1852 in _body
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1921 in _run_slot
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2181 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0dbed640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 387 in _health_monitor
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0d9ec640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 106 in _recv_msg
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 323 in _read_thread
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/tmp/4981047.alex/inductor/vi/cvijomuqyvma6lumlzwrvdp5aprpiyjtl3zxtl7rdjkyi5iqaq3r.py", line 1487 in call
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/output_code.py", line 828 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py", line 151 in call_func_at_runtime_with_args
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3613 in _backward_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 10 in impl_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 16 in _compiled_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3532 in backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/function.py", line 374 in apply_boxed
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072 in _engine_run_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594 in grad
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1663 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1858 in _body
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1921 in _run_slot
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2181 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0dbed640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 387 in _health_monitor
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0d9ec640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 106 in _recv_msg
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 323 in _read_thread
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/tmp/4981047.alex/inductor/vi/cvijomuqyvma6lumlzwrvdp5aprpiyjtl3zxtl7rdjkyi5iqaq3r.py", line 1487 in call
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/output_code.py", line 828 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py", line 151 in call_func_at_runtime_with_args
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3613 in _backward_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 10 in impl_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 16 in _compiled_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3532 in backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/function.py", line 374 in apply_boxed
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072 in _engine_run_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594 in grad
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1663 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1858 in _body
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1921 in _run_slot
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2181 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0dbed640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 387 in _health_monitor
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0d9ec640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 106 in _recv_msg
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 323 in _read_thread
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/tmp/4981047.alex/inductor/vi/cvijomuqyvma6lumlzwrvdp5aprpiyjtl3zxtl7rdjkyi5iqaq3r.py", line 1487 in call
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/output_code.py", line 828 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/utils.py", line 151 in call_func_at_runtime_with_args
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3613 in _backward_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 10 in impl_fn
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(compiled_function_backward)", line 16 in _compiled_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 3532 in backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/function.py", line 374 in apply_boxed
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072 in _engine_run_backward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594 in grad
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1663 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1858 in _body
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1921 in _run_slot
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2181 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+Timeout (0:10:00)!
+Thread 0x0000150d0dbed640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 387 in _health_monitor
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0d9ec640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 106 in _recv_msg
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/compile_worker/subproc_pool.py", line 323 in _read_thread
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d0e5f2640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/concurrent/futures/thread.py", line 81 in _worker
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 953 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x0000150d263f1640 (most recent call first):
+  <no Python frame>
+
+Thread 0x0000150d7c3b8640 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 324 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 607 in wait
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/tqdm/_monitor.py", line 69 in run
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 1016 in _bootstrap_inner
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/threading.py", line 973 in _bootstrap
+
+Thread 0x00001511f1146040 (most recent call first):
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/utils.py", line 452 in _c_check_aliasing_constraint
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/custom_ops.py", line 476 in backend_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 926 in redispatch
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 43 in redispatch_no_grad
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_library/autograd.py", line 147 in autograd_impl
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_ops.py", line 916 in __call__
+  File "/tmp/4981047.alex/inductor/s2/cs25iyaszhg47yqngbknuulchvysc6ywgnc2ppcs6gqcdsq6iajc.py", line 1918 in call
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_inductor/output_code.py", line 828 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 2594 in __call__
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/codegen.py:codegen(runtime_wrapper_orchestration)", line 8 in _runtime_wrapper
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/_aot_autograd/runtime_wrappers.py", line 1189 in runtime_wrapper
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_functorch/aot_autograd.py", line 1289 in forward
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1548 in _fn
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1731 in _first_forward_masked
+  File "/home/atuin/v130cb/v130cb18/fm-a100omat/env/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1261 in compile_wrapper
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1650 in _first
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1849 in _body
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1921 in _run_slot
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2181 in tile
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 2235 in _call
+  File "/tmp/4981047.alex/src/fastmace/model/tiled.py", line 1965 in __call__
+  File "tools/bench/tiled_capacity.py", line 446 in main
+  File "tools/bench/tiled_capacity.py", line 540 in <module>
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 86 in _run_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 96 in _run_module_code
+  File "/home/atuin/v130cb/v130cb18/fm-offpolar/uv-python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/runpy.py", line 289 in run_path
+  File "/tmp/4981047.alex/run.py", line 5 in <module>
+{"atoms": 397535000, "phase": "done", "error": null, "calls": [{"seconds": 9601.302620206028, "allocated": 29177117184, "reserved": 51690602496, "peak_above_before": 22266625536, "host_rss": 106668376064, "host_peak": 159419801600, "tiles": 92000, "grid": [38, 36, 36], "edge_cap": 4611686018427387904, "max_receivers": 8192, "max_halo": 5820, "max_edges": 608920, "list_reused": false, "list_rebuilds": 1, "list_reuse": "off: the host state (64.8 GiB) fits only without them", "receivers": 8192, "edges": 29417590000, "mode": "eager", "mode_reason": "compiled force field: the first call measures its memory", "neighbours": "tiles", "species": "index", "search_s": 738.1016095210798, "lanes": "off: eager tiles", "wavefront": {"on": true, "pool_rows": 26349776, "pool_fraction": 0.0662829084231577, "boundary_skin": 6.3}, "copy_stream": true, "host_worker": true, "loop_base": 41514912768, "peak_before_tiles": 41514912768, "tiles_s": 8852.088503001956, "graph_cache": {"tiles": 0, "bytes": 0, "budget": 0}, "tiles_peak": 42035547136, "global_bytes": 68294565888, "heap_trims": 1, "heap_trim_s": 13.178, "list_cache_bytes": 0, "list_kept_bytes": 0, "list_kept_pinned_bytes": 0, "list_cache_hits": 184000, "list_cache": "on", "host_bytes": 68294565888, "state_dtype": "float32", "state_dtype_reason": "the call's dtype after dropping the kept lists (117.4 GiB)", "allocated_before": 22811892736, "total_peak": 45078518272}, {"seconds": 3606.302807120024, "allocated": 29336597504, "reserved": 55708745728, "peak_above_before": 20831302656, "host_rss": 130270781440, "host_peak": 159419801600, "tiles": 37433, "grid": [31, 29, 29], "edge_cap": 4611686018427387904, "max_receivers": 16384, "max_halo": 8920, "max_edges": 1215440, "list_reused": false, "list_rebuilds": 1, "list_reuse": "off: the host state (64.8 GiB) fits only without them", "receivers": 16384, "edges": 29417590000, "mode": "compiled", "mode_reason": "39.58 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)", "neighbours": "tiles", "species": "index", "search_s": 231.03258080792148, "lanes": "off: not measured faster on NVIDIA A100-SXM4-80GB", "wavefront": {"on": true, "pool_rows": 33062064, "pool_fraction": 0.0831676808331342, "boundary_skin": 6.0}, "slots": {"1": [2476, 4495, 182528], "6": [16089, 9093, 1095168], "7": [16385, 9812, 1277696]}, "slot_needs": {"1": [2250, 4086, 166500], "6": [14625, 8266, 1082250], "7": [16384, 8920, 1215440]}, "slot_changes": 3, "copy_stream": true, "host_worker": true, "loop_base": 41829090304, "peak_before_tiles": 41829090304, "tiles_s": 3368.3095953570446, "graph_cache": {"tiles": 0, "bytes": 0, "budget": 0}, "tiles_peak": 42887816704, "global_bytes": 82581854080, "heap_trims": 1, "heap_trim_s": 13.178, "list_cache_bytes": 0, "list_kept_bytes": 0, "list_kept_pinned_bytes": 0, "list_cache_hits": 74866, "list_cache": "on", "host_bytes": 82581854080, "state_dtype": "float32", "state_dtype_reason": "the call's dtype: fits", "allocated_before": 24406
