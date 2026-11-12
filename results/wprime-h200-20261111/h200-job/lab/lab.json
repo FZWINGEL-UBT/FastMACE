@@ -1,0 +1,151 @@
+{
+  "structure": "SrTiO3",
+  "natoms": 5000,
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "plan_lines": [
+    "RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on as the carrier of wprime_backward, whose backward never chunks, decision 66 (NVIDIA H200))",
+    "RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA H200))",
+    "RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA H200))"
+  ],
+  "tool": "omat0_kernel_lab",
+  "created_utc": "2026-11-11T23:52:24.373674+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA H200",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "1ad25fa8ef6e72da42e5c85a16b41cd57286e38c",
+  "model": "omat0-medium",
+  "rounds": 21,
+  "capture_s": 79.634251877,
+  "kernels": {
+    "wprime": {
+      "shapes": {
+        "edges": 373760,
+        "gprime": [
+          6579,
+          1280,
+          4
+        ],
+        "gprime_MB": 128.49609375,
+        "species": 3,
+        "pieces": 731,
+        "threads": 128,
+        "cohort": 32
+      },
+      "variants": {
+        "base": {
+          "kind": "exact",
+          "registers": 72,
+          "local_bytes": 0,
+          "median_us": 1042.3359870910645,
+          "min_us": 1034.3680381774902,
+          "max_us": 1144.5120573043823,
+          "ratio": 1.0
+        },
+        "h2-skip": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 5.46e-10",
+            "dr": "max|d|/max|a| = 6.87e-08",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1064.352035522461,
+          "min_us": 1055.999994277954,
+          "max_us": 1155.295968055725,
+          "ratio": 1.0211218347097835
+        },
+        "h2-hoist": {
+          "kind": "exact",
+          "registers": 80,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "bitwise",
+            "dr": "bitwise",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1041.0560369491577,
+          "min_us": 1031.2000513076782,
+          "max_us": 1093.5039520263672,
+          "ratio": 0.9987720368885288
+        },
+        "h2-skip+hoist": {
+          "kind": "rounding",
+          "registers": 96,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 5.46e-10",
+            "dr": "max|d|/max|a| = 6.87e-08",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1014.240026473999,
+          "min_us": 1008.1280469894409,
+          "max_us": 1057.919979095459,
+          "ratio": 0.973045197551439
+        },
+        "h2-vec2": {
+          "kind": "rounding",
+          "registers": 128,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.40e-07",
+            "dr": "max|d|/max|a| = 6.18e-07",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1152.5440216064453,
+          "min_us": 1145.9840536117554,
+          "max_us": 1193.4399604797363,
+          "ratio": 1.1057317754354312
+        },
+        "h2-skip+vec2": {
+          "kind": "rounding",
+          "registers": 128,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 1.40e-07",
+            "dr": "max|d|/max|a| = 6.18e-07",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1127.9360055923462,
+          "min_us": 1116.2879467010498,
+          "max_us": 1174.239993095398,
+          "ratio": 1.0821232496636455
+        },
+        "h2-vec4": {
+          "kind": "rounding",
+          "registers": 141,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 2.10e-07",
+            "dr": "max|d|/max|a| = 6.53e-07",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1674.399971961975,
+          "min_us": 1662.176012992859,
+          "max_us": 1714.8159742355347,
+          "ratio": 1.606391789882325
+        },
+        "h2-skip+vec4": {
+          "kind": "rounding",
+          "registers": 167,
+          "local_bytes": 0,
+          "compare": {
+            "dsh": "max|d|/max|a| = 2.10e-07",
+            "dr": "max|d|/max|a| = 6.53e-07",
+            "dx": "max|d|/max|a| = 2.50e-07"
+          },
+          "median_us": 1527.616024017334,
+          "min_us": 1513.4719610214233,
+          "max_us": 1579.0079832077026,
+          "ratio": 1.4655696847621866
+        }
+      }
+    }
+  },
+  "constants": {},
+  "profiled": {
+    "wprime": []
+  }
+}

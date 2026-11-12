@@ -1,0 +1,27 @@
+2026-11-11T23:53:38Z end ab-skip-hoist-SrTiO3-10x10x10-ab exit=0 SrTiO3 a 3.3599 ms b 3.3227 ms b/a 0.9889 valid  
+2026-11-11T23:54:38Z end ab-skip-hoist-SrTiO3-10x10x10-ba exit=0 SrTiO3 b 3.3288 ms a 3.3537 ms b/a 0.9926 valid  
+2026-11-11T23:55:50Z end ab-skip-hoist-NbCl5-ab exit=0 NbCl5 a 1.0692 ms b 1.0503 ms b/a 0.9823 valid  
+2026-11-11T23:56:35Z end ab-skip-hoist-NbCl5-ba exit=0 NbCl5 b 1.0472 ms a 1.0674 ms b/a 0.9811 valid  
+2026-11-11T23:51:01Z wprime-h200 on NVIDIA H200; source 1ad25fa8ef6e72da42e5c85a16b41cd57286e38c
+2026-11-11T23:52:31Z end lab exit=0
+wprime   base                1042.3 us  ratio 1.000  regs 72 local 0  
+wprime   h2-skip             1064.4 us  ratio 1.021  regs 96 local 0  {'dsh': 'max|d|/max|a| = 5.46e-10', 'dr': 'max|d|/max|a| = 6.87e-08', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   h2-hoist            1041.1 us  ratio 0.999  regs 80 local 0  {'dsh': 'bitwise', 'dr': 'bitwise', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   h2-skip+hoist       1014.2 us  ratio 0.973  regs 96 local 0  {'dsh': 'max|d|/max|a| = 5.46e-10', 'dr': 'max|d|/max|a| = 6.87e-08', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   h2-vec2             1152.5 us  ratio 1.106  regs 128 local 0  {'dsh': 'max|d|/max|a| = 1.40e-07', 'dr': 'max|d|/max|a| = 6.18e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   h2-skip+vec2        1127.9 us  ratio 1.082  regs 128 local 0  {'dsh': 'max|d|/max|a| = 1.40e-07', 'dr': 'max|d|/max|a| = 6.18e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   h2-vec4             1674.4 us  ratio 1.606  regs 141 local 0  {'dsh': 'max|d|/max|a| = 2.10e-07', 'dr': 'max|d|/max|a| = 6.53e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+wprime   h2-skip+vec4        1527.6 us  ratio 1.466  regs 167 local 0  {'dsh': 'max|d|/max|a| = 2.10e-07', 'dr': 'max|d|/max|a| = 6.53e-07', 'dx': 'max|d|/max|a| = 2.50e-07'}
+2026-11-11T23:52:31Z pick: NAME=skip-hoist KIND=rounding RATIO=0.9730 CONSTANTS='fastmace.kernels.oeq_streaming.wprime_backward:SKIP_OUTSIDE=True fastmace.kernels.oeq_streaming.wprime_backward:HOIST_DX=True'
+2026-11-11T23:52:31Z modal NVIDIA H200; source 1ad25fa8ef6e72da42e5c85a16b41cd57286e38c; skip-hoist: fastmace.kernels.oeq_streaming.wprime_backward:SKIP_OUTSIDE=True fastmace.kernels.oeq_streaming.wprime_backward:HOIST_DX=True
+2026-11-11T23:52:31Z start ab-skip-hoist-SrTiO3-10x10x10-ab
+2026-11-11T23:53:38Z end ab-skip-hoist-SrTiO3-10x10x10-ab exit=0 SrTiO3 a 3.3599 ms b 3.3227 ms b/a 0.9889 valid  
+2026-11-11T23:53:38Z start ab-skip-hoist-SrTiO3-10x10x10-ba
+2026-11-11T23:54:38Z end ab-skip-hoist-SrTiO3-10x10x10-ba exit=0 SrTiO3 b 3.3288 ms a 3.3537 ms b/a 0.9926 valid  
+2026-11-11T23:54:38Z start ab-skip-hoist-NbCl5-ab
+2026-11-11T23:55:50Z end ab-skip-hoist-NbCl5-ab exit=0 NbCl5 a 1.0692 ms b 1.0503 ms b/a 0.9823 valid  
+2026-11-11T23:55:50Z start ab-skip-hoist-NbCl5-ba
+2026-11-11T23:56:35Z end ab-skip-hoist-NbCl5-ba exit=0 NbCl5 b 1.0472 ms a 1.0674 ms b/a 0.9811 valid  
+2026-11-11T23:56:35Z done
+2026-11-11T23:59:42Z gate-skip-hoist exit=0 NaCl summary {"energy": {"production_max_abs": 4.842700647074067e-05, "ase_f32_max_abs": 0.0001715989854902647, "ratio": 0.28221033086170594, "floor": 0.01, "limit": 0.01, "passed": true, "gated": true}, "forces": {"production_max_abs": 4.032158903766181e-06, "ase_f32_max_abs": 4.694577445618631e-06, "ratio": 0.8588970893491865, "floor": 1e-05, "limit": 1.4083732336855892e-05, "passed": true, "gat
+2026-11-11T23:59:42Z done

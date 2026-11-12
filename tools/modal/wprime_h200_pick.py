@@ -1,0 +1,48 @@
+"""Pick the H200 lab's best w' variant for the MD-step A/B (tools/modal/wprime_h200_lab_ab.sh): prints NAME, KIND, CONSTANTS.
+
+Valid: dsh and dr bitwise or within 1e-5 of the base (relative to max |a|). KIND is measured, not declared: exact only
+when dsh and dr are bitwise (the A/B suffices), otherwise rounding (the force/stress gate too; on the Colab A100,
+12 Nov, SKIP_OUTSIDE came out 4e-9 off in dsh: the compiler schedules the FMAs differently). Best: the lowest lab
+ratio, which must be under 0.99 (else NAME=none).
+"""
+import json
+import re
+import sys
+
+MODULE = "fastmace.kernels.oeq_streaming.wprime_backward"
+CONSTANTS = {"skip": ["SKIP_OUTSIDE=True"], "hoist": ["HOIST_DX=True"], "vec2": ["CHANNEL_VECTOR=2"],
+             "vec4": ["CHANNEL_VECTOR=4"]}
+
+
+def kind(entry):
+    """'exact' (dsh and dr bitwise), 'rounding' (within 1e-5) or None (invalid)."""
+    compare = entry.get("compare") or {}
+    if entry.get("median_us") is None or entry.get("error"):
+        return None
+    result = "exact"
+    for key in ("dsh", "dr"):
+        text = compare.get(key, "")
+        if text == "bitwise":
+            continue
+        m = re.search(r"= ([0-9.e+-]+)", text)
+        if not m or float(m.group(1)) > 1e-5:
+            return None
+        result = "rounding"
+    return result
+
+
+def main(path):
+    variants = json.load(open(path))["kernels"]["wprime"]["variants"]
+    ranked = sorted((v["ratio"], name) for name, v in variants.items()
+                    if name.startswith("h2-") and v.get("ratio") is not None and kind(v))
+    if not ranked or ranked[0][0] >= 0.99:
+        print("NAME=none KIND=none CONSTANTS=")
+        return
+    ratio, name = ranked[0]
+    parts = name[3:].split("+")
+    constants = " ".join(f"{MODULE}:{c}" for part in parts for c in CONSTANTS[part])
+    print(f"NAME={name[3:].replace('+', '-')} KIND={kind(variants[name])} RATIO={ratio:.4f} CONSTANTS='{constants}'")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])

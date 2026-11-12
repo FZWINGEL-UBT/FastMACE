@@ -746,7 +746,22 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         **_ideas3738_variants(kernel),
         # sx-layout lab: the w' with w and its slope from an N-knot cubic spline instead of the 6-term table.
         **_sx_layout_lab().wprime_variants(kernel),
+        # H200 w' instruction tuning (12 November 2026, results/wprime-h200-20261111; fastmace wprime_tuning): skip the edges at
+        # or beyond the cutoff before the channel loop (exact), the dx address hoisted (exact), N channels per lane
+        # with vector dout / x / dx accesses (rounding: each lane's dsh and dr sums in another channel order).
+        **_wprime_h200_variants(),
     }
+
+
+def _wprime_h200_variants():
+    from fastmace.kernels.oeq_streaming import wprime_tuning
+
+    def make(name):
+        return lambda s: wprime_tuning.variant(s, name)
+    # skip: exact in exact arithmetic, but the A100 (12 Nov) measured dsh 4e-9 off (FMA schedule): rounding
+    kinds = {"skip": "rounding", "hoist": "exact", "skip+hoist": "rounding", "vec2": "rounding", "skip+vec2": "rounding",
+             "vec4": "rounding", "skip+vec4": "rounding"}
+    return {f"h2-{name}": (kind, make(name), ()) for name, kind in kinds.items()}
 
 
 def _restrict_all(s):

@@ -1,0 +1,31 @@
+[fastmace-colab 23:11:41] allocating H100 as fm-h100-20261111-231055-ac03ab
+colab new --gpu H100 -s fm-h100-20261111-231055-ac03ab failed (1):
+
+[colab] A new version of Colab CLI is available: 0.8.0 (current: 0.7.5)
+[colab] Run 'colab update' to update.
+[colab] To silence this check, set "enable_update_check": false in ~/.config/colab-cli/settings.json
+
+[colab] Creating session 'fm-h100-20261111-231055-ac03ab'...
+[colab] Backend rejected accelerator 'H100'. You may not have quota or entitlement for this accelerator on your account. Try a different one (e.g. --gpu T4) or omit --gpu/--tpu for a CPU runtime.
+
+[fastmace-colab 23:11:41] stopped fm-h100-20261111-231055-ac03ab
+[fastmace-colab 23:11:42] exit error, wall 47.3 s, CU 165.56 -> 165.56; /home/fzwin/fastmace-runs/wprime-h200-20261111/lab1/colab.json; ledger /home/fzwin/.fastmace-colab/colab-ledger.csv
+Traceback (most recent call last):
+  File "/mnt/d/Margraf/FastMACE-wprime-h200/tools/colab/fastmace_colab.py", line 721, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/mnt/d/Margraf/FastMACE-wprime-h200/tools/colab/fastmace_colab.py", line 712, in main
+    record = run_job(args)
+             ^^^^^^^^^^^^^
+  File "/mnt/d/Margraf/FastMACE-wprime-h200/tools/colab/fastmace_colab.py", line 427, in run_job
+    return _run_job(args, colab)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/Margraf/FastMACE-wprime-h200/tools/colab/fastmace_colab.py", line 464, in _run_job
+    job.call(new_args(args.gpu, job.session), timeout=900)
+  File "/mnt/d/Margraf/FastMACE-wprime-h200/tools/colab/fastmace_colab.py", line 344, in call
+    return self.colab(argv, timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/d/Margraf/FastMACE-wprime-h200/tools/colab/fastmace_colab.py", line 326, in run_colab
+    raise subprocess.CalledProcessError(done.returncode, argv, done.stdout, done.stderr)
+subprocess.CalledProcessError: Command '['colab', 'new', '--gpu', 'H100', '-s', 'fm-h100-20261111-231055-ac03ab']' returned non-zero exit status 1.
+driver exit 1
