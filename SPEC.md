@@ -3682,3 +3682,10 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Measured on OMAT-0 medium only. Other families on the A100 get the switches through the GPU sets; this is an open cell in defaults-by-gpu.
 - Suite on the branch tip e907e9dc (murphy, idle check incl. our jobs, 13:27 UTC): 5,730 passed, 206 skipped, 0 failed.
 - See `results/wprime-h200-20261111/README.md` Part 5.
+
+**w′ 12 November defaults on MACE-OFF and MACE-POLAR (12 November 2026; decision 66 per-model off-list): WEIGHTED_VECTOR off for POLAR-1-M on the A100.**
+- The H200 set (SKIP_OUTSIDE + HOIST_DX, LATE_PULLBACK) and the A100 set (SKIP_OUTSIDE + HOIST_DX + WEIGHTED_VECTOR) were measured on OMAT-0 medium only. No MACE-OFF plan runs the w′ kernel on any GPU (generic w′ is OMAT-0 only); no POLAR plan runs it on the H200; on the A100 family only POLAR-1-M does.
+- POLAR-1-M's w′ is MH-1's class (`WPrime(generic=False)`, no TABLE_W): SKIP_OUTSIDE and LATE_PULLBACK need TABLE_W and HOIST_DX by default needs SKIP_OUTSIDE, so all three stay off, also when forced (source unchanged). WEIGHTED_VECTOR needs FACTORED only and applies.
+- Alex A100-SXM4-80GB, b = WEIGHTED_VECTOR off against the defaults, ab / ba: NaCl 3³ 0.9932 / 1.0041, NbCl5 3³ 0.9987 / 0.9986; gate passes with it on. No gain, so `wprime_backward.WEIGHTED_VECTOR_MODEL_OFF_GPUS = {"polar1-m": A100}` (`weighted_vector_default(device, model_label)`). POLAR-1-M's A100 kernel is the pre-12-November source again.
+- MH-1 on the A100 family takes WEIGHTED_VECTOR through the same class; not measured (open cell).
+- No Modal spend. See `results/wprime-off-polar-20261112/README.md`.

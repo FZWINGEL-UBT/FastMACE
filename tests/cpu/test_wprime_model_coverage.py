@@ -4,7 +4,7 @@ SKIP_OUTSIDE + HOIST_DX + LATE_PULLBACK (H200) and SKIP_OUTSIDE + HOIST_DX + WEI
 GPU set, measured on OMAT-0 medium only. results/wprime-off-polar-20261112: no MACE-OFF plan runs the w' kernel on
 any GPU, no POLAR-1 plan runs it on the H200, and on the A100 family only POLAR-1-M does, through MH-1's class
 (``WPrime(generic=False)``: no TABLE_W). There SKIP_OUTSIDE, HOIST_DX and LATE_PULLBACK fall back to off by
-themselves; WEIGHTED_VECTOR applies and was measured on POLAR-1-M separately.
+themselves; WEIGHTED_VECTOR applies, measured no gain there and is on POLAR-1-M's per-model off-list.
 """
 
 from types import SimpleNamespace
@@ -98,13 +98,28 @@ def test_mh1_class_kernel_falls_back_from_the_table_w_switches(monkeypatch, name
     assert forced_source == source
 
 
-def test_mh1_class_kernel_takes_weighted_vector_on_the_a100_only(monkeypatch):
-    """WEIGHTED_VECTOR needs FACTORED only, so it reaches POLAR-1-M's (and MH-1's) kernel on the A100 family;
-    measured there on POLAR-1-M (results/wprime-off-polar-20261112)."""
+def test_mh1_class_kernel_takes_weighted_vector_on_the_a100_except_polar1_m(monkeypatch):
+    """WEIGHTED_VECTOR needs FACTORED only, so it reaches MH-1-class kernels on the A100 family; POLAR-1-M is on its
+    per-model off-list (Alex: NaCl 0.9932 / 1.0041, NbCl5 0.9987 / 0.9986 with b = off; no gain)."""
     # _quadrupole's J = 5 path has a scalar input, which SCALAR_PATHS takes first: off here, so the weighted form
     # shows in the source (POLAR-1-M's weighted paths have 1o inputs)
-    a100, a100_source = _decided(monkeypatch, "NVIDIA A100-SXM4-80GB", (8, 0), SCALAR_PATHS=False)
-    assert a100.factored and a100.weighted_vector and not a100.stage_dout  # STAGE_DOUT_MODEL_OFF_GPUS
-    assert "WEIGHTED_VECTOR" in a100_source
-    h200, h200_source = _decided(monkeypatch, "NVIDIA H200", (9, 0), SCALAR_PATHS=False)
+    assert set(wp.WEIGHTED_VECTOR_MODEL_OFF_GPUS) == {"polar1-m"}
+    for name in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"):
+        polar, polar_source = _decided(monkeypatch, name, (8, 0), SCALAR_PATHS=False)
+        assert polar.factored and not polar.weighted_vector and not polar.stage_dout  # both model off-lists
+        assert "WEIGHTED_VECTOR" not in polar_source
+        other, other_source = _decided(monkeypatch, name, (8, 0), label="mh1-r2scan", SCALAR_PATHS=False)
+        assert other.weighted_vector and "WEIGHTED_VECTOR" in other_source
+        forced, _ = _decided(monkeypatch, name, (8, 0), WEIGHTED_VECTOR=True, SCALAR_PATHS=False)
+        assert forced.weighted_vector  # an A/B side's True wins over the off-list
+    h200, h200_source = _decided(monkeypatch, "NVIDIA H200", (9, 0), label="mh1-r2scan", SCALAR_PATHS=False)
     assert not h200.weighted_vector and "WEIGHTED_VECTOR" not in h200_source
+
+
+def test_weighted_vector_model_off_list(monkeypatch):
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", None)
+    for name, on in (("NVIDIA A100-SXM4-80GB", True), ("NVIDIA A100-SXM4-40GB", True), ("NVIDIA H200", False)):
+        monkeypatch.setattr(wp, "_device_name", lambda device, name=name: name)
+        assert wp.weighted_vector_default(None) is on and wp.weighted_vector_default(None, "omat0-medium") is on
+        assert not wp.weighted_vector_default(None, "polar1-m"), name
+        assert not wp.weighted_vector_on(None, True, False, "polar1-m")
