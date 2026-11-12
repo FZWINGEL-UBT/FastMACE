@@ -76,6 +76,14 @@ with the evaluated energy; and the memory formula in Section 6.1 counts allocate
 pools are preallocated. Its recommendation: put further effort into the experiments of Table 13, not into
 another wording revision.
 
+A fourth review, of commit `956824f3`, found one more reporting error, in text that had not changed: the paper
+called the symmetric contraction "the only kernel FastMACE generates per model". That is wrong. The streaming
+kernels are also rendered per model, from the coupling paths, the layout and the spline grid
+(`spline_forward.py` `_render`, `wprime_backward.py` `render`). Section 4.3, Section 5.2 and the design table
+now distinguish the synthesised contraction from the template-rendered streaming kernels, and state the
+difference from Symmetrix-XL that does hold: FastMACE keeps PyTorch's execution of the model and its automatic
+differentiation.
+
 ## Where the numbers come from
 
 Every number in the paper is taken from a record in this repository or from a cited paper. Nothing was measured

@@ -338,9 +338,16 @@ forward pass.
 \paragraph{Checks and effect.}
 A test compares both variants with the library kernel on the output and on both gradients to a relative
 $10^{-5}$; no numeric comparison is run at setup beyond the residual test above. On the H200 the four kernels
-this replaces took 179.5\us{} per force call and the generated pair takes 82.4\us{}. This is the only kernel
-FastMACE generates per model; Symmetrix-XL generates its Clebsch--Gordan contractions per checkpoint as a matter
-of design.
+this replaces took 179.5\us{} per force call and the generated pair takes 82.4\us{}.
+
+\paragraph{Two kinds of generated code.}
+This contraction is \emph{synthesised}: its program is derived from the checkpoint's polynomial, with the
+sharing and the change of basis described above. The streaming kernels of Section~\ref{sec:conv} are also
+specific to the model, in a simpler way: their CUDA source is rendered from templates with the model's coupling
+paths, tensor layout and spline grid, and compiled at run time. Generating kernels per checkpoint is therefore
+common to FastMACE and Symmetrix-XL, which does so as a matter of design \cite{fu2026symmetrixxl}. The
+difference that remains is where the kernels sit: in FastMACE they are operators inside PyTorch's execution of
+the model and its automatic differentiation.
 
 \section{Streamed execution}
 \label{sec:stream}
@@ -430,7 +437,8 @@ receiver's edges are sorted by length so that neighbouring receivers read the sa
 
 The kernels descend from the receiver-streaming convolution of Fuchs \cite{fuchs2026oeqpr223} in
 OpenEquivariance \cite{bharadwaj2025oeq}, which adapts the schedule of Sobek \cite{chorosajev2026sobek}; the
-adapted files keep the upstream licence. The receiver-major layout with spline weights was taken from
+adapted files keep the upstream licence. As there, the source of the forward and reverse kernels is rendered at
+setup from the model's coupling paths, tensor layout and spline grid and compiled at run time. The receiver-major layout with spline weights was taken from
 Symmetrix-XL after a profile on 6 November showed its forward at 952\us{} against 1{,}623\us{} for ours on the
 H200; with that layout ours takes 629\us{} (Table~\ref{tab:profile}).
 
@@ -1240,7 +1248,7 @@ through its own modules with batched or compiled execution.
 Aspect & Symmetrix-XL & FastMACE \\
 \midrule
 Model & Checkpoint converted to its own format; native evaluator & MACE's PyTorch modules, rewritten in a private copy \\
-Kernels & Generated per model, precision and target; cached & General kernels chosen by a planner per GPU; one generated contraction \\
+Kernels & Generated per model, precision and target; cached & Streaming kernels rendered from templates for the model's paths, layout and spline grid; first contraction synthesised as a polynomial program; the rest general; routes chosen by a planner per GPU \\
 Forces & Hand-scheduled reverse stages & Automatic differentiation with custom reverse kernels \\
 Radial functions & Cubic Hermite splines, 256 nodes; forces from the same spline & Chebyshev tables and banded cubic splines; packed forward table by default \\
 Dense products & float32 & Tensor cores (three TF32 products, or TF32 with FP16) \\
