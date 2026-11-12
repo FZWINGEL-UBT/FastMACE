@@ -1,0 +1,45 @@
+{
+ "swaps": [
+  [
+   "fastmace.kernels.triton.species_gemm",
+   "bound_plan",
+   "no_bound_plan"
+  ],
+  [
+   "fastmace.rewrites.generic.modules",
+   "_reshaped",
+   "reshape_copy"
+  ]
+ ],
+ "trace": [
+  {
+   "side": "a",
+   "phase": "build",
+   "code": "reference",
+   "attribute": "_reshaped",
+   "calls": 32
+  },
+  {
+   "side": "a",
+   "phase": "build",
+   "code": "reference",
+   "attribute": "bound_plan",
+   "calls": 44
+  },
+  {
+   "side": "b",
+   "phase": "build",
+   "code": "library",
+   "attribute": "_reshaped",
+   "calls": 32
+  },
+  {
+   "side": "b",
+   "phase": "build",
+   "code": "library",
+   "attribute": "bound_plan",
+   "calls": 44
+  }
+ ],
+ "wrong": []
+}

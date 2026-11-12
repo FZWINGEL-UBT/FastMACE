@@ -258,11 +258,16 @@ class FirstInteractionReassociation(torch.nn.Module):
         """The versions of every tensor the composition reads besides the table: the radial last layer, the
         interaction's linear and skip (``compose_skip``) and the nested rotation. A reload or an optimiser step
         writes them in place and moves their versions; nothing in an MD step does."""
+        from fastmace.kernels.triton.species_gemm import PLAN_BUFFERS
+
         tensors = []
         modules = [self.compose_radial] + ([self.compose_skip[0], self.compose_skip[2]] if self.compose_skip else [])
         for module in modules:
             if isinstance(module, torch.nn.Module):
-                tensors += list(module.parameters()) + list(module.buffers())
+                # Not the species plan bound onto the skip (step-layout-cleanup): no input of the composition, and a
+                # capture's snapshot restore moves its versions, which recomposed inside the captured step.
+                tensors += list(module.parameters()) + [buffer for name, buffer in module.named_buffers()
+                                                        if name.rpartition(".")[2] not in PLAN_BUFFERS]
             elif module is not None:  # a plain record of tensors (the CPU tests' radial layer)
                 tensors += [value for value in vars(module).values() if isinstance(value, torch.Tensor)]
         if self.nested_rotation is not None:
