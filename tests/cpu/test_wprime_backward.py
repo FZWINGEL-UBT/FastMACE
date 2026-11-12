@@ -380,6 +380,71 @@ def test_hoist_dx_and_channel_vector_sources():
         wt.hoist("no channel loop here")
 
 
+def _quadrupole(channels=64):
+    """``_edge16`` plus a 0e x 2e -> 2e path: five edge sums v_j (WEIGHTED_VECTOR's J > 3)."""
+    schedule = _edge16()
+    slot = lambda name, start, component, dim: SimpleNamespace(name=name, start=start, component=component,  # noqa: E731
+                                                              irrep_dim=dim)
+    grad = slot("gx0", 0, 0, 1)
+    outs = [SimpleNamespace(accumulator=slot(f"o2{m}", 4 * channels, m, 5),
+                            terms=(SimpleNamespace(input_component=0, edge_component=m, coefficient=-0.25,
+                                                   input_accumulator=grad),)) for m in range(5)]
+    path = SimpleNamespace(input_start=0, input_irrep_dim=1, edge_start=4, edge_irrep_dim=5,
+                           weight_start=2 * channels, edge_mul=1, outputs=tuple(outs))
+    schedule.paths = (*schedule.paths, path)
+    schedule.output_slots = (*schedule.output_slots, *(o.accumulator for o in outs))
+    schedule.output_dim, schedule.weight_numel = 9 * channels, 3 * channels
+    return schedule
+
+
+def test_weighted_vector_source():
+    """WEIGHTED_VECTOR (12 November 2026): a path with more than 3 edge sums adds w x_i c g_o per term, without v_j;
+    paths with 3 or fewer, and SCALAR_PATHS' paths, keep their form."""
+    options = dict(vector=2, table_w=True, factored=True, horner=True)
+    plain = wp.render(_quadrupole(), "float", 4, **options)
+    source = wp.render(_quadrupole(), "float", 4, weighted_vector=True, **options)
+    flat, flat_plain = " ".join(source.split()), " ".join(plain.split())
+    assert "WEIGHTED_VECTOR" not in plain and flat.count("WEIGHTED_VECTOR:") == 1
+    for j in range(4, 9):  # the 2e path: per term, from radial_weight, no v_j
+        assert f"edge_gradient[{j}] += scaled * (radial_weight * input_value);" in flat
+        assert f"edge_gradient[{j}] += scaled_weight * v_" in flat_plain
+        assert f"edge_gradient[{j}] += scaled_weight * v_" not in flat
+    assert "edge_gradient[2] += scaled_weight * v_1;" in flat  # the 1o path (J = 3) keeps v_j
+    # with FACTORED_SCALE and without FOLD_ALPHA the path's alpha goes into the weight once
+    scaled = " ".join(wp.render(_quadrupole(), "float", 4, scale=True, weighted_vector=True, **options).split())
+    assert "const scalar_t vector_weight = radial_weight * static_cast<scalar_t>(0x1.0000000000000p-2f);" in scaled
+    assert "edge_gradient[4] -= scaled * (vector_weight * input_value);" in scaled
+    folded = " ".join(wp.render(_quadrupole(), "float", 4, scale=True, fold_alpha=True, weighted_vector=True,
+                                **options).split())
+    assert "vector_weight" not in folded and "edge_gradient[4] -= scaled * (radial_weight * input_value);" in folded
+    # SCALAR_PATHS takes the scalar-input 2e path first
+    both = wp.render(_quadrupole(), "float", 4, scalar_paths=True, weighted_vector=True, **options)
+    assert both == wp.render(_quadrupole(), "float", 4, scalar_paths=True, **options)
+    with pytest.raises(ValueError, match="weighted_vector"):
+        wp.render(_quadrupole(), "float", 4, vector=2, table_w=True, weighted_vector=True)  # no FACTORED
+
+
+def test_weighted_vector_default(monkeypatch):
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", None)
+    assert not wp.weighted_vector_default(torch.device("cpu")) and len(wp.WEIGHTED_VECTOR_GPUS) == 0
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", True)
+    assert wp.weighted_vector_default(torch.device("cpu"))
+
+
+def test_weighted_vector_compiles_with_nvrtc():
+    from fastmace.kernels import nvrtc_available
+    if not nvrtc_available():
+        pytest.skip("NVRTC is not available")
+    from fastmace.kernels.oeq_streaming import wprime_tuning as wt
+    from fastmace.kernels.oeq_streaming.runtime import compile_cubin
+
+    options = dict(vector=2, table_w=True, factored=True, scale=True, horner=True, weighted_vector=True,
+                   blocks=[(1, [0]), (3, [64]), (5, [256])], stage_dout=True, stage_sh=4)
+    for capability in ((12, 0), (9, 0), (8, 0)):
+        source = wp.render(_quadrupole(), "float", 4, skip_outside=True, **options)
+        assert compile_cubin(source, capability) and compile_cubin(wt.hoist(source), capability)
+
+
 def test_hoist_dx_and_channel_vector_defaults(monkeypatch):
     cpu = torch.device("cpu")
     monkeypatch.setattr(wp, "HOIST_DX", None)

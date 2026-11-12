@@ -188,6 +188,7 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                                           "EDGE_FORCE": "idea 13: w′ writes dL/dv, no dsh; per GPU, A/B",
                                                           "SKIP_OUTSIDE": "w′ padding edges skip the channel loop; A/B",
                                                           "HOIST_DX": "w′ dx address hoisted; A/B",
+                                                          "WEIGHTED_VECTOR": "w′ weighted input on J > 3 paths; A/B",
                                                           "CHANNEL_VECTOR": "w′ channels per lane, vector loads; A/B"},
     "fastmace/kernels/oeq_streaming/spline_forward.py": {"SPLINE_W": "spline w, Symmetrix-XL layout; per GPU, A/B",
                                                          "MIN_BLOCKS": "spline forward register cap; A/B",

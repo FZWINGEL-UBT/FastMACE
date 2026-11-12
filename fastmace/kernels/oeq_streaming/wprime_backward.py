@@ -329,6 +329,13 @@ SKIP_OUTSIDE_GPUS = GPUModels(("NVIDIA H200",))
 # above); CHANNEL_VECTOR lost on the H200 (vec2 1.106, skip+vec2 1.082, vec4 1.606, skip+vec4 1.466: registers).
 HOIST_DX = None
 HOIST_DX_GPUS = SKIP_OUTSIDE_GPUS
+# SCALAR_PATHS' weighted input for the paths whose edge sums v_j have more than 3 components (OMAT-0 interaction 2:
+# 1x2->1, 1x3->2, 1x2->3; conductor review idea 1, 12 November 2026): dsh_j += s (w x_i) per term instead of
+# v_j += s x_i and dsh_j += w v_j. Rounding (another FP32 order). sm_80 census with SKIP_OUTSIDE + HOIST_DX:
+# 1,976 -> 1,942 instructions per edge and lane, 128 -> 96 registers; sm_90 1,990 -> 1,957, 96 -> 95.
+# None: on for WEIGHTED_VECTOR_GPUS (none yet); True / False: an A/B side's choice.
+WEIGHTED_VECTOR = None
+WEIGHTED_VECTOR_GPUS = GPUModels(())
 CHANNEL_VECTOR = None
 CHANNEL_VECTOR_GPUS = MappingProxyType({})  # device name -> 2 or 4
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
@@ -725,6 +732,8 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).
                 {%- set scalar_path = scalar_paths and path.input_irrep_dim == 1
                                       and (factored[path_index].alpha == 1.0 or fold_alpha) %}
+                {%- set weighted_path = weighted_vector and not scalar_path
+                                        and factored[path_index].edges | length > 3 %}
                 {%- for i in factored[path_index].inputs %}
                 acc_t u_{{ i }} = acc_t(0);
                 {%- endfor %}
@@ -732,6 +741,12 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.
                 const scalar_t weighted_input =
                     radial_weight * x[input_base + {{ node_offset(path.input_start, 0, path.input_irrep_dim) }}];
+                {%- elif weighted_path %}
+                // WEIGHTED_VECTOR: a path with more than 3 edge components adds w x_i c g_o per term, without v_j.
+                {%- if not fold_alpha and factored[path_index].alpha != 1.0 %}
+                const scalar_t vector_weight =
+                    radial_weight * {{ cpp_scalar_literal(factored[path_index].alpha, scalar) }};
+                {%- endif %}
                 {%- else %}
                 {%- for j in factored[path_index].edges %}
                 acc_t v_{{ j }} = acc_t(0);
@@ -795,6 +810,11 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                         {%- if scalar_path %}
                         edge_gradient[{{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}]
                             += weighted_input * scaled;
+                        {%- elif weighted_path %}
+                        {%- set vw = "radial_weight" if fold_alpha or factored[path_index].alpha == 1.0
+                                     else "vector_weight" %}
+                        {%- set dj = path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim %}
+                        edge_gradient[{{ dj }}] {{ op }} scaled * ({{ vw }} * input_value);
                         {%- else %}
                         v_{{ term.edge_component }} {{ op }} scaled * input_value;
                         {%- endif %}
@@ -839,7 +859,7 @@ extern "C" __global__ void oeq_projected_backward_wprime(
                 {%- if alpha != 1.0 %}
                 weight_gradient *= alpha;
                 {%- endif %}
-                {%- if not scalar_path %}
+                {%- if not scalar_path and not weighted_path %}
                 {%- for j in factored[path_index].edges %}
                 edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] +=
                     scaled_weight * v_{{ j }};
@@ -1002,7 +1022,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
            factored=False, scale=False, horner=False, scalar_paths=False, butterfly=False, redux=False,
            table_pairs=False, hoist_scale=False, stage_dout=False, estrin=False, fold_alpha=False, spline=None,
            stage_quads=False, shared_locator=False, stage_sh=0, stage_edges=False, edge_force=False,
-           skip_outside=False):
+           skip_outside=False, weighted_vector=False):
     """CUDA source of ``oeq_projected_backward_wprime`` for a schedule, ``scalar`` ("float" or "double") and the
     derivative table's ``terms``; ``stream_w`` (default ``STREAM_W``): the stored weights loaded with ``__ldcs``;
     ``vector`` 2 or 4: the q-major table's terms loaded as float2/float4 (``SLOPE_VECTOR``; float only).
@@ -1029,7 +1049,9 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
     vectors ``vec [E, 3]`` after ``dr`` and writes ``dL/dv [E, 3]`` through ``dsh`` (edge_sh3's backward contracted
     in the epilogue, one lane per edge) instead of ``dsh [E, 16]``. ``skip_outside`` (``SKIP_OUTSIDE``; with
     ``table_w``): an edge at or beyond the cutoff writes its zeros and skips the channel loop, whose table loads are
-    then unconditional (exact arithmetic; rounding through the FMA order)."""
+    then unconditional (exact arithmetic; rounding through the FMA order). ``weighted_vector`` (``WEIGHTED_VECTOR``;
+    with ``factored``): a path with more than 3 edge components (and not on SCALAR_PATHS) adds ``w x_i c g_o`` to the
+    edge gradient per term instead of summing ``v_j`` and adding ``w v_j`` (rounding)."""
     from fastmace.kernels.oeq_streaming.fused_forward import block_map
 
     if blocks is not None and schedule.layout != "ir_mul":
@@ -1046,6 +1068,8 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
         raise ValueError("horner evaluates the value table: it needs table_w")
     if scalar_paths and not factored:
         raise ValueError("scalar_paths regroups the factored sums: it needs factored")
+    if weighted_vector and not factored:
+        raise ValueError("weighted_vector regroups the factored sums: it needs factored")
     if table_w and not vector:
         raise ValueError("table_w reads the q-major value table: it needs a slope vector of 2 or 4")
     if butterfly and not butterfly_supported(schedule):
@@ -1104,7 +1128,7 @@ def render(schedule, scalar, terms, stream_w=None, vector=0, table_w=False, bloc
                                             spline=None if spline is None else _spline_lookup(spline, scalar),
                                             shared_locator=bool(shared_locator), stage_sh=int(stage_sh),
                                             stage_edges=bool(stage_edges), edge_force=bool(edge_force),
-                                            skip_outside=bool(skip_outside),
+                                            skip_outside=bool(skip_outside), weighted_vector=bool(weighted_vector),
                                             slab="int64_t(loc.x)" if shared_locator
                                             else "int64_t(stage_slab[stage_k])" if stage_edges
                                             else "(int64_t(pairs[e]) * pieces + piece)")
@@ -1326,6 +1350,7 @@ class WPrimeBackward:
                             and not self.shared_locator and stage_edges_default(device, model_label))
         self.edge_force = bool(edge_force)  # EDGE_FORCE: dL/dv [E, 3] through dsh; the vectors after dr
         self.skip_outside = self.table_w and skip_outside_default(device)
+        self.weighted_vector = bool(self.factored) and weighted_vector_default(device)
         self.launches = 0  # host-side launch count (tests: the EDGE_FORCE kernel ran)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
@@ -1335,7 +1360,7 @@ class WPrimeBackward:
                              stage_dout=self.stage_dout, estrin=self.estrin, fold_alpha=self.fold_alpha,
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force,
-                             skip_outside=self.skip_outside)
+                             skip_outside=self.skip_outside, weighted_vector=self.weighted_vector)
         self.hoist_dx, self.channel_vector = hoist_dx_default(device), channel_vector_default(device)
         if HOIST_DX is None:  # the default: with SKIP_OUTSIDE only (they win together), where it was measured
             self.hoist_dx = (self.hoist_dx and self.skip_outside and scalar == "float" and bool(self.factored)
@@ -1878,6 +1903,11 @@ def hoist_dx_default(device):
     return bool(HOIST_DX) if HOIST_DX is not None else _device_name(device) in HOIST_DX_GPUS
 
 
+def weighted_vector_default(device):
+    """``WEIGHTED_VECTOR`` on ``device``: the constant when set, else on for ``WEIGHTED_VECTOR_GPUS``."""
+    return bool(WEIGHTED_VECTOR) if WEIGHTED_VECTOR is not None else _device_name(device) in WEIGHTED_VECTOR_GPUS
+
+
 def channel_vector_default(device):
     """``CHANNEL_VECTOR`` on ``device``: the constant when set, else ``CHANNEL_VECTOR_GPUS``' entry (0 without)."""
     return int(CHANNEL_VECTOR) if CHANNEL_VECTOR is not None else int(CHANNEL_VECTOR_GPUS.get(_device_name(device), 0))
@@ -2120,7 +2150,8 @@ class WPrime(torch.nn.Module):
 
 __all__ = ["EDGE_FORCE", "EDGE_FORCE_GPUS", "edge_force_default", "edge_force_supported",
            "SKIP_OUTSIDE", "SKIP_OUTSIDE_GPUS", "skip_outside_default", "HOIST_DX", "HOIST_DX_GPUS",
-           "hoist_dx_default", "CHANNEL_VECTOR", "CHANNEL_VECTOR_GPUS", "channel_vector_default",
+           "hoist_dx_default", "WEIGHTED_VECTOR", "WEIGHTED_VECTOR_GPUS",
+           "weighted_vector_default", "CHANNEL_VECTOR", "CHANNEL_VECTOR_GPUS", "channel_vector_default",
            "streaming_conv_wprime_backward_force", "BLOCK_LDG", "BLOCK_LDG_GPUS",
            "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
            "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",

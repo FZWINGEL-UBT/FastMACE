@@ -1,0 +1,8 @@
+#!/bin/bash
+# Colab A100 run of WEIGHTED_VECTOR (12 Nov 2026); the VM is stopped after the job.
+cd /mnt/d/Margraf/FastMACE-wprime-h200
+python3 tools/colab/fastmace_colab.py --gpu A100 --commit ${COMMIT:-59456497} --repo /mnt/d/Margraf/FastMACE \
+  --models medium-omat-0 --out ~/fastmace-runs/wprime-h200-20261111/${RUN:-lab1} --timeout-min 90 \
+  --command 'bash results/wprime-h200-20261111/colab_weighted_a100.sh' \
+  > /mnt/d/Margraf/FastMACE-wprime-h200/results/wprime-h200-20261111/${RUN:-lab1}.driver.log 2>&1
+echo "driver exit $?" >> /mnt/d/Margraf/FastMACE-wprime-h200/results/wprime-h200-20261111/${RUN:-lab1}.driver.log
