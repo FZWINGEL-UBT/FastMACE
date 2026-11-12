@@ -1,0 +1,96 @@
+LAMMPS (30 Sep 2026 - Update 1)
+KOKKOS mode with Kokkos version 5.2.1 is enabled
+  using double precision
+  using view layout = legacy
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (31.1292 26.9586 33.8804)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  2448 atoms
+  read_data CPU = 0.009 seconds
+Loading MACEKokkos model from '/mnt/homes/zwingel/benchmark-loup-20261112/prefix/inputs/mace-omat-0-medium.json' ... (h1_affine_mode m0_composite) success
+Symmetrix streamed_edges requested='direct' resolved='direct'
+Activated Execution JIT device artifact 'jit-r1-gen11-f32-6fdf3e63624a0e45'
+Symmetrix execution profile='capacity'
+  mapping LAMMPS type 1 (Cu) to MACEKokkos type 28
+  mapping LAMMPS type 2 (H) to MACEKokkos type 0
+  mapping LAMMPS type 3 (O) to MACEKokkos type 7
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- KOKKOS package: https://doi.org/10.1145/3731599.3767498
+
+@inproceedings{Johansson25,
+ author = {A. Johansson and E. Weinberg and C. Trott and M. McCarthy and S. Moore},
+ title = {{LAMMPS-KOKKOS}: {P}erformance Portable Molecular Dynamics Across Exascale Architectures},
+ year = 2025,
+ booktitle = {Proceedings of the SC '25 Workshops of the International Conference for High Performance Computing,
+  Networking, Storage and Analysis},
+ pages = {1217--1232},
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+WARNING: No fixes with time integration, atoms won't move
+For more information see https://docs.lammps.org/err0028 (src/lammps/src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.5
+  ghost atom cutoff = 6.5
+  binsize = 6.5, bins = 5 5 6
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair symmetrix/mace/float32/kk, perpetual
+      attributes: full, newton on, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Per MPI rank memory allocation (min/avg/max) = 3.4 | 3.4 | 3.4 Mbytes
+   Step        Atoms        PotEng          Pxx            Pyy            Pzz            Pyz            Pxz            Pxy      
+         0        2448  -10907.510092 -14874.9607265 -17913.7546352 -11154.8097183 -2667.97899627 -2557.89884851 273.899151336
+         5        2448  -10907.510092 -14874.9607265 -17913.7546352 -11154.8097183 -2667.97899627 -2557.89884851 273.899151336
+Loop time of 0.107841 on 1 procs for 5 steps with 2448 atoms
+
+WARMUP_COMPLETE step=5 atoms=2448
+New timer settings: style=full  mode=nosync  timeout=off
+WARNING: No fixes with time integration, atoms won't move
+For more information see https://docs.lammps.org/err0028 (src/lammps/src/verlet.cpp:60)
+Per MPI rank memory allocation (min/avg/max) = 3.4 | 3.4 | 3.4 Mbytes
+   Step        Atoms        PotEng          Pxx            Pyy            Pzz            Pyz            Pxz            Pxy      
+         5        2448  -10907.5100919 -14874.9595519 -17913.7540131 -11154.8092652 -2667.97881941 -2557.89855798 273.899397515
+        20        2448  -10907.5100919 -14874.9595519 -17913.7540131 -11154.8092652 -2667.97881941 -2557.89855798 273.899397515
+        25        2448  -10907.5100919 -14874.9595519 -17913.7540131 -11154.8092652 -2667.97881941 -2557.89855798 273.899397515
+Loop time of 0.417777 on 1 procs for 20 steps with 2448 atoms
+
+Performance: 4.136 ns/day, 5.802 hours/ns, 47.872 timesteps/s, 117.192 katom-step/s
+100.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg|  %CPU | %total
+-----------------------------------------------------------------------
+Pair    | 0.41537    | 0.41537    | 0.41537    |   0.0 | 100.0 | 99.42
+Neigh   | 0          | 0          | 0          |   0.0 | 100.0 |  0.00
+Comm    | 0.0014529  | 0.0014529  | 0.0014529  |   0.0 | 100.0 |  0.35
+Output  | 0.0002564  | 0.0002564  | 0.0002564  |   0.0 | 100.0 |  0.06
+Modify  | 3.7927e-05 | 3.7927e-05 | 3.7927e-05 |   0.0 | 100.0 |  0.01
+Other   |            | 0.0006648  |            |       |       |  0.16
+
+Nlocal:           2448 ave        2448 max        2448 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           4831 ave        4831 max        4831 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:       237024 ave      237024 max      237024 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 237024
+Ave neighs/atom = 96.823529
+Neighbor list builds = 0
+Dangerous builds = 0
+MEASUREMENT_COMPLETE step=25 atoms=2448
+Total wall time: 0:00:07

@@ -1,0 +1,106 @@
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/mace/calculators/mace.py:226: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  torch.load(f=model_path, map_location=device)
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+[W1112 12:33:05.040542195 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 2566914048 bytes (free: 1814167552, total: 20985348096).
+[W1112 12:33:06.692175390 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 1786773504 bytes (free: 1078067200, total: 20985348096).
+[W1112 12:33:06.692241534 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 1786773504 bytes (free: 1078067200, total: 20985348096).
+Traceback (most recent call last):
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/Benchmark_loup/reproduce/scripts/mace_ase_bench.py", line 95, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/Benchmark_loup/reproduce/scripts/mace_ase_bench.py", line 62, in main
+    call()
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/Benchmark_loup/reproduce/scripts/mace_ase_bench.py", line 55, in call
+    calc.calculate(atoms, properties=PROPS, system_changes=all_changes)
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/mace/calculators/mace.py", line 635, in calculate
+    out = model(
+          ^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/mace/modules/models.py", line 549, in forward
+    node_feats, sc = interaction(
+                     ^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/mace/modules/blocks.py", line 1013, in forward
+    sc = self.skip_tp(node_feats, node_attrs)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/cuequivariance_torch/operations/tp_fully_connected.py", line 198, in forward
+    output = self.f([self.weight, x1, x2])
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py", line 372, in forward
+    return self.m(inputs, input_indices, output_shapes, output_indices)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/cuequivariance_torch/primitives/segmented_polynomial_naive.py", line 405, in forward
+    out = graph(input_list)
+          ^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/cuequivariance_torch/primitives/segmented_polynomial_naive.py", line 277, in forward
+    return self.graph(inputs[0], inputs[1], inputs[2])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/fx/graph_module.py", line 1007, in call_wrapped
+    return self._wrapped_call(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/fx/graph_module.py", line 514, in __call__
+    raise e
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/fx/graph_module.py", line 500, in __call__
+    return super(self.cls, obj).__call__(*args, **kwargs)  # type: ignore[misc]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<eval_with_key>.83", line 24, in forward
+  File "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/venvs/mace-cueq/lib/python3.12/site-packages/torch/functional.py", line 372, in einsum
+    return _VF.einsum(equation, operands)  # type: ignore[attr-defined]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.66 GiB. GPU 0 has a total capacity of 19.54 GiB of which 1.00 GiB is free. Including non-PyTorch memory, this process has 18.52 GiB memory in use. Of the allocated memory 17.49 GiB is allocated by PyTorch, and 866.18 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)

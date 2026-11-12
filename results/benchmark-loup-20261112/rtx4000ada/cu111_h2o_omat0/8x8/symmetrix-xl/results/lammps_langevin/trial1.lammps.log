@@ -1,0 +1,98 @@
+LAMMPS (30 Sep 2026 - Update 1)
+KOKKOS mode with Kokkos version 5.2.1 is enabled
+  using double precision
+  using view layout = legacy
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (83.0112 71.8896 33.8804)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  17408 atoms
+  read_data CPU = 0.029 seconds
+Loading MACEKokkos model from '/mnt/homes/zwingel/benchmark-loup-20261112/prefix/inputs/mace-omat-0-medium.json' ... (h1_affine_mode m0_composite) success
+Symmetrix streamed_edges requested='direct' resolved='direct'
+Activated Execution JIT device artifact 'jit-r1-gen11-f32-6fdf3e63624a0e45'
+Symmetrix execution profile='capacity'
+  mapping LAMMPS type 1 (Cu) to MACEKokkos type 28
+  mapping LAMMPS type 2 (H) to MACEKokkos type 0
+  mapping LAMMPS type 3 (O) to MACEKokkos type 7
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- KOKKOS package: https://doi.org/10.1145/3731599.3767498
+
+@inproceedings{Johansson25,
+ author = {A. Johansson and E. Weinberg and C. Trott and M. McCarthy and S. Moore},
+ title = {{LAMMPS-KOKKOS}: {P}erformance Portable Molecular Dynamics Across Exascale Architectures},
+ year = 2025,
+ booktitle = {Proceedings of the SC '25 Workshops of the International Conference for High Performance Computing,
+  Networking, Storage and Analysis},
+ pages = {1217--1232},
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.5
+  ghost atom cutoff = 6.5
+  binsize = 6.5, bins = 13 12 6
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair symmetrix/mace/float32/kk, perpetual
+      attributes: full, newton on, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Per MPI rank memory allocation (min/avg/max) = 6.696 | 6.696 | 6.696 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+         0       17408  -77564.5164974 0 0
+         5       17408  -77668.3061624 107.290262889 47.6838970151
+Loop time of 0.765308 on 1 procs for 5 steps with 17408 atoms
+
+WARMUP_COMPLETE step=5 atoms=17408
+New timer settings: style=full  mode=nosync  timeout=off
+Per MPI rank memory allocation (min/avg/max) = 6.689 | 6.689 | 6.689 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+         5       17408  -77668.3061878 107.290262889 47.6838970151
+        20       17408  -77731.072077 186.847095417 83.0419966879
+        25       17408  -77813.578631 272.835388671 121.25848353
+Loop time of 3.09549 on 1 procs for 20 steps with 17408 atoms
+
+Performance: 0.279 ns/day, 85.986 hours/ns, 6.461 timesteps/s, 112.473 katom-step/s
+99.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg|  %CPU | %total
+-----------------------------------------------------------------------
+Pair    | 3.0843     | 3.0843     | 3.0843     |   0.0 |  99.9 | 99.64
+Neigh   | 0.0013262  | 0.0013262  | 0.0013262  |   0.0 | 100.0 |  0.04
+Comm    | 0.0078808  | 0.0078808  | 0.0078808  |   0.0 |  98.4 |  0.25
+Output  | 0.00046973 | 0.00046973 | 0.00046973 |   0.0 | 100.0 |  0.02
+Modify  | 0.00023844 | 0.00023844 | 0.00023844 |   0.0 | 100.0 |  0.01
+Other   |            | 0.001257   |            |       |       |  0.04
+
+Nlocal:          17408 ave       17408 max       17408 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          16322 ave       16322 max       16322 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:  1.68719e+06 ave 1.68719e+06 max 1.68719e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 1687194
+Ave neighs/atom = 96.920611
+Neighbor list builds = 1
+Dangerous builds = 0
+MEASUREMENT_COMPLETE step=25 atoms=17408
+FINAL_PE -77813.578631 STEP 25
+Per MPI rank memory allocation (min/avg/max) = 6.693 | 6.693 | 6.693 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+        25       17408  -77813.5786322 272.835388671 121.25848353
+Loop time of 4.9084e-05 on 1 procs for 0 steps with 17408 atoms
+
+Total wall time: 0:00:11

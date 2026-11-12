@@ -1,0 +1,101 @@
+LAMMPS (30 Sep 2026 - Update 1)
+KOKKOS mode with Kokkos version 5.2.1 is enabled
+  using double precision
+  using view layout = legacy
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (207.528 179.724 33.8804)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  108800 atoms
+  read_data CPU = 0.151 seconds
+Loading MACEKokkos model from '/mnt/homes/zwingel/benchmark-loup-20261112/prefix/inputs/mace-omat-0-medium.json' ... (h1_affine_mode m0_composite) success
+Symmetrix streamed_edges requested='direct' resolved='direct'
+Activated Execution JIT device artifact 'jit-r1-gen11-f32-6fdf3e63624a0e45'
+Symmetrix execution profile='capacity'
+  mapping LAMMPS type 1 (Cu) to MACEKokkos type 28
+  mapping LAMMPS type 2 (H) to MACEKokkos type 0
+  mapping LAMMPS type 3 (O) to MACEKokkos type 7
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+- KOKKOS package: https://doi.org/10.1145/3731599.3767498
+The log file lists these citations in BibTeX format.
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.5
+  ghost atom cutoff = 6.5
+  binsize = 6.5, bins = 32 28 6
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair symmetrix/mace/float32/kk, perpetual
+      attributes: full, newton on, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.0005
+Per MPI rank memory allocation (min/avg/max) = 32.15 | 32.15 | 32.15 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+         0      108800  -484778.228142 0 0
+         5      108800  -485426.800996 670.34758484 47.666197333
+Loop time of 4.99564 on 1 procs for 5 steps with 108800 atoms
+
+WARMUP_COMPLETE step=5 atoms=108800
+New timer settings: style=full  mode=nosync  timeout=off
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 5
+  Time step     : 0.0005
+Per MPI rank memory allocation (min/avg/max) = 32.12 | 32.12 | 32.12 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+         5      108800  -485426.80103 670.34758484 47.666197333
+        20      108800  -485816.460611 1165.08648246 82.8454423326
+        25      108800  -486334.067313 1704.32271499 121.188745494
+Loop time of 20.331 on 1 procs for 20 steps with 108800 atoms
+
+Performance: 0.042 ns/day, 564.750 hours/ns, 0.984 timesteps/s, 107.029 katom-step/s
+99.3% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg|  %CPU | %total
+-----------------------------------------------------------------------
+Pair    | 20.276     | 20.276     | 20.276     |   0.0 |  99.2 | 99.73
+Neigh   | 0.0061571  | 0.0061571  | 0.0061571  |   0.0 | 100.0 |  0.03
+Comm    | 0.041836   | 0.041836   | 0.041836   |   0.0 | 100.0 |  0.21
+Output  | 0.0015942  | 0.0015942  | 0.0015942  |   0.0 | 100.0 |  0.01
+Modify  | 0.00034015 | 0.00034015 | 0.00034015 |   0.0 | 100.0 |  0.00
+Other   |            | 0.00468    |            |       |       |  0.02
+
+Nlocal:         108800 ave      108800 max      108800 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          67409 ave       67409 max       67409 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:  1.05455e+07 ave 1.05455e+07 max 1.05455e+07 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 10545490
+Ave neighs/atom = 96.92546
+Neighbor list builds = 1
+Dangerous builds = 0
+MEASUREMENT_COMPLETE step=25 atoms=108800
+FINAL_PE -486334.067313 STEP 25
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 25
+  Time step     : 0.0005
+Per MPI rank memory allocation (min/avg/max) = 32.14 | 32.14 | 32.14 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+        25      108800  -486334.067248 1704.32271499 121.188745494
+Loop time of 0.000285924 on 1 procs for 0 steps with 108800 atoms
+
+Total wall time: 0:00:36

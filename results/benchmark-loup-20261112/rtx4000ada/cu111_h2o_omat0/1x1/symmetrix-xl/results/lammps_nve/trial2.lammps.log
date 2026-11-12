@@ -1,0 +1,93 @@
+LAMMPS (30 Sep 2026 - Update 1)
+KOKKOS mode with Kokkos version 5.2.1 is enabled
+  using double precision
+  using view layout = legacy
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (10.3764 8.9862 33.8804)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  272 atoms
+  read_data CPU = 0.005 seconds
+Loading MACEKokkos model from '/mnt/homes/zwingel/benchmark-loup-20261112/prefix/inputs/mace-omat-0-medium.json' ... (h1_affine_mode m0_composite) success
+Symmetrix streamed_edges requested='direct' resolved='direct'
+Activated Execution JIT device artifact 'jit-r1-gen11-f32-6fdf3e63624a0e45'
+Symmetrix execution profile='capacity'
+  mapping LAMMPS type 1 (Cu) to MACEKokkos type 28
+  mapping LAMMPS type 2 (H) to MACEKokkos type 0
+  mapping LAMMPS type 3 (O) to MACEKokkos type 7
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- KOKKOS package: https://doi.org/10.1145/3731599.3767498
+
+@inproceedings{Johansson25,
+ author = {A. Johansson and E. Weinberg and C. Trott and M. McCarthy and S. Moore},
+ title = {{LAMMPS-KOKKOS}: {P}erformance Portable Molecular Dynamics Across Exascale Architectures},
+ year = 2025,
+ booktitle = {Proceedings of the SC '25 Workshops of the International Conference for High Performance Computing,
+  Networking, Storage and Analysis},
+ pages = {1217--1232},
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.5
+  ghost atom cutoff = 6.5
+  binsize = 6.5, bins = 2 2 6
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair symmetrix/mace/float32/kk, perpetual
+      attributes: full, newton on, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Per MPI rank memory allocation (min/avg/max) = 3.372 | 3.372 | 3.372 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+         0         272  -1211.94553903 0 0
+         5         272  -1213.57693934 1.59807970318 45.6209690503
+Loop time of 0.0165544 on 1 procs for 5 steps with 272 atoms
+
+WARMUP_COMPLETE step=5 atoms=272
+New timer settings: style=full  mode=nosync  timeout=off
+Per MPI rank memory allocation (min/avg/max) = 3.372 | 3.372 | 3.372 Mbytes
+   Step        Atoms        PotEng         KinEng          Temp     
+         5         272  -1213.57693967 1.59807970318 45.6209690503
+        20         272  -1214.60362295 2.64947984302 75.6356755405
+        25         272  -1215.94449652 3.97279359275 113.41279986
+Loop time of 0.0650294 on 1 procs for 20 steps with 272 atoms
+
+Performance: 13.286 ns/day, 1.806 hours/ns, 307.553 timesteps/s, 83.655 katom-step/s
+98.5% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg|  %CPU | %total
+-----------------------------------------------------------------------
+Pair    | 0.06252    | 0.06252    | 0.06252    |   0.0 |  98.5 | 96.14
+Neigh   | 0.00033137 | 0.00033137 | 0.00033137 |   0.0 |  99.9 |  0.51
+Comm    | 0.0010338  | 0.0010338  | 0.0010338  |   0.0 |  99.3 |  1.59
+Output  | 0.00024383 | 0.00024383 | 0.00024383 |   0.0 | 100.0 |  0.37
+Modify  | 0.00011982 | 0.00011982 | 0.00011982 |   0.0 |  99.3 |  0.18
+Other   |            | 0.0007807  |            |       |       |  1.20
+
+Nlocal:            272 ave         272 max         272 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           1838 ave        1838 max        1838 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:        26378 ave       26378 max       26378 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 26378
+Ave neighs/atom = 96.977941
+Neighbor list builds = 1
+Dangerous builds = 0
+MEASUREMENT_COMPLETE step=25 atoms=272
+FINAL_PE -1215.94449652 STEP 25
+Total wall time: 0:00:07

@@ -1,0 +1,68 @@
+{
+ "code": "fastmace",
+ "natoms": 2448,
+ "structure": "/mnt/homes/zwingel/benchmark-loup-20261112/results/cu111_h2o_omat0/3x3/inputs/cu111_h2o_3x3_2448atoms.extxyz",
+ "checkpoint": "/mnt/homes/zwingel/benchmark-loup-20261112/prefix/inputs/mace-omat-0-medium.model",
+ "precision": "float32",
+ "warmups": 5,
+ "samples": 20,
+ "setup_s": 2.9543415079824626,
+ "first_call_s": 18.846640523988754,
+ "call_times_s": [
+  0.012464707950130105,
+  0.011173243867233396,
+  0.01320922002196312,
+  0.01164014101959765,
+  0.011166971875354648,
+  0.011113510932773352,
+  0.011127662844955921,
+  0.013179265195503831,
+  0.011552955023944378,
+  0.010876130778342485,
+  0.01089626387692988,
+  0.010906229028478265,
+  0.012364365858957171,
+  0.012253999011591077,
+  0.010977156925946474,
+  0.010880663059651852,
+  0.01089716306887567,
+  0.01118730497546494,
+  0.011044488986954093,
+  0.011215039994567633
+ ],
+ "median_call_s": 0.011170107871294022,
+ "median_us_per_atom": 4.5629525618031135,
+ "min_us_per_atom": 4.442863880041865,
+ "max_us_per_atom": 5.395923211586242,
+ "energy_eV": -10907.5,
+ "stress_voigt": [
+  0.009284536354243755,
+  0.01118114497512579,
+  0.006962561048567295,
+  0.0016652978956699371,
+  0.001596473273821175,
+  -0.00017102228594012558
+ ],
+ "force_rms": 0.5899175524131831,
+ "torch_max_mem_alloc_mib": 2093.04248046875,
+ "gpu_mem_mib_after": 2466,
+ "fastmace_version": "1.0.0",
+ "overrides": {
+  "tier": "compiled",
+  "skin": 0.5,
+  "float32_energy": true
+ },
+ "plan_summary": {
+  "tier": "compiled",
+  "backend": "hybrid",
+  "compile_mode": "default",
+  "skin_A": 0.5,
+  "dtype": "float32",
+  "float64_energy": false,
+  "tf32": false
+ },
+ "plan": "Plan(tier='compiled', rewrites=RewriteConfig(factor_species='off', fold_cutoff='off', density_first='off', reassociate_first='on', joint_radial_input='off', fused_folded_backward='on', folded_backward_tiles='off', segmented_first_sum='on', streaming_conv='on', chunked_conv_backward='on', fused_folded_forward='on', radial_tables='on', w_tables='off', wprime_backward='on', recompute_conv_weights='off', recompute_first_table='off', recompute_first_layer='off', recompute_node_segments='off', recompute_node_region='off', species_skip='on', fused_radial_hidden='off', direct_node_feats='off', folded_constants='off', block_linear='on', grouped_linear='on', merged_residual='on', gated_rows='off', segment_gemm='off', gate_epilogue='off', grouped_launch='off', species_tables='off', fold_readout_tail='off', fold_product_linear='on', species_residual='off', combo_kernels='off', save_transcendentals='off', tf32x3_gemms='on', cueq_projected='off', sc_generated='on', fx_e3nn_linear='off', polar_graph_sums='off', inplace_block_linear=False, single_graph_strain='on', polar_uvu=True), engine=EngineConfig(backend='hybrid', compile_mode='default', device='cuda:0', pipelined='off', async_output='off', speculative_graph=False, pipeline_edge_margin=0.0, pipeline_rebuild_fraction=0.8, cueq_conv_fusion='off', first_derivative_only=True, unfuse_full_addmm=True, dynamo_cache_size_limit=64, expandable_segments='on', fp64_emulation='off', fp64_emulation_mantissa_bits='dynamic', empty_cache_before_capture=True, warmup_in_graph_pool=True, dynamic_edges=True, model_template_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64, force_graphs='keep', memory_probe='off'), precision=PrecisionConfig(dtype='float32', tf32=False, float64_energy=False, mc_energy='float32'), neighbours=NeighbourConfig(skin=0.5, sort_receivers='on', gpu_neighbour_list='on', edge_multiple=256, edge_bucket_fraction=0.05, capacity_headroom=1.15, headroom='fixed', d3",
+ "notes": [
+  "compatibility tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for full speed"
+ ]
+}
