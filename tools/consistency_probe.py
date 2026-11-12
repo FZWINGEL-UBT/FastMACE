@@ -46,7 +46,8 @@ def parse_args(argv=None):
     p.add_argument("--cif", type=Path, required=True, help="SrTiO3 unit cell (Benchmark_loup's CIF)")
     p.add_argument("--repeats", nargs="+", default=["3x3x3", "10x10x10"])
     p.add_argument("--directions", type=int, default=20)
-    p.add_argument("--steps-A", nargs="+", type=float, default=[1e-3, 3e-4, 1e-4])
+    p.add_argument("--steps-A", nargs="+", type=float, default=[1e-2, 3e-3, 1e-3, 3e-4, 1e-4],
+                   help="1e-3, 3e-4, 1e-4 are the specified steps; 1e-2 and 3e-3 lift the float32 energy noise floor")
     p.add_argument("--line-A", type=float, default=0.05)
     p.add_argument("--line-step-A", type=float, default=1e-4)
     p.add_argument("--loop-side-A", type=float, default=0.02)
