@@ -107,3 +107,36 @@ Through `tools/ci/local_gpu.py run` with the H200 plan alias (source 01bc2471; n
 **Deciding job 4990803** (source 4063180f = main 1d491a67 + this branch; the new A100 default SKIP_OUTSIDE + HOIST_DX +
 WEIGHTED_VECTOR against LATE_PULLBACK, which keeps SKIP_OUTSIDE + HOIST_DX and turns WEIGHTED_VECTOR off): gate, MD-step
 A/B in both orders (SrTiO3 10³, NbCl5), stress-mode pair; one job (owner). Results go here.
+
+## Two channels per lane on top of LATE_PULLBACK (owner's follow-up via the conductor; CPU census only)
+
+Idea: each lane takes two consecutive channels into the same pull_Gx/Gy/Gz/pull_R quartet, float2 loads of x and the
+stage row, float2 dx atomics on sm_90. That is exactly `fu-h200-lp-vec2.cu` (`wprime_tuning.vec(lp, 2)` duplicates only
+the dx accumulators; pull_G and pull_R are declared outside the channel loop and stay shared). Falsifier: stop above 96
+registers on sm_90 or below 6 % fewer instructions per edge than LP+skip+hoist. `vec2_categories.py` →
+`vec2_categories.json`:
+
+| sm_90, per edge | lp (skip + LP + hoist) | lp + 2 channels per lane | change |
+|---|---:|---:|---:|
+| instructions (edge loop + channel passes) | 1,779 | 1,674 | −105 (−5.9 %) |
+| with the prologue | 1,826 | 1,721 | −5.8 % |
+| registers (blocks per SM) | 56 (9) | 78 (6) | |
+| FP (FFMA/FMUL/FADD) | 1,274 | 1,274 | 0 |
+| memory | 245 | 159 | −86 (LDS −80, LDG −8, REDG −8) |
+| integer, move, branch, other | 239 | 225 | −14 |
+| edge loop outside the channel passes | 291 | 276 | −15 |
+
+sm_80: 1,754 → 1,647 (−6.1 %; with the prologue 1,799 → 1,692, −5.9 %), 64 → 92 registers (7 → 5 blocks per SM);
+FP 1,270 both, memory 245 → 157.
+
+**Stopped by the falsifier: −5.8 % on sm_90, under the 6 % line (registers 78, inside the 96 limit).** What the census
+shows:
+- The FP work is per channel and does not shrink: 1,274 of 1,779 instructions (72 %). Pairing channels saves only the
+  shared-memory reads of the staged row (float2 instead of two scalars), a few global loads and the dx atomics.
+- The per-edge items the idea counts on are not per channel: the n loads, the spline locator and table offsets, the
+  edge-loop indexing and the butterfly already run once per edge per warp, so two channels per lane cannot halve
+  them (the edge loop outside the channel passes goes 291 → 276).
+- The register cost (56 → 78) takes the H200 from 9 to 6 blocks per SM. The H200 lab showed LP gaining more than its
+  census (0.859 against 0.901), most likely from occupancy, so losing a third of it works against a 5.8 % count.
+- This matches why vec2 lost before even at 72 registers (1.106): its saving was memory instructions too, while it
+  added the per-pair overhead. No lab, gate or Alex entry.
