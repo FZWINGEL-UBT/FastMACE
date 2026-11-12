@@ -8,6 +8,8 @@ import torch
 from fastmace.kernels.oeq_streaming import wprime_backward as wp
 from fastmace.kernels.oeq_streaming import wprime_pullback as wpb
 
+torch.serialization.add_safe_globals([slice])  # e3nn 0.4.4's constants under torch's weights_only load
+
 
 @pytest.mark.parametrize("a, l, L", [(0, 0, 0), (0, 1, 1), (0, 2, 2), (0, 3, 3), (1, 0, 1), (1, 1, 2), (1, 2, 3),
                                      (1, 1, 0), (1, 2, 1), (1, 3, 2)])
