@@ -1,0 +1,4 @@
+idea,switch,gpu,profile,timeout,kind,name
+mh1-h200-tf32wp,--rewrites tf32x3_gemms=on wprime_backward=on,H200,fifth,,gate,tf32wp
+mh1-h200-tf32wptw,--rewrites tf32x3_gemms=on wprime_backward=on --production-constant fastmace.kernels.oeq_streaming.wprime_backward:TABLE_W=True,H200,fifth,,gate,tf32wptw
+mh1-h200-wpgepi,--rewrites wprime_backward=on gate_epilogue=on,H200,fifth,,gate,wpgepi

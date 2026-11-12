@@ -118,7 +118,7 @@ def _check_switch(switch, kind, line):
     if any(c in switch for c in ";|\n\r'\"`$\\"):
         raise ManifestError(f"line {line}: switch {switch!r} has one of ; | ' \" ` $ \\ (separators or shell)")
     words = switch.split()
-    if kind == "ab" and words[0].startswith("--"):
+    if kind in ("ab", "gate") and words[0].startswith("--"):
         return " ".join(words)
     bad = [w for w in words if not CONSTANT_RE.match(w)]
     if bad:
