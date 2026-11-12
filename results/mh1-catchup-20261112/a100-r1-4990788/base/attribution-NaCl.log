@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/tmp/4990788.alex/mh1/jobs/attribution.py", line 30, in <module>
+    events = json.loads(gzip.open(trace_path).read())
+                        ^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/4990788.alex/mh1/uv-python311/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/gzip.py", line 58, in open
+    binary_file = GzipFile(filename, gz_mode, compresslevel)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/4990788.alex/mh1/uv-python311/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/gzip.py", line 174, in __init__
+    fileobj = self.myfileobj = builtins.open(filename, mode or 'rb')
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/4990788.alex/mh1/base/profile/trace-attr-NaCl.json.gz'
