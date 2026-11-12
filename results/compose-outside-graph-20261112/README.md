@@ -10,7 +10,7 @@ CUTLASS d884 GEMMs every step (Ada: 301 µs, 1.8 %, SrTiO3 10³; 331 µs with co
 |---|---|---|
 | Ada MD step b/a, ab / ba | **0.9873 / 0.9823** (17.11 → 16.89 ms) | **0.9273 / 0.9341** (3.774 → 3.500 ms) |
 | Ada compose kernels per step (2.15 attribution) | 301 µs → **0** | 278 µs CUTLASS + copies → **0** |
-| A100 MD step b/a | pending (Alex job via tiled-speed, awaiting the owner's OK) | pending |
+| A100 / H200 | not measured: decision 66's work-removal rule (conductor) | same |
 | Exactness | composed weights bitwise equal; same arithmetic, run once instead of per replay | same |
 
 ## Why the composition was captured
@@ -113,17 +113,17 @@ steps after 200 + 200. Before = §6a's records (`b7c19b19`); after = this branch
 
 The other classes moved by tens of µs between the two code bases (`b7c19b19` → `236fa60c` + this change).
 
-## A100
+## A100 and H200
 
-Pending: `jobs/alex_compose.sh` (smoke + A/B both orders, SrTiO3 10³ + NbCl5, caches and code on node-local
-$TMPDIR). The conductor's ssh is refused; the job was handed to the tiled-speed session, whose permission check asks
-the owner before it stages and submits a job for another session. On the A100 float64 runs on tensor cores at full
-rate, so the gain should be far smaller than on the Ada (where float64 is 1/64 rate).
+Not measured. The conductor decided the change under decision 66's work-removal rule (AGENTS.md idea triage step 2:
+a bitwise pure work removal needs one not-slower A/B on any GPU; the Ada's covers it), and withdrew the A100 job
+(`jobs/alex_compose.sh`, kept for a later check). The capture mechanism is GPU-independent, so every GPU with
+COMPOSE_FAST on (H200 and A100 families, RTX 4000 Ada) replayed the compose.
 
-## H200
-
-Not run (the Modal account is at its cap; no `--owner-override`). The change is bitwise and removes work; the
-conductor decides on the H200.
+**Estimate, not measured (H200):** the composition is about 100 MFLOP of float64 per step, about 1.5 µs at the H200's
+float64 tensor-core rate, so what remains is per-node cost: about 37 graph nodes per step (Ada: 232 → 195 graph
+events) at 1–2 µs each in a serial chain, plus small-GEMM inefficiency: about 25–70 µs per step, b/a about
+0.98–0.99 on SrTiO3 10³ (3.07 ms) and 0.93–0.975 on NbCl5 3³ (1.02 ms). The A100 should save a similar number of µs.
 
 ## Suite
 
