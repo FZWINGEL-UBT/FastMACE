@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -64,6 +65,16 @@ def test_ab_rewrite_words_pass_through():
     assert row.switch == "--b radial_tables=off"
 
 
+def test_gate_rewrite_words_pass_through():
+    """gate_pack v2: a body starting with "--" goes to force_stress_gate.py as it is (e.g. --rewrites)."""
+    (row,) = launch.parse_manifest(
+        _manifest("i1,--rewrites tf32x3_gemms=on wprime_backward=on,H200,fourth,,gate,tw", header=HEADER7))
+    assert row.switch == "--rewrites tf32x3_gemms=on wprime_backward=on"
+    template = (Path(launch.__file__).parent / "gate_pack.sh").read_text()
+    assert "gate_pack v2" in template and '"${consts[0]:0:2}" = "--"' in template
+    assert '${structures_list//,/ }' in template  # STRUCTURES=NaCl,NaNbO3,NbCl5 through --env
+
+
 @pytest.mark.parametrize("header, match", [
     ("idea,switch,gpu,profile\n", "missing"),
     ("idea,switch,gpu,profile,timeout,colour\n", "unknown"),
@@ -96,7 +107,7 @@ def test_bad_rows_are_refused_with_their_line(row, match):
 @pytest.mark.parametrize("row, match", [
     (f"i1,{T}:CHUNK=8,H200,fourth,,ab,a/b", "name"),
     (f"i1,{T}:CHUNK=8,H200,fourth,,bench,", "kind"),
-    ("i1,--b radial_tables=off,H200,fourth,,gate,", "MODULE:NAME=VALUE"),
+    ("i1,radial_tables=off,H200,fourth,,gate,", "MODULE:NAME=VALUE"),
 ])
 def test_bad_kind_and_name_are_refused(row, match):
     with pytest.raises(launch.ManifestError, match=match):
@@ -187,7 +198,7 @@ def test_template_env_is_limited_to_known_variables():
 def test_templates_exist_and_are_versioned():
     for name in launch.KINDS.values():
         text = (JOBS / name).read_text()
-        assert " v1" in text.splitlines()[1] and "EXPECT_GPU" in text and "set -uo pipefail" in text
+        assert re.search(r" v\d+:", text.splitlines()[1]) and "EXPECT_GPU" in text and "set -uo pipefail" in text
     for name in launch.TEMPLATE_FILES:
         assert (JOBS / name).is_file(), name
     for name in launch.MODAL_FILES:

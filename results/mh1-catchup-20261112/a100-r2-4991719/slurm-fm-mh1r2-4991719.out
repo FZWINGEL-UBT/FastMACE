@@ -1,0 +1,160 @@
+### Starting TaskPrologue of job 4991719 on a0931 at Thu Nov 12 10:51:25 PM CET 2026
+Running on cores 48-63 with governor schedutil
+Thu Nov 12 22:51:25 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:90:00.0 Off |                    0 |
+| N/A   44C    P0             69W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-12T22:51:26+0100 round2 job 4991719 on a0931
+2026-11-12T22:51:26+0100 job 4991719 on a0931: NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; 16 cores
+2026-11-12T22:51:53+0100 prod env staged in 27 s
+2026-11-12T22:54:44+0100 prod-NbCl5-3x3x3 exit=0 point NbCl5 float32 1944 atoms (3x3x3): ok, 8.33 ms/step, steady peak reserved 0.85 GiB (/tmp/4991719.alex/mh1/base/points/prod-NbCl5-3x3x3/point-NbCl5-float32-1944.json)
+2026-11-12T22:56:37+0100 prod-NaCl-3x3x3 exit=0 point NaCl float32 216 atoms (3x3x3): ok, 2.60 ms/step, steady peak reserved 0.31 GiB (/tmp/4991719.alex/mh1/base/points/prod-NaCl-3x3x3/point-NaCl-float32-216.json)
+2026-11-12T22:58:50+0100 prod-NaNbO3-3x3x3 exit=0 point NaNbO3 float32 1080 atoms (3x3x3): ok, 6.63 ms/step, steady peak reserved 0.75 GiB (/tmp/4991719.alex/mh1/base/points/prod-NaNbO3-3x3x3/point-NaNbO3-float32-1080.json)
+2026-11-12T23:01:53+0100 prod-NbCl5-6x6x6 exit=0 point NbCl5 float32 15552 atoms (6x6x6): ok, 56.21 ms/step, steady peak reserved 4.54 GiB (/tmp/4991719.alex/mh1/base/points/prod-NbCl5-6x6x6/point-NbCl5-float32-15552.json)
+2026-11-12T23:03:20+0100 prod-omat0-medium-NbCl5-3x3x3 exit=0 point NbCl5 float32 1944 atoms (3x3x3): ok, 8.33 ms/step, steady peak reserved 0.85 GiB (/tmp/4991719.alex/mh1/base/points/prod-omat0-medium-NbCl5-3x3x3/point-NbCl5-float32-1944.json)
+2026-11-12T23:03:39+0100 t215 env built=1 in 18 s 5 log lines
+Using Python 3.11.16 environment at: /tmp/4991719.alex/mh1/envs/mace_cueq_oeq_torch215_prof
+2026-11-12T23:06:30+0100 attr-NbCl5 exit=0 point NbCl5 float32 1944 atoms (3x3x3): error, failed in build: record_py_stacks=True could not register CUPTI node-creation callbacks. This requires cupti-python, CUPTI >= 13.3, and a CUPTI subscript
+2026-11-12T23:06:30+0100 attribution NbCl5 exit=1
+2026-11-12T23:08:28+0100 attr-NaCl exit=0 point NaCl float32 216 atoms (3x3x3): error, failed in build: record_py_stacks=True could not register CUPTI node-creation callbacks. This requires cupti-python, CUPTI >= 13.3, and a CUPTI subscriptio
+2026-11-12T23:08:28+0100 attribution NaCl exit=1
+2026-11-12T23:10:41+0100 attr-NaNbO3 exit=0 point NaNbO3 float32 1080 atoms (3x3x3): error, failed in build: record_py_stacks=True could not register CUPTI node-creation callbacks. This requires cupti-python, CUPTI >= 13.3, and a CUPTI subscrip
+2026-11-12T23:10:41+0100 attribution NaNbO3 exit=1
+2026-11-12T23:12:19+0100 attr-omat0-medium-NbCl5 exit=0 point NbCl5 float32 1944 atoms (3x3x3): error, failed in build: record_py_stacks=True could not register CUPTI node-creation callbacks. This requires cupti-python, CUPTI >= 13.3, and a CUPTI subscript
+2026-11-12T23:12:19+0100 attribution omat0-medium-NbCl5 exit=1
+2026-11-12T23:12:19+0100 DONE records /home/atuin/v130cb/v130cb18/fm-mh1/runs/mh1base2-4991719.tgz
+2026-11-12T23:12:19+0100 base exit=0
+2026-11-12T23:13:01+0100 STAGE copied to /tmp/4991719.alex/fm in 33 s
+2026-11-12T23:13:02+0100 cache /tmp/4991719.alex/mh1cache shared through /tmp/4991719.alex/fm/cache, oeq/ per job
+2026-11-12T23:13:02+0100 alex_ab_pack v2 job 4991719 on a0931 (16 cores, AMD EPYC 7713 64-Core Processor); NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; source 62536879
+2026-11-12T23:13:02+0100 start ab-mh1-r2scan-ab (5 switches)
+2026-11-12T23:28:16+0100 end ab-mh1-r2scan-ab exit=0 wall 914 s
+  mh1-r2scan ab nosegrows NaCl a 1.8102 ms b 1.7454 ms b/a 0.9642 valid 
+  mh1-r2scan ab noweighted NaCl a 1.8402 ms b 1.8337 ms b/a 0.9965 valid 
+  mh1-r2scan ab nosegrows_noweighted NaCl a 1.8284 ms b 1.7619 ms b/a 0.9636 valid 
+  mh1-r2scan ab noint32 NaCl a 1.8285 ms b 1.7954 ms b/a 0.9819 valid 
+  mh1-r2scan ab nosort NaCl a 1.8283 ms b 1.8123 ms b/a 0.9912 valid 
+  mh1-r2scan ab nosegrows NbCl5 a 7.2295 ms b 7.1833 ms b/a 0.9936 valid 
+  mh1-r2scan ab noweighted NbCl5 a 7.2460 ms b 7.2880 ms b/a 1.0058 valid 
+  mh1-r2scan ab nosegrows_noweighted NbCl5 a 7.2560 ms b 7.2744 ms b/a 1.0025 valid 
+  mh1-r2scan ab noint32 NbCl5 a 7.2455 ms b 7.2349 ms b/a 0.9985 valid 
+  mh1-r2scan ab nosort NbCl5 a 7.2500 ms b 7.2495 ms b/a 0.9999 valid 
+  SETUP ab-mh1-r2scan-ab-noint32 NaCl a 105 s b 58 s
+  SETUP ab-mh1-r2scan-ab-noint32 NbCl5 a 72 s b 60 s
+  SETUP ab-mh1-r2scan-ab-nosegrows NaCl a 105 s b 63 s
+  SETUP ab-mh1-r2scan-ab-nosegrows NbCl5 a 72 s b 61 s
+  SETUP ab-mh1-r2scan-ab-nosegrows_noweighted NaCl a 105 s b 49 s
+  SETUP ab-mh1-r2scan-ab-nosegrows_noweighted NbCl5 a 72 s b 50 s
+  SETUP ab-mh1-r2scan-ab-nosort NaCl a 105 s b 39 s
+  SETUP ab-mh1-r2scan-ab-nosort NbCl5 a 72 s b 38 s
+  SETUP ab-mh1-r2scan-ab-noweighted NaCl a 105 s b 47 s
+  SETUP ab-mh1-r2scan-ab-noweighted NbCl5 a 72 s b 48 s
+2026-11-12T23:28:16+0100 start ab-mh1-r2scan-ba (5 switches)
+2026-11-12T23:39:27+0100 end ab-mh1-r2scan-ba exit=0 wall 671 s
+  mh1-r2scan ba nosegrows NaCl b 1.7425 ms a 1.8143 ms b/a 0.9605 valid 
+  mh1-r2scan ba noweighted NaCl b 1.8309 ms a 1.8433 ms b/a 0.9933 valid 
+  mh1-r2scan ba nosegrows_noweighted NaCl b 1.7604 ms a 1.8317 ms b/a 0.9611 valid 
+  mh1-r2scan ba noint32 NaCl b 1.8046 ms a 1.8308 ms b/a 0.9857 valid 
+  mh1-r2scan ba nosort NaCl b 1.8097 ms a 1.8284 ms b/a 0.9897 valid 
+  mh1-r2scan ba nosegrows NbCl5 b 7.1876 ms a 7.2321 ms b/a 0.9938 valid 
+  mh1-r2scan ba noweighted NbCl5 b 7.3078 ms a 7.2456 ms b/a 1.0086 valid 
+  mh1-r2scan ba nosegrows_noweighted NbCl5 b 7.2574 ms a 7.2544 ms b/a 1.0004 valid 
+  mh1-r2scan ba noint32 NbCl5 b 7.2504 ms a 7.2789 ms b/a 0.9961 valid 
+  mh1-r2scan ba nosort NbCl5 b 7.2639 ms a 7.2890 ms b/a 0.9966 valid 
+  SETUP ab-mh1-r2scan-ba-noint32 NaCl a 38 s b 37 s
+  SETUP ab-mh1-r2scan-ba-noint32 NbCl5 a 39 s b 39 s
+  SETUP ab-mh1-r2scan-ba-nosegrows NaCl a 38 s b 63 s
+  SETUP ab-mh1-r2scan-ba-nosegrows NbCl5 a 39 s b 40 s
+  SETUP ab-mh1-r2scan-ba-nosegrows_noweighted NaCl a 38 s b 39 s
+  SETUP ab-mh1-r2scan-ba-nosegrows_noweighted NbCl5 a 39 s b 38 s
+  SETUP ab-mh1-r2scan-ba-nosort NaCl a 38 s b 37 s
+  SETUP ab-mh1-r2scan-ba-nosort NbCl5 a 39 s b 38 s
+  SETUP ab-mh1-r2scan-ba-noweighted NaCl a 38 s b 37 s
+  SETUP ab-mh1-r2scan-ba-noweighted NbCl5 a 39 s b 39 s
+2026-11-12T23:39:28+0100 done failed=0
+2026-11-12T23:49:13+0100 gate nosegrows exit=0 
+2026-11-12T23:58:37+0100 gate noweighted exit=0 
+2026-11-13T00:07:41+0100 gate nosegrows_noweighted exit=0 
+2026-11-13T00:16:14+0100 gate nosort exit=0 
+2026-11-13T00:16:18+0100 ab exit=0
+=== JOB_STATISTICS ===
+=== current date     : Fri Nov 13 00:16:19 CET 2026
+= Job-ID             : 4991719 on alex
+= Job-Name           : fm-mh1r2
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-mh1/jobs/alex_mh1_round2.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-mh1
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 06:00:00
+= Elapsed runtime    : 01:25:02
+= Total RAM usage    : 20.2 GiB of assigned  GiB (%)
+= Node list          : a0931
+= Subm/Elig/Start/End: 2026-11-12T22:43:36 / 2026-11-12T22:43:36 / 2026-11-12T22:51:16 / 2026-11-13T00:16:18
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             598.3M   104.9G   209.7G        N/A   1,229      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            28.3G     0.0K     0.0K        N/A      99K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 317288, 6 %, 2 %, 4696 MiB, 168598 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 319081, 3 %, 1 %, 4694 MiB, 110676 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 320270, 7 %, 2 %, 4694 MiB, 130821 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 322220, 41 %, 26 %, 5222 MiB, 180484 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 323738, 11 %, 4 %, 4696 MiB, 85535 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 324645, 1 %, 0 %, 4668 MiB, 167037 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 326503, 1 %, 0 %, 4666 MiB, 113871 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 327858, 1 %, 0 %, 4666 MiB, 128336 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 332168, 0 %, 0 %, 1344 MiB, 93247 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 336739, 19 %, 6 %, 6680 MiB, 873764 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 406953, 24 %, 7 %, 6544 MiB, 666767 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 410178, 1 %, 0 %, 1426 MiB, 23555 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 410519, 1 %, 0 %, 1002 MiB, 25496 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 410866, 5 %, 3 %, 10278 MiB, 24216 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 411194, 3 %, 1 %, 5362 MiB, 25933 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 411546, 4 %, 2 %, 7362 MiB, 23770 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 411944, 2 %, 1 %, 3974 MiB, 25780 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 412277, 1 %, 0 %, 5188 MiB, 380953 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 415675, 1 %, 0 %, 1426 MiB, 23546 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 416000, 1 %, 0 %, 1002 MiB, 25812 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 416353, 4 %, 3 %, 10278 MiB, 24361 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 416681, 3 %, 1 %, 5362 MiB, 25979 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 417181, 4 %, 2 %, 7362 MiB, 23838 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 417523, 2 %, 1 %, 3974 MiB, 25722 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 417877, 1 %, 0 %, 5208 MiB, 352630 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 419395, 1 %, 0 %, 1426 MiB, 24661 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 419745, 1 %, 0 %, 1002 MiB, 25494 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 420152, 4 %, 3 %, 10278 MiB, 24301 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 420480, 3 %, 1 %, 5362 MiB, 25907 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 420920, 4 %, 2 %, 7362 MiB, 23942 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 421245, 2 %, 1 %, 3974 MiB, 25628 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 421611, 0 %, 0 %, 5208 MiB, 310908 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 422889, 1 %, 0 %, 1426 MiB, 23528 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 423241, 1 %, 0 %, 1002 MiB, 25629 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 423559, 5 %, 3 %, 10278 MiB, 24052 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 424139, 3 %, 1 %, 5362 MiB, 26017 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 424481, 4 %, 2 %, 7362 MiB, 24273 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 424832, 2 %, 1 %, 3974 MiB, 25943 ms
+NVIDIA A100-SXM4-80GB, 00000000:90:00.0, 425166, 0 %, 0 %, 5208 MiB, 306770 ms

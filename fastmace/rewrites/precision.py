@@ -30,7 +30,7 @@ def _targets(model):
     return [(name, module) for name, module in model.named_modules() if type(module).__name__ in _TYPES]
 
 
-def route(model, cueq_projected="auto", sc_generated_config="auto"):
+def route(model, cueq_projected="auto", sc_generated_config="auto", model_label=None):
     """Set ``tf32x3`` on every module that has atom GEMMs, and ``tf32x3_backend``, the backend ``tf32x3_mm`` uses on
     the module's device ("cutlass" on compute capability 8.0, else "triton"; ``GatedRows`` then takes the block
     products instead of its joined Triton GEMM); returns their names."""
@@ -61,7 +61,7 @@ def route(model, cueq_projected="auto", sc_generated_config="auto"):
 
             module.linear_div = linear_div.linear_div_default(torch.cuda.get_device_name(device))
 
-            if segment_rows.segment_rows_default(device):
+            if segment_rows.segment_rows_default(device, model_label):
                 count = len(module.block_ends)
                 module.segment_plan = segment_rows.plan_of(
                     module.segments_in, module.segments_out, module.block_ends,
@@ -266,7 +266,8 @@ def _selfcheck(original, rewritten, context):
 
 
 def _apply(model, context):
-    return route(model, context.config.cueq_projected, context.config.sc_generated)
+    return route(model, context.config.cueq_projected, context.config.sc_generated,
+                 (context.inputs or {}).get("model_label"))
 
 
 RECORDS = {
