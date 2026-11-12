@@ -148,3 +148,58 @@ Per edge and lane:
   the step), the rank-9 CG factorisation (the 9 transformed input gradients need 27 FMAs per path to convert back or 9
   atomics per path: net about zero), packed input components (at most about 24 per edge), component scaling (the same
   as `outside-joint-rescaling`, stopped 11 November), an interior-only kernel (the channel loop already has one branch).
+
+## Part 5: WEIGHTED_VECTOR as a switch, and the A100 MD-step A/Bs (12 November 2026)
+
+`wprime_backward.WEIGHTED_VECTOR` (off; `render(..., weighted_vector=True)`, needs FACTORED): in a path with more
+than 3 edge sums v_j that is not on SCALAR_PATHS, `dsh_j += s (w x_i)` per term replaces `v_j += s x_i` and the final
+`dsh_j += w v_j`. With FACTORED_SCALE and without FOLD_ALPHA, the path's alpha goes into w once. Rounding.
+`wv_check.py` checks the template against `wxin_variant.py`: on the H200 and A100 renders with skip+hoist, the code
+lines are identical.
+
+Census (`census_weighted_sm{80,90}.json`), instructions per edge and lane (registers):
+
+| render | base | weighted | skip+hoist | skip+hoist+weighted |
+|---|---:|---:|---:|---:|
+| H200 plan, sm_90 | 2,198 (72) | 2,168 (72) | 1,990 (96) | 1,957 (95) |
+| H200 plan, sm_80 | 2,169 (96) | 2,137 (80) | 1,976 (128) | 1,942 (96) |
+| A100 plan (STAGE_EDGES on), sm_80 | 2,053 (79) | 2,019 (80) | 1,874 (96) | 1,842 (96) |
+| A100 plan, sm_90 | 2,088 (80) | 2,052 (80) | 1,914 (96) | 1,882 (87) |
+
+The A100's own plan already has skip+hoist at 96 registers on sm_80, so there is no 128 -> 96 drop from weighted.
+That drop happens only on the H200 plan's render. The earlier A100 lab result (skip+hoist 1.025) ran the H200 plan
+through the GPU alias. It did not test the A100's own plan.
+
+The Colab A100 had 0 compute units, so these ran on Alex: A100-SXM4-80GB, the A100's own default plan, OMAT-0
+medium, Benchmark_loup, 6 x 256 steps, both build orders, source 015717c4 (the code equals the branch tip). Job
+4988118 is in `alex-weighted-4988118/` and job 4988246 in `alex-skiphoist-4988246/`. MD step b/a against today's
+A100 defaults:
+
+| side b | SrTiO3 10x10x10 ab / ba | NbCl5 3x3x3 ab / ba |
+|---|---|---|
+| WEIGHTED_VECTOR | 0.9950 / 0.9914 | 0.9971 / 0.9950 |
+| SKIP_OUTSIDE + HOIST_DX | 0.9849 / 0.9828 | 0.9751 / 0.9751 |
+| SKIP_OUTSIDE + HOIST_DX + WEIGHTED_VECTOR | 0.9742 / 0.9730 | 0.9710 / 0.9701 |
+
+All 12 A/Bs are valid. The 3x float32 force/stress gate (gate_pack, SrTiO3 3x3x3, NaCl, NbCl5) passes for every
+candidate. Each candidate's forces / stress ratios are shown beside that job's default plan:
+
+| side | SrTiO3 3x3x3 | NaCl | NbCl5 |
+|---|---|---|---|
+| default (job 4988118) | 0.90 / 0.68 | 0.82 / 1.00 | 0.97 / 1.39 |
+| skip+hoist+weighted | 0.95 / 0.58 | 0.98 / 0.98 | 0.98 / 1.32 |
+| weighted | 0.89 / 0.59 | 0.86 / 1.05 | 1.00 / 1.36 |
+| default (job 4988246) | 0.83 / 0.70 | 0.80 / 0.96 | 0.99 / 1.31 |
+| skip+hoist | 0.97 / 0.58 | 0.87 / 0.94 | 0.99 / 1.18 |
+
+Reading:
+- On the A100's own plan, skip+hoist wins on its own: 1.5-2.5 %.
+- weighted adds about 1.1 % (SrTiO3) and 0.5 % (NbCl5) on top. That matches weighted alone (0.3-0.9 %), so it
+  comes from fewer instructions, not from occupancy.
+- All three together give 2.6-3.0 %.
+- H200: census only. weighted on top of skip+hoist saves 33 instructions per edge (-1.7 % of the kernel, about
+  0.5 % of the step) at the same register class. That is under the bar, so there is no H200 run.
+
+Decision (conductor, decision 66, 12 Nov): the A100 family adopts SKIP_OUTSIDE + HOIST_DX + WEIGHTED_VECTOR, through
+`SKIP_OUTSIDE_GPUS` (HOIST_DX shares it) and `WEIGHTED_VECTOR_GPUS`. WEIGHTED_VECTOR yields to LATE_PULLBACK
+(`weighted_vector_on`), which is on for the H200 only, so the guard changes nothing on the A100 today.
