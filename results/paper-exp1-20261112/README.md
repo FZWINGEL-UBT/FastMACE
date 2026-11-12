@@ -185,9 +185,12 @@ How to read the table:
   A100.
 - **The drift floor is 3.7e-6 meV/atom/ps at 300 K**, the 7-run SD (mean +1.2e-6). Every (a) and (b) lies within
   ±1.6 SD of zero, with no consistent sign.
-- At 1,500 K four runs scatter within ±1.5e-5. The Ada (a), at −4.8e-5, is the one outlier: −2.4e-3 meV/atom over
-  50 ps, 0.7× its own RMS. That is about what the 300 K scatter-to-SE ratio predicts for 1,500 K (about 4e-5), but the
-  A100's (a) on its own state is +6e-6. The replicate below settles it.
+- At 1,500 K the first Ada (a), at −4.8e-5, looked like an outlier against the other four runs. The replicate below
+  shows it is scatter. With all eight 1,500 K runs, the **drift floor at 1,500 K is 2.8e-5 meV/atom/ps** (SD; mean
+  +6e-6).
+  - (a): mean −1.1e-5 over 4 runs.
+  - (b): mean +1.2e-5 over 3 runs.
+  - Over 50 ps that floor amounts to 1.4e-3 meV/atom, below the 3.5e-3 meV/atom RMS.
 - The fluctuation (RMS about the line), the temperatures and the rebuild counts are the same for a, b and c on
   every GPU.
 - The wall ms/step includes sampling every 100 steps; it is not an A/B.
@@ -197,8 +200,19 @@ How to read the table:
 
 ### Ada replicate at 1,500 K
 
-Pending: `ada_nve1500_rep.sh` on leto, started 15:52 CET. It runs (a) again from the same state (does one trajectory
-reproduce?), then a second Langevin seed (seed 2) with (a) and (b). Records go to `ada-leto/nve1500-replicate/`.
+`jobs/ada_nve1500_rep.sh` ran on leto (source `53add601`, 15:52–16:55 CET) after the idle check. Records are in
+`ada-leto/nve1500-replicate/`.
+
+| run | drift (meV/atom/ps) | RMS (meV/atom) | mean T (K) | rebuilds | start state |
+| --- | --- | --- | --- | --- | --- |
+| a again, same state as the first Ada pair | −7.48e-06 ± 1.1e-05 | 3.56e-03 | 1511.2 | 13,837 | ae8106ac |
+| a, second Langevin seed (seed 2) | +4.48e-05 ± 1.2e-05 | 3.57e-03 | 1497.0 | 13,720 | 10a03650 |
+| b, seed 2 | +3.15e-05 ± 1.2e-05 | 3.67e-03 | 1497.3 | 13,763 | 10a03650 |
+
+- (a) from the identical start state gives −7.5e-6 this time, not −4.8e-5. The MD is not bitwise reproducible
+  (floating-point atomics), so two runs from one state are two trajectories, and the first value was scatter.
+- On seed 2, (a) and (b) both drift positive by similar amounts.
+- (a) is not worse than (b).
 
 ## 5. Speed: the price of consistency
 
