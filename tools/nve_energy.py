@@ -131,8 +131,10 @@ def main(argv=None):
 
     def sample(step):
         values = engine.integrator.output_values(engine.state)
-        conserved = float(values[CONSERVED_KEY][0])
         kinetic = float(values["kinetic"][0])
+        total = float(values["energy"][0]) + kinetic  # E_pot (float64 sum) + E_kin
+        # NVE: the integrator's own conserved output (equal to the total; Langevin has none)
+        conserved = float(values[CONSERVED_KEY][0]) if CONSERVED_KEY in values else total
         return [step, conserved, kinetic]
 
     steps = int(round(1000 * args.ps / args.timestep_fs))
