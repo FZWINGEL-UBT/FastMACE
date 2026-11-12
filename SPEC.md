@@ -3720,3 +3720,8 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Alex A100-SXM4-80GB, b = WEIGHTED_VECTOR off against the defaults, ab / ba: NaCl 3³ 0.9932 / 1.0041, NbCl5 3³ 0.9987 / 0.9986; gate passes with it on. No gain, so `wprime_backward.WEIGHTED_VECTOR_MODEL_OFF_GPUS = {"polar1-m": A100}` (`weighted_vector_default(device, model_label)`). POLAR-1-M's A100 kernel is the pre-12-November source again.
 - MH-1 on the A100 family takes WEIGHTED_VECTOR through the same class; not measured (open cell).
 - No Modal spend. Suite on `aa8db8d3` (leto, GPU idle): 5,764 passed, 206 skipped, 0 failed. See `results/wprime-off-polar-20261112/README.md`.
+
+**Tiled capacity go/no-go at 397.5M atoms on one A100 (12 November 2026; conductor, tiled-speed; records only, no code changed).**
+- Alex 4985889 (e7ac9b42, A100-SXM4-80GB, 16 CPUs): valid and faster, but over the 28 GiB GPU line. GPU peak 36.93 GiB (99.8 B/atom) in the eager first call, 31.56 GiB (85.2 B/atom) compiled; host 185.7 GB (cgroup 187.1 of 231.5 GB). 74.0 edges/atom, -7.98954679 eV/atom, max |F| 4.37e-6 eV/Å on the perfect crystal. Compiled call 6.16 µs/atom (0.63 of 9.84), eager first call 25.91 µs/atom; float32 state in both calls.
+- Alex 4988550 (320M request, ran 400³, `--state-dtype none`): compiled 5.69 µs/atom, GPU peaks 29.92 / 33.50 GiB, host 183.3 GB; -7.98954680 eV/atom.
+- Plan verdict for 1e9 atoms: NO-GO until the eager first call's transient (+71 B/atom) is censused and the resident copies (int64 sender_groups beside the uint8 copy, `tiled._g.pos`, the block order: about 24 B/atom) are cut. See `plans/billion-atoms-20261111.md` and `results/` go-alex-4985889 / f32-alex-4988550.
