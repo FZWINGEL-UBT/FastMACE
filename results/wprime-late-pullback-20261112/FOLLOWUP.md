@@ -85,3 +85,25 @@ Through `tools/ci/local_gpu.py run` with the H200 plan alias (source 01bc2471; n
   registers; dL/dv max 7.3e-7 (median edge 4.6e-7), dx 1.9e-7.
 - 3× float32 gate with LATE_PULLBACK on (NaCl, SrTiO3 3×3×3): passes; APPLIED advanced by 2 per build, no
   expect failures; forces 0.82 / 0.80, stress 0.73 / 0.38 of the ASE float32 spread.
+
+## Alex A100-SXM4-80GB results (12 Nov 2026, `alex/`)
+
+**4988692** (source 01bc2471; the A100 default then: no SKIP_OUTSIDE / HOIST_DX / WEIGHTED_VECTOR; b = LATE_PULLBACK):
+- Kernel lab: base 2,630.7 µs at 79 registers, lp 2,320.4 µs = **0.882** at 64; dL/dv 6.6e-7 (median edge 4.7e-7), dx 2.2e-7.
+- Gate (LATE_PULLBACK on): passes on NaCl and SrTiO3 3³ (forces 0.87 / 0.89, stress 0.94 / 0.52), no expect failures.
+- MD-step A/B b/a: SrTiO3 10³ **0.9633 / 0.9607** (6.19 → 5.96 ms), NbCl5 **0.9648 / 0.9670**; proof counter advanced on b only.
+
+**4988974** (source c21ad219; a = LATE_PULLBACK, b = LATE_PULLBACK + SKIP_OUTSIDE + HOIST_DX):
+- Gate with all three on: passes on NaCl, NbCl5, SrTiO3 3³, no expect failures.
+- MD-step A/B b/a: SrTiO3 10³ 0.9908 / 0.9882, NbCl5 0.9841 / 0.9868. The run is flagged INVALID only because
+  ab_rewrites requires side a's proof counter not to advance, and side a had LATE_PULLBACK on by design (both sides
+  transformed). The timings stand: SKIP_OUTSIDE + HOIST_DX add about 1.1 to 1.6 % on top of LATE_PULLBACK. The census
+  (0.893 on the kernel) suggested more. With the w′ kernel about 30 % of the step (4988692: kernel 0.882 → step 0.963),
+  0.893 on the kernel would be about 0.967 on the step.
+- Stress mode (virial_ab, SrTiO3 10³; a = the A100 default at c21ad219, b = all three on): force call with stress
+  0.9969 / 1.0027 (18.1 ms per call: a tie; kernel time per atom 1,368 → 1,288 ns, −6 %, which the call's other work
+  hides). Stress of b against a: max 1.5e-8 against a stress of 0.029; forces 2.3e-6.
+
+**Deciding job 4990803** (source 4063180f = main 1d491a67 + this branch; the new A100 default SKIP_OUTSIDE + HOIST_DX +
+WEIGHTED_VECTOR against LATE_PULLBACK, which keeps SKIP_OUTSIDE + HOIST_DX and turns WEIGHTED_VECTOR off): gate, MD-step
+A/B in both orders (SrTiO3 10³, NbCl5), stress-mode pair; one job (owner). Results go here.

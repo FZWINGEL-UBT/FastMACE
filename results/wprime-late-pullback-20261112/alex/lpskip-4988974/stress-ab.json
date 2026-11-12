@@ -1,0 +1,64 @@
+{
+ "gpu": "NVIDIA A100-SXM4-80GB",
+ "atoms": 5000,
+ "order": "ab",
+ "pattern": "abab",
+ "calls": 20,
+ "constants": {
+  "a": [],
+  "b": [
+   "fastmace.kernels.oeq_streaming.wprime_backward:LATE_PULLBACK=True",
+   "fastmace.kernels.oeq_streaming.wprime_backward:SKIP_OUTSIDE=True",
+   "fastmace.kernels.oeq_streaming.wprime_backward:HOIST_DX=True"
+  ]
+ },
+ "expect": {
+  "a": {
+   "fastmace.kernels.oeq_streaming.wprime_pullback:APPLIED": 0
+  },
+  "b": {
+   "fastmace.kernels.oeq_streaming.wprime_pullback:APPLIED": 2
+  }
+ },
+ "expect_failed": [],
+ "strain_path": {
+  "a": "one_graph",
+  "b": "one_graph"
+ },
+ "profile": {
+  "a": {
+   "kernel_ns_per_atom": 1368.0,
+   "largek_kernels": 2,
+   "largek_ns_per_atom": 5.81
+  },
+  "b": {
+   "kernel_ns_per_atom": 1288.0,
+   "largek_kernels": 2,
+   "largek_ns_per_atom": 5.81
+  }
+ },
+ "stress_max_abs": 1.4901161193847656e-08,
+ "stress_max": 0.028883203864097595,
+ "forces_max_abs": 2.2692547645419836e-06,
+ "times_ms": {
+  "a": [
+   16.49393595289439,
+   17.57493205368519,
+   18.193450500257313,
+   18.220306397415698,
+   18.17166930413805,
+   18.19345850381069
+  ],
+  "b": [
+   17.43561894982122,
+   18.171101599000394,
+   18.124645348871127,
+   18.088000849820673,
+   18.145917600486428,
+   18.126302695600316
+  ]
+ },
+ "a_ms": 18.1826,
+ "b_ms": 18.1255,
+ "b_over_a": 0.9969
+}
