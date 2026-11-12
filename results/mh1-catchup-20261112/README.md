@@ -224,3 +224,10 @@ confirm this failed (6.3).
 The bundle (`h200/`) is unchanged. Its `tf32wptw` entry carries `TABLE_W=True`, which round 1 confirmed on the A100.
 `SEGMENT_ROWS` and `WEIGHTED_VECTOR` are A100-only sets, so they have no H200 entry. Not launched: Modal is at $29.49
 of the $30 cap; the conductor's rule is to wait for room or the 1 December reset.
+
+## Known bugs
+
+- `profile_point.py` (the copy in torch-215-trial's `t215-jobs`, which `jobs/alex_mh1_base2.sh` uses) ignores
+  `--model`. Alex 4991719's `prod-omat0-medium-*` and `attr-omat0-medium-*` points ran `mh1-r2scan`; their point
+  JSON says `model: mh1-r2scan`. Not fixed and not rerun (conductor, 13 November 2026). Before reusing the script for
+  another model, check the `model` field of the point JSON.
