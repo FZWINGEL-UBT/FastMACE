@@ -97,9 +97,10 @@ Additional sources used for the third revision:
 
 ## Open items before submission
 
-- **The five experiments of Table 13.** None was run. The first two overlap with
-  `plans/notes/conductor-prompt-20261111-paper-measurements.md` in the main checkout, which predates the review
-  and should be extended by the review's items 1, 3, 4 and 5.
+- **The five experiments of Table 13.** None was run. The brief for them is
+  `plans/notes/conductor-prompt-20261112-paper-experiments.md` in the main checkout (owner request of
+  12 November 2026); it is not committed there yet and is for the conductor to pick up. It also lists the code
+  items the reviews raised.
 - **A public repository or archive** with checkpoint and structure identities, resolved configurations and
   commands. The availability statement says this is needed.
 - **Author list, affiliation, acknowledgements, release plan.** Marked `TODO (owner)` in `main.tex`.
