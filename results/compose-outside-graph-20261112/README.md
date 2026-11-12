@@ -65,7 +65,7 @@ No new switch. Same arithmetic (`compose_skip.composed`, float64, cast once), sa
 - Targeted run on leeloo (`42b87382` + the counter fix, CUDA hidden): test_compose_outside_graph, test_compose_skip,
   test_composed_cache, test_layering, test_superset, test_events, test_registry, test_ab_rewrites_tool: 182 passed,
   1 skipped.
-- Full `tests/cpu`: see "Suite" below.
+- Full `tests/cpu`: 5,738 passed, 206 skipped, 0 failed (see "Suite").
 
 ## GPU smoke (`gpu_smoke.py`, Ada, OMAT-0 medium float32, production plan, 300 steps)
 
@@ -127,7 +127,8 @@ conductor decides on the H200.
 
 ## Suite
 
-Pending (leto, full `tests/cpu` on `381ac910` = main `236fa60c` + this branch).
+Full `tests/cpu` on `381ac910` (main `236fa60c` + this branch's code; later commits add records and docs only), leto,
+idle check (no GPU process), CUDA hidden, 12 Nov 17:52 CET: **5,738 passed, 206 skipped, 0 failed** (13 min 49 s).
 
 ## Files
 
