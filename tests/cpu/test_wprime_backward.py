@@ -457,7 +457,7 @@ def test_weighted_vector_yields_to_late_pullback(monkeypatch):
     import inspect  # WPrimeBackward decides LATE_PULLBACK before the render and passes it to the guard
     init = inspect.getsource(wp.WPrimeBackward.__init__)
     assert init.index("self.late_pullback = (") < init.index("weighted_vector_on(device, self.factored, "
-                                                              "self.late_pullback)") < init.index("render(")
+                                                              "self.late_pullback, model_label)") < init.index("render(")
 
 
 def test_weighted_vector_compiles_with_nvrtc():

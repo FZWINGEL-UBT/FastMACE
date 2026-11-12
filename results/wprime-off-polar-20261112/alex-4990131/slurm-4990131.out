@@ -1,0 +1,72 @@
+### Starting TaskPrologue of job 4990131 on a0535 at Thu Nov 12 07:20:29 PM CET 2026
+Running on cores 32-47 with governor schedutil
+Thu Nov 12 19:20:29 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:96:00.0 Off |                    0 |
+| N/A   38C    P0             65W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+2026-11-12T19:21:13+0100 STAGE copied to /tmp/4990131.alex/fm in 44 s
+2026-11-12T19:21:13+0100 cache /home/atuin/v130cb/v130cb18/fm-offpolar/cache shared through /tmp/4990131.alex/fm/cache, oeq/ per job
+2026-11-12T19:21:13+0100 alex_ab_pack v2 job 4990131 on a0535 (16 cores, AMD EPYC 7713 64-Core Processor); NVIDIA A100-SXM4-80GB, 615.71.10, 81920 MiB; source ee2c2207b64928b50fa53051c3441d0cb07eba16
+2026-11-12T19:21:13+0100 start ab-polar1-m-ab (1 switches)
+2026-11-12T19:40:03+0100 end ab-polar1-m-ab exit=0 wall 1130 s
+  polar1-m ab noweighted NaCl a 4.0352 ms b 4.0075 ms b/a 0.9932 valid 
+  polar1-m ab noweighted NbCl5 a 15.4334 ms b 15.4129 ms b/a 0.9987 valid 
+  SETUP ab-polar1-m-ab-noweighted NaCl a 228 s b 203 s
+  SETUP ab-polar1-m-ab-noweighted NbCl5 a 225 s b 171 s
+2026-11-12T19:40:03+0100 start ab-polar1-m-ba (1 switches)
+2026-11-12T19:55:14+0100 end ab-polar1-m-ba exit=0 wall 911 s
+  polar1-m ba noweighted NaCl b 4.0291 ms a 4.0127 ms b/a 1.0041 valid 
+  polar1-m ba noweighted NbCl5 b 15.3824 ms a 15.4044 ms b/a 0.9986 valid 
+  SETUP ab-polar1-m-ba-noweighted NaCl a 175 s b 169 s
+  SETUP ab-polar1-m-ba-noweighted NbCl5 a 138 s b 139 s
+2026-11-12T19:55:15+0100 done failed=0
+2026-11-12T20:14:46+0100 gate exit=0 
+=== JOB_STATISTICS ===
+=== current date     : Thu Nov 12 20:14:50 CET 2026
+= Job-ID             : 4990131 on alex
+= Job-Name           : fm-wvpolar
+= Job-Command        : /home/atuin/v130cb/v130cb18/fm-offpolar/alex_wv_polar.sh
+= Initial workdir    : /home/atuin/v130cb/v130cb18/fm-offpolar
+= Queue/Partition    : a100
+= Slurm account      : v130cb with QOS=normal
+= Features           : a100_80
+= Requested resources:  for 02:30:00
+= Elapsed runtime    : 00:54:33
+= Total RAM usage    : 19.1 GiB of assigned  GiB (%)
+= Node list          : a0535
+= Subm/Elig/Start/End: 2026-11-12T16:36:05 / 2026-11-12T16:36:05 / 2026-11-12T19:20:17 / 2026-11-12T20:14:50
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc             596.3M   104.9G   209.7G        N/A   1,207      300K     400K        N/A    
+    /home/vault             0.0K  1048.6G  2097.2G        N/A       1      200K     400K        N/A    
+    /home/atuin            28.3G     0.0K     0.0K        N/A      99K                          N/A    
+    /lustre                 4.0K     0.0K     0.0K        N/A       1       80K     250K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4181008, 7 %, 2 %, 6032 MiB, 1088819 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4188215, 7 %, 2 %, 6040 MiB, 907133 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4192140, 4 %, 2 %, 2858 MiB, 31516 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4192456, 2 %, 0 %, 1706 MiB, 28722 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4192738, 11 %, 9 %, 19382 MiB, 28516 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4193021, 6 %, 4 %, 10008 MiB, 28870 ms
+NVIDIA A100-SXM4-80GB, 00000000:96:00.0, 4193311, 1 %, 0 %, 5436 MiB, 1011993 ms
