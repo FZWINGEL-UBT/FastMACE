@@ -81,3 +81,16 @@ def test_the_joined_layout_compiles_without_layout_copies():
     assert "triton_poi_fused_cat" not in new_code and "clone" not in new_code
     assert "sort" not in new_code
     assert torch.equal(old(x), new(x))
+
+
+def test_the_family_constant_loads_the_sm80_cubin_on_another_8x(monkeypatch):
+    """Item 5's A/B side (CUTLASS on the RTX 4000 Ada, compute capability 8.9): ``FAMILY_CAPABILITIES`` lets an 8.x
+    device without its own cubin load the sm_80 one; by default it does not."""
+    from fastmace.kernels.cutlass import tf32x3
+
+    capability = tuple(torch.cuda.get_device_capability())
+    if capability[0] != 8 or capability in tf32x3.CUBINS:
+        pytest.skip("needs an 8.x device without its own cubin")
+    assert not tf32x3.available("cuda")
+    monkeypatch.setattr(tf32x3, "FAMILY_CAPABILITIES", (capability,))
+    assert tf32x3.available("cuda")

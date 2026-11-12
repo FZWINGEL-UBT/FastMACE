@@ -250,6 +250,11 @@ def main(argv=None):
     p.add_argument("--iterations", type=int, default=20)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--profile-once", action="store_true")
+    p.add_argument("--product", type=int, default=0,
+                   help="the product block whose contraction is generated (1: the last, scalar-output one; "
+                        "step-layout-cleanup item 6)")
+    p.add_argument("--sources-only", action="store_true",
+                   help="write the generated sources and the factored counts, then stop (for the offline census)")
     args = p.parse_args(argv)
     ab_step_time.prepare_fastmace_hybrid()
     import torch
@@ -279,6 +284,10 @@ def main(argv=None):
 
     factored = sc_factored.factor(terms, seg_in, seg_w, seg_out)
     if factored is None:
+        if args.sources_only:  # the monomial sources alone
+            (args.output / "sources.json").write_text(json.dumps(dict(meta=meta, counts=counts, factored=None),
+                                                                 indent=1, default=str) + "
+")
         raise SystemExit("sc_factored: the candidates do not span the descriptor's basis")
     prog, feats, basis_k = factored
     counts["fac"] = dict(sc_factored.counts(prog, feats), check=sc_factored.check(terms, prog, feats, basis_k, seg_in))
@@ -294,6 +303,13 @@ def main(argv=None):
     (args.output / "fac-bwd4.cu").write_text(source)
     kernels["fac-bwd4"] = Generated(source, b"sc0_bwd")
     print("factored", json.dumps(counts["fac"]), flush=True)
+    meta.update(product=args.product, segments=[seg_in, seg_w, seg_out], terms=len(terms))
+    if args.sources_only:
+        (args.output / "sources.json").write_text(json.dumps(dict(meta=meta, counts=counts), indent=1, default=str)
+                                                  + "
+")
+        print("sources written", args.output, flush=True)
+        return
     gen = torch.Generator(device="cuda").manual_seed(0)
     density = torch.rand(natoms, 1, device="cuda", generator=gen) * 2.0
     m = (x * (density + 1.0)).contiguous()

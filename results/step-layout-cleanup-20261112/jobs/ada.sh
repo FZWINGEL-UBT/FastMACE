@@ -44,7 +44,7 @@ ST=$OUT/SrTiO3.cif
 K="fastmace.kernels.triton.species_gemm:bound_plan=no_bound_plan fastmace.rewrites.generic.modules:_reshaped=reshape_copy"
 A="fastmace.kernels.triton.compose_skip:JOINED_LAYOUT=False"
 # item 5 (conductor, 12 November 2026): the CUTLASS tf32x3 backend on sm_89, as ada-5060-screen built it
-KC="fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES=((8,0),(8,9),(9,0))"
+KC="fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES=((8,0),(8,9),(9,0)) fastmace.kernels.cutlass.tf32x3:FAMILY_CAPABILITIES=((8,9),)"
 for job in "$@"; do
   idle "$job" || exit 3
   note "start $job"

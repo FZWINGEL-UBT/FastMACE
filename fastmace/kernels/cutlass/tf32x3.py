@@ -28,6 +28,9 @@ CAPABILITY = (8, 0)
 # One cubin per compute capability, built from the same source (5 November 2026: sm_90 for the H100 and H200; the
 # mainloop is the same mma.sync code, so every element's sum is the same as on the A100).
 CUBINS = {CAPABILITY: CUBIN, (9, 0): Path(__file__).with_name("tf32x3_sm90.cubin")}
+# Further capabilities that load the sm_80 cubin (the same 8.x family: its SASS runs there). () by default; the
+# RTX 4000 Ada's (8, 9) for the step-layout-cleanup item 5 A/B (CUTLASS against Triton on the Ada), read at call time.
+FAMILY_CAPABILITIES = ()
 ALIGNMENT = 4  # elements: 128-bit loads
 # The output tile: "64x64" (four warps), or "32x64" / "64x32" (two warps, twice the blocks; 4 November 2026, for
 # Benchmark_loup's 5,000-row products of 128 columns, 158 blocks of 64x64 on the A100's 108 SMs). The same
@@ -107,6 +110,7 @@ def available(device, family=False) -> bool:
         return False
     index = torch.cuda.current_device() if device.index is None else device.index
     capability = tuple(torch.cuda.get_device_capability(index))
+    family = family or capability in FAMILY_CAPABILITIES
     if capability not in CUBINS and not (family and capability[0] == CAPABILITY[0]):
         return False
     if not _cubin(index, hybrid_default(index)).is_file():
