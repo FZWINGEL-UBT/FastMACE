@@ -990,7 +990,11 @@ def attach_recompute(model):
             continue
         interaction.recompute_weight_rows = int(interaction.chunked_backward_edges)
         fused = getattr(interaction, "fused_folded_forward", None)
-        if RECOMPUTE_KERNEL == "rebuild" and fused is not None:
+        if getattr(interaction.wprime_backward, "table_w", False):
+            # TABLE_W (generic, or MH-1 on TABLE_W_MH1_GPUS): w comes from the value table and the fused forward's
+            # message-only kernel keeps none, so there is nothing to rebuild (WPrime.convolution ignores the rows).
+            names.append(f"interactions.{index} (TABLE_W: the forward stores no w)")
+        elif RECOMPUTE_KERNEL == "rebuild" and fused is not None:
             interaction.wprime_backward.attach_rebuild(interaction.streaming_kernels, fused)
             names.append(f"interactions.{index} (w built on chip in the backward)")
         else:

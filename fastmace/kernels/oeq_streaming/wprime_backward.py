@@ -62,6 +62,12 @@ TABLE_W = None
 # SrTiO3 10x10x10, abab / abba, every other A100 switch on).
 TABLE_W_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                           "NVIDIA H200"))
+# MH-1 (its w' is built with generic=False) by label, on these GPU models (decision 66; fastmace/mh1-catchup,
+# results/mh1-catchup-20261112): MD step b/a in both build orders against the GPU's MH-1 defaults, b = TABLE_W=True,
+# NaCl / NbCl5 3x3x3, 6 x 256 steps. RTX 4000 Ada (leto, 12 November 2026): 0.9640 / 0.9663, 0.9694 / 0.9669; 3x float32
+# gate passes (forces 0.95 / 1.00 / 1.00 of the ASE float32 reference). POLAR-1 (the same class) was not measured.
+TABLE_W_MH1_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
+TABLE_W_MH1_LABELS = ("mh1-r2scan", "mh1-omat", "mh1-mp")  # the MH-1 checkpoint's heads (one backbone)
 TABLE_W_VECTOR = 2
 # The message in linear_1's block layout (OMAT-0 work, 4 November 2026): with TABLE_W and the fused forward, the
 # message-only kernel writes each same-irrep group of the grouped BlockLinear's input as its own [N * dim, P * C]
@@ -1813,13 +1819,18 @@ class _WPrimeConvolution(torch.autograd.Function):
                 None, None, None, None, None, None, None, None, None, None)
 
 
-def table_w_default(device, generic):
+def table_w_default(device, generic, model_label=None):
     """``TABLE_W`` for a WPrime on ``device``: the constant when set, else on for the generic family on
-    ``TABLE_W_GPUS``."""
+    ``TABLE_W_GPUS`` and for MH-1 (``TABLE_W_MH1_LABELS``) on ``TABLE_W_MH1_GPUS``."""
     if TABLE_W is not None:
         return bool(TABLE_W)
     device = torch.device(device)
-    return bool(generic) and device.type == "cuda" and torch.cuda.get_device_name(device) in TABLE_W_GPUS
+    if device.type != "cuda":
+        return False
+    name = torch.cuda.get_device_name(device)
+    if generic:
+        return name in TABLE_W_GPUS
+    return model_label in TABLE_W_MH1_LABELS and name in TABLE_W_MH1_GPUS
 
 
 def block_message_default(device):
@@ -1999,7 +2010,8 @@ class WPrime(torch.nn.Module):
         super().__init__()
         self.model_label = model_label  # the model's label-table label: per-model kernel defaults (STAGE_EDGES)
         # TABLE_W: the value table G in place of G' (w and its slope from one slab; the forward stores no w).
-        self.table_w = table_w_default(table.coef.device, generic) and table.coef.dtype == torch.float32
+        self.table_w = (table_w_default(table.coef.device, generic, model_label)
+                        and table.coef.dtype == torch.float32)
         self.horner = self.table_w and horner_default(table.coef.device)
         device = table.coef.device
         self.fold_alpha = (self.table_w and fold_alpha_default(device, self.model_label) and factored_default(device)
