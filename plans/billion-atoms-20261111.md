@@ -191,7 +191,7 @@ answer), the 16-CPU re-measurement, then 2, then 3's profile.
 
 ## Feasibility of 10^9 atoms (owner's question, 11 November 2026)
 
-Still possible on paper; step 3's measured peak decides it.
+Still possible on paper; step 3's measured peak decides it. **Step 3 (12 November 2026):** 99.8 B/atom in the eager first call and 85.2 in the compiled call against the projected 75.6; at 10^9 the first call would need about 100 GB. Not yet: the first call's transient needs a census and cuts first (`results/billion-atoms-20261111/go-alex-4985889/`).
 - **Device (the hard limit):** about 101 B/atom before the tiles (census), less step 1's 34 (host positions 24, uint8
   maps 6, no whole-system order 4): about 67 B/atom, so about 67 GB of per-atom arrays and 3-4 GB of tile workspace
   at 10^9, about 71 GB of the A100-80's 85.9 GB (about 15 GB left). Step 3 measures it at 397.5M (projected
@@ -214,6 +214,7 @@ Still possible on paper; step 3's measured peak decides it.
 | 0 | done: about 100 B/atom live before the first tile, 24 of it float64 positions | `census-colab/` (Colab A100, 3.91 CU) |
 | 1 | in (34 B/atom): gate 3x 12/12 (Alex 4984899); host rows 1.043 / 1.021 at 58^3 (a capacity option, not a default) | `073f1f37`, `step1-alex-4984899/` |
 | 2 | audit done (one fix: the tile lists' sort key, `KEY_LIMIT`); Alex 4984768 at 750M: the gathers bitwise (compiled and eager `_tile_vectors`, compiled `_slot_local_vectors`), untouched rows zero, the flat view's tail right; `index_add_` differed by 3e-5 at 1M as at 750M (the atomics' order with random values), again with integer values in 4984899: every check bitwise at 1M and 750M | `jobs/alex_overflow.sh`, `step1-alex-4984899/probe-*` |
-| 3 | queued: Alex 4985889 on main `e7ac9b42` (one A100-80, 430^3 with `--host-positions`; 4985152 cancelled before it started, its source older than the large caps) | `jobs/alex_go.sh` |
+| 3 | **GPU line missed** (Alex 4985889, `e7ac9b42`, 16 CPUs): GPU peak 36.93 GiB (99.8 B/atom) in the eager first call, 31.56 GiB (85.2) in the compiled call, against 28 GiB; valid (74.0 edges/atom, -7.989547 eV/atom, max |F| 4.37e-6 eV/A); compiled call 6.16 us/atom (cap 65,536) against 9.84; float32 state in both calls; host peak 185.7 GB. Next: census the eager first call's transient (+71 B/atom before its first tile) | `go-alex-4985889/` |
+| paper row | 320M float32 state (Alex 4988550): compiled 5.69 us/atom, max |F| 4.40e-6, host peak 209.3 GB | `f32-alex-4988550/` |
 | before 4 | supercell builder: bitwise ASE's at 300^3, 135 s and 31.5 GB at 585^3 (10^9 atoms); first-call probe: the whole call's decision at 58^3 and 160^3, workspace 0.998, on for the A100 family (Alex 4985954) | `setup-alex-4985954/` |
 | 4 | not reserved (owner, 11 November 2026) | |
