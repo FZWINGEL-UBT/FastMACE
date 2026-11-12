@@ -903,6 +903,7 @@ class MACEForceField:
         from fastmace.kernels.triton.species_gemm import plan_of
 
         self._plans = []  # (column tuple, (kind, order, counts), [modules])
+        self._plan_columns = {}  # column tuple -> the columns on the one-hot's device (the refresh is captured)
         if self.node_attrs_released:
             return
         model = getattr(self.model, "_orig_mod", self.model)
@@ -916,17 +917,16 @@ class MACEForceField:
                 with torch.no_grad():
                     plan = tuple(t.clone() for t in plan_of(self.data["node_attrs"], columns))
                 groups[key] = (key, plan, [])
+                self._plan_columns[key] = torch.as_tensor(key, dtype=torch.int64, device=self.data["node_attrs"].device)
                 self._plans.append(groups[key])
             groups[key][2].append(module)
 
     def _refresh_plan(self, key, plan):
-        import torch
-
         from fastmace.kernels.triton.species_gemm import plan_of
 
         if self.node_attrs_released:  # the one-hot was dropped; nothing binds the plan any more
             return
-        columns = torch.as_tensor(key, dtype=torch.int64, device=self.data["node_attrs"].device)
+        columns = self._plan_columns[key]  # no host-to-device copy: species refreshes run inside attempt graphs
         for dst, src in zip(plan, plan_of(self.data["node_attrs"], columns)):
             dst.copy_(src)
 
