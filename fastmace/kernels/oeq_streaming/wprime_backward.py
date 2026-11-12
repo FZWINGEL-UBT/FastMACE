@@ -332,6 +332,19 @@ HOIST_DX_GPUS = SKIP_OUTSIDE_GPUS
 CHANNEL_VECTOR = None
 CHANNEL_VECTOR_GPUS = MappingProxyType({})  # device name -> 2 or 4
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# Late pullback (outside review, 12 November 2026; results/wprime-late-pullback-20261112, wprime_pullback): every path
+# in N1's Cartesian form with the geometry differentiated once per edge after the channel reduction. The STAGE_DOUT
+# prologue stages q = M g; per lane G = sum w grad phi (3) and R = sum dw/dt phi; G / sqrt(3) goes into the l = 1 dsh
+# slots and R into dr, so the outputs and the autograd graph are unchanged. Rounding. sm_90 census (OMAT-0 medium,
+# prologue included): 2,026 -> 1,826 instructions per edge, 96 -> 56 registers; sm_80 2,010 -> 1,799, 128 -> 64.
+# None: on for LATE_PULLBACK_GPUS; True / False: an A/B side's choice (float32 FACTORED kernels with STAGE_DOUT,
+# BLOCK_MESSAGE, HORNER and covered paths only; without CHANNEL_VECTOR, STAGE_QUADS and EDGE_FORCE).
+# NVIDIA H200 (decision 66, 12 November 2026; OMAT-0 medium only, on top of SKIP_OUTSIDE + HOIST_DX): lab 0.859
+# (1,010.9 -> 868.9 us, 96 -> 56 registers); MD step b/a SrTiO3 10x10x10 0.9597 / 0.9612, NbCl5 0.9848 / 0.9825;
+# force/stress gate passed (NaCl, NbCl5, SrTiO3 3x3x3). Other H200 variants get it through GPUModels' family match.
+# A100: open (Alex job 4988692).
+LATE_PULLBACK = None
+LATE_PULLBACK_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def spline_vector_default(device):
@@ -1340,6 +1353,14 @@ class WPrimeBackward:
         if HOIST_DX is None:  # the default: with SKIP_OUTSIDE only (they win together), where it was measured
             self.hoist_dx = (self.hoist_dx and self.skip_outside and scalar == "float" and bool(self.factored)
                              and bool(self.stage_dout))
+        self.late_pullback = (late_pullback_default(device) and not self.channel_vector and not self.stage_quads
+                              and not self.edge_force and self.stage_dout and self.table_w and self.horner
+                              and bool(self.factored) and scalar == "float" and kernels.output_dim > 0)
+        if self.late_pullback:  # LATE_PULLBACK (wprime_pullback; before wprime_tuning)
+            from fastmace.kernels.oeq_streaming import wprime_pullback
+            self.late_pullback = wprime_pullback.supported(kernels.schedule, scalar, blocks)
+            if self.late_pullback:
+                self.source = wprime_pullback.apply(self.source, kernels.schedule, blocks, self.fold_alpha)
         if self.hoist_dx or self.channel_vector:  # HOIST_DX / CHANNEL_VECTOR (wprime_tuning; raise where unmatched)
             from fastmace.kernels.oeq_streaming import wprime_tuning
             self.source = wprime_tuning.apply(self.source, self.hoist_dx, self.channel_vector)
@@ -1871,6 +1892,11 @@ def stage_edges_default(device, model_label=None):
 def skip_outside_default(device):
     """``SKIP_OUTSIDE`` on ``device``: the constant when set, else on for ``SKIP_OUTSIDE_GPUS``."""
     return bool(SKIP_OUTSIDE) if SKIP_OUTSIDE is not None else _device_name(device) in SKIP_OUTSIDE_GPUS
+
+
+def late_pullback_default(device):
+    """``LATE_PULLBACK`` on ``device``: the constant when set, else on for ``LATE_PULLBACK_GPUS``."""
+    return bool(LATE_PULLBACK) if LATE_PULLBACK is not None else _device_name(device) in LATE_PULLBACK_GPUS
 
 
 def hoist_dx_default(device):

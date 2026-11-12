@@ -3658,3 +3658,12 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Measured on OMAT-0 medium only; the GPU set turns it on for every H200 w′ with TABLE_W (open cell in defaults-by-gpu).
 - Modal: one H200 job, 547 s, $0.79 metered. See `results/wprime-h200-20261111/README.md`.
 - Suite on the branch tip 45efd9de (murphy, idle check incl. our jobs): 5,714 passed, 204 skipped, 0 failed.
+
+**w′ late pullback (12 November 2026; outside review, conductor; owner "i approve" for one H200 job beyond the Modal cap and "launch now"; decision 66): `wprime_backward.LATE_PULLBACK` on for the H200.**
+- Design: every path in N1's Cartesian form (q = M g staged by the STAGE_DOUT prologue). Each lane sums only G = Σ w ∇φ and R = Σ (dw/dt) φ, and the geometry is differentiated once per edge after the channel reduction. The vector paths 1⊗2→1 and 1⊗3→2 use the unit-sphere extension (no Euler term). G/√3 goes into dsh's l = 1 slots and R into dr, so the outputs and the autograd graph are unchanged (`wprime_pullback.py`, a post-render transform before HOIST_DX).
+- CPU algebra: float64 6.6e-16, float32 as the direct contraction. sm_90 census per edge 2,026 → 1,826 (0.901), 96 → 56 registers; sm_80 2,010 → 1,799, 128 → 64.
+- H200 (OMAT-0 medium, on top of SKIP_OUTSIDE + HOIST_DX): lab 0.859 (1,010.9 → 868.9 µs); MD step b/a SrTiO3 10³ 0.9597 / 0.9612, NbCl5 3³ 0.9848 / 0.9825; gate passes (NaCl, NbCl5, SrTiO3 3³: forces 0.87, 0.94, 0.88; stress 0.85, 1.30, 0.54 of the ASE float32 spread). Rounding (dL/dv 7.6e-7).
+- Per-degree hybrids (16 masks) are all dominated by the full form; the irrep-first loop nest costs +31 % instructions: both closed.
+- Measured on OMAT-0 medium only; the GPU set turns it on for every H200 variant and every model whose w′ paths it covers (open cell in defaults-by-gpu). A100 off until its A/B (Alex 4988692).
+- Modal cost: lab $0.06 (second), gate + A/B $1.01 (fifth, owner override).
+- Suite on 082c656c (coraline, idle check incl. our jobs): 5,726 passed, 206 skipped, 0 failed; the tip 8ed2611d adds one line to test_wprime_pullback.py (standalone: 12 passed, 2 skipped). See `results/wprime-late-pullback-20261112/README.md`.
