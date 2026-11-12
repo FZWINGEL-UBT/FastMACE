@@ -69,6 +69,30 @@ float64; tiled, host state aliased, wavefront.
 - bfloat16's spread is five times larger.
 - So float16 is usable for MD where the host is short. It fails the force gate, so it is not a default.
 
+## Float16 storage against float16 arithmetic (owner question, 12 November 2026)
+
+The owner asked whether the float16 NVE result means the whole force call could run in float16 for MD. No:
+the two kinds of rounding behave differently.
+
+- **Storage only (this record).** Each node-feature value is rounded once, where it is written to the host; every
+  tile computes in float32. The rounding depends only on the positions, so it acts as a fixed perturbation of the
+  potential, the same on every step. That is why the NVE drift equals float32's (0.0022 against 0.0023 meV/atom/ps).
+- **Float16 arithmetic would add errors that are neither small nor repeatable:**
+  - the sums are long: about 75 neighbours times 128 channels per atom, and 128 to 512 terms in the GEMMs, so
+    their float16 error grows far beyond one storage rounding;
+  - the atomic adds sum in a different order on every call, so their float16 rounding becomes per-step random
+    force noise, which heats the system and makes the energy drift;
+  - geometry cannot be float16: it resolves only about 0.008 A at a 10 A coordinate (positions and edge vectors
+    stay float32 or better, see `TILE_LOCAL_FRAME` and `WHOLE_SYSTEM_FLOAT64_EDGES`);
+  - measured already: float16 for only interaction 2's far edges in w' (`half-far-edges`, 11 November) puts the
+    forces 7x and the stress 13x over the gate and is 4.5-10.6 % slower on the A100 (w' is issue-bound); the
+    3xFP16 GEMMs were rejected on accuracy (A100 round 4, 5 November).
+- **What it does open (not built, `md-grade-store`):** an opt-in MD-grade mode that keeps the float16 host store
+  where the host is short, judged on MD observables (energy drift, radial distribution functions, diffusion)
+  instead of the 3x float32 force gate. Its force errors (at most 1.6 meV/A in the gate, 2.2 meV/A on the 397.5M
+  perfect crystal) are far below the model's own error against DFT. It raises the tiled capacity; it would not be
+  faster. A narrower variant to try first: only the adjoints in float16, the node features in float32.
+
 ## Speed and host memory
 
 **A/B, both orders** (`tools/bench/tiled_ab.py`, `config:state_dtype=…` sides; SrTiO3 975,560 atoms, wavefront,
