@@ -101,8 +101,10 @@ def test_mh1_class_kernel_falls_back_from_the_table_w_switches(monkeypatch, name
 def test_mh1_class_kernel_takes_weighted_vector_on_the_a100_only(monkeypatch):
     """WEIGHTED_VECTOR needs FACTORED only, so it reaches POLAR-1-M's (and MH-1's) kernel on the A100 family;
     measured there on POLAR-1-M (results/wprime-off-polar-20261112)."""
-    a100, a100_source = _decided(monkeypatch, "NVIDIA A100-SXM4-80GB", (8, 0))
+    # _quadrupole's J = 5 path has a scalar input, which SCALAR_PATHS takes first: off here, so the weighted form
+    # shows in the source (POLAR-1-M's weighted paths have 1o inputs)
+    a100, a100_source = _decided(monkeypatch, "NVIDIA A100-SXM4-80GB", (8, 0), SCALAR_PATHS=False)
     assert a100.factored and a100.weighted_vector and not a100.stage_dout  # STAGE_DOUT_MODEL_OFF_GPUS
     assert "WEIGHTED_VECTOR" in a100_source
-    h200, h200_source = _decided(monkeypatch, "NVIDIA H200", (9, 0))
+    h200, h200_source = _decided(monkeypatch, "NVIDIA H200", (9, 0), SCALAR_PATHS=False)
     assert not h200.weighted_vector and "WEIGHTED_VECTOR" not in h200_source
