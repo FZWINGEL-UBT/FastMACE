@@ -1,0 +1,96 @@
+{
+ "gap_threshold_us": 20.0,
+ "gaps_over_threshold_us_per_step": 0.0,
+ "window_start_artefacts": [
+  {
+   "gap_us": 372.3,
+   "before": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 1.7,
+    "bytes": 46656,
+    "copy_kind": "DtoD",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   },
+   "after": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 1.66,
+    "bytes": 46656,
+    "copy_kind": "DtoD",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   }
+  },
+  {
+   "gap_us": 57.8,
+   "before": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 1.66,
+    "bytes": 46656,
+    "copy_kind": "DtoD",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   },
+   "after": {
+    "name": "noise_kernel",
+    "cat": "kernel",
+    "dur_us": 2.5,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": 2,
+    "site": [
+     "fastmace/kernels/triton/fused_integrator.py:274:stage",
+     "fastmace/engine/graph.py:1154:_stage_acp"
+    ]
+   }
+  },
+  {
+   "gap_us": 197.2,
+   "before": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 0.99,
+    "bytes": 24,
+    "copy_kind": "DtoH",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   },
+   "after": {
+    "name": "void at::native::vectorized_elementwise_kernel<4, at::native::BUnaryFunctor<float, float, ",
+    "cat": "kernel",
+    "dur_us": 2.02,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": 11,
+    "site": [
+     "fastmace/rewrites/generic/modules.py:150:fc_last_weight",
+     "fastmace/rewrites/mh1/modules.py:226:_radial_weight"
+    ]
+   }
+  }
+ ],
+ "gap_patterns": [],
+ "gaps": [],
+ "radix": [
+  {
+   "kernel": "void at::native::radixSortKVInPlace<-2, -1, 64, 32, long, long, unsigned int>(at",
+   "stack": "fastmace/model/compile.py:330:lean_forward <- fastmace/model/forces.py:1194:_split_outputs <- fastmace/model/forces.py:1166:_outputs",
+   "per_step": 2.0,
+   "us_per_step": 48.5,
+   "graph_ids": {
+    "11": 10
+   }
+  }
+ ]
+}

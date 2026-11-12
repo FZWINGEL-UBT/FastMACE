@@ -1,0 +1,362 @@
+{
+ "gap_threshold_us": 20.0,
+ "gaps_over_threshold_us_per_step": 24.5,
+ "window_start_artefacts": [
+  {
+   "gap_us": 386.1,
+   "before": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 2.02,
+    "bytes": 120000,
+    "copy_kind": "DtoD",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   },
+   "after": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 2.11,
+    "bytes": 120000,
+    "copy_kind": "DtoD",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   }
+  },
+  {
+   "gap_us": 48.3,
+   "before": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 2.11,
+    "bytes": 120000,
+    "copy_kind": "DtoD",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   },
+   "after": {
+    "name": "noise_kernel",
+    "cat": "kernel",
+    "dur_us": 3.62,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": 2,
+    "site": [
+     "fastmace/kernels/triton/fused_integrator.py:274:stage",
+     "fastmace/engine/graph.py:1154:_stage_acp"
+    ]
+   }
+  }
+ ],
+ "gap_patterns": [
+  {
+   "pattern": "Memset (gpu_memset, 32 B, graph None) -> Memset (graph None)",
+   "us_per_step": 7.2,
+   "count": 1
+  },
+  {
+   "pattern": "void at::native::vectorized_elementwise_ (kernel, None B, graph None) -> void at::native::unrolled_elementwise_ke (graph None)",
+   "us_per_step": 6.6,
+   "count": 1
+  },
+  {
+   "pattern": "Memcpy (DtoH, 8 B, graph None) -> void at::native::vectorized_elementwise_ (graph None)",
+   "us_per_step": 6.0,
+   "count": 1
+  },
+  {
+   "pattern": "Memset (gpu_memset, 2048 B, graph 5) -> void at_cuda_detail::cub::detail::radix_ (graph 5)",
+   "us_per_step": 4.7,
+   "count": 1
+  }
+ ],
+ "gaps": [
+  {
+   "gap_us": 36.0,
+   "before": {
+    "name": "Memset",
+    "cat": "gpu_memset",
+    "dur_us": 0.42,
+    "bytes": 32,
+    "copy_kind": null,
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemsetAsync"
+    ]
+   },
+   "after": {
+    "name": "Memset",
+    "cat": "gpu_memset",
+    "dur_us": 3.3,
+    "bytes": 16384,
+    "copy_kind": null,
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemsetAsync"
+    ]
+   },
+   "host_during": [
+    {
+     "name": "aten::_unique2",
+     "cat": "cpu_op",
+     "dur_us": 6671.4
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 3.9
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 3.7
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 3.3
+    },
+    {
+     "name": "cudaMemsetAsync",
+     "cat": "cuda_runtime",
+     "dur_us": 2.8
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 2.6
+    }
+   ]
+  },
+  {
+   "gap_us": 32.9,
+   "before": {
+    "name": "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std",
+    "cat": "kernel",
+    "dur_us": 1.57,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaLaunchKernel"
+    ]
+   },
+   "after": {
+    "name": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::Tenso",
+    "cat": "kernel",
+    "dur_us": 2.18,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaLaunchKernel"
+    ]
+   },
+   "host_during": [
+    {
+     "name": "aten::to",
+     "cat": "cpu_op",
+     "dur_us": 29.5
+    },
+    {
+     "name": "aten::_to_copy",
+     "cat": "cpu_op",
+     "dur_us": 28.5
+    },
+    {
+     "name": "aten::copy_",
+     "cat": "cpu_op",
+     "dur_us": 9.4
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 5.1
+    },
+    {
+     "name": "aten::empty_strided",
+     "cat": "cpu_op",
+     "dur_us": 4.8
+    }
+   ]
+  },
+  {
+   "gap_us": 30.2,
+   "before": {
+    "name": "Memcpy",
+    "cat": "gpu_memcpy",
+    "dur_us": 1.95,
+    "bytes": 8,
+    "copy_kind": "DtoH",
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaMemcpyAsync"
+    ]
+   },
+   "after": {
+    "name": "void at::native::vectorized_elementwise_kernel<2, at::native::BUnaryFunctor<long, long, lo",
+    "cat": "kernel",
+    "dur_us": 7.71,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": null,
+    "site": [
+     "(eager) via cudaLaunchKernel"
+    ]
+   },
+   "host_during": [
+    {
+     "name": "aten::remainder",
+     "cat": "cpu_op",
+     "dur_us": 8.6
+    },
+    {
+     "name": "aten::remainder",
+     "cat": "cpu_op",
+     "dur_us": 7.0
+    },
+    {
+     "name": "aten::_unique2",
+     "cat": "cpu_op",
+     "dur_us": 6671.4
+    },
+    {
+     "name": "aten::item",
+     "cat": "cpu_op",
+     "dur_us": 6572.6
+    },
+    {
+     "name": "aten::_local_scalar_dense",
+     "cat": "cpu_op",
+     "dur_us": 6572.1
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 3.1
+    }
+   ]
+  },
+  {
+   "gap_us": 23.4,
+   "before": {
+    "name": "Memset",
+    "cat": "gpu_memset",
+    "dur_us": 0.99,
+    "bytes": 2048,
+    "copy_kind": null,
+    "graph_id": 5,
+    "site": [
+     "fastmace/model/compile.py:330:lean_forward",
+     "fastmace/model/forces.py:1194:_split_outputs"
+    ]
+   },
+   "after": {
+    "name": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail",
+    "cat": "kernel",
+    "dur_us": 5.5,
+    "bytes": null,
+    "copy_kind": null,
+    "graph_id": 5,
+    "site": [
+     "fastmace/model/compile.py:330:lean_forward",
+     "fastmace/model/forces.py:1194:_split_outputs"
+    ]
+   },
+   "host_during": [
+    {
+     "name": "aten::__and__",
+     "cat": "cpu_op",
+     "dur_us": 10.4
+    },
+    {
+     "name": "aten::all",
+     "cat": "cpu_op",
+     "dur_us": 10.7
+    },
+    {
+     "name": "aten::bitwise_and",
+     "cat": "cpu_op",
+     "dur_us": 9.4
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 3.9
+    },
+    {
+     "name": "cudaLaunchKernel",
+     "cat": "cuda_runtime",
+     "dur_us": 3.6
+    },
+    {
+     "name": "aten::as_strided",
+     "cat": "cpu_op",
+     "dur_us": 0.3
+    }
+   ]
+  }
+ ],
+ "radix": [
+  {
+   "kernel": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_c",
+   "stack": "fastmace/model/compile.py:330:lean_forward <- fastmace/model/forces.py:1194:_split_outputs <- fastmace/model/forces.py:1166:_outputs",
+   "per_step": 16.0,
+   "us_per_step": 100.3,
+   "graph_ids": {
+    "5": 80
+   }
+  },
+  {
+   "kernel": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_c",
+   "stack": "(eager) via cudaLaunchKernel",
+   "per_step": 1.6,
+   "us_per_step": 51.7,
+   "graph_ids": {
+    "None": 8
+   }
+  },
+  {
+   "kernel": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortHistogramKernel<at_",
+   "stack": "fastmace/model/compile.py:330:lean_forward <- fastmace/model/forces.py:1194:_split_outputs <- fastmace/model/forces.py:1166:_outputs",
+   "per_step": 2.0,
+   "us_per_step": 8.4,
+   "graph_ids": {
+    "5": 10
+   }
+  },
+  {
+   "kernel": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortHistogramKernel<at_",
+   "stack": "(eager) via cudaLaunchKernel",
+   "per_step": 0.2,
+   "us_per_step": 7.3,
+   "graph_ids": {
+    "None": 1
+   }
+  },
+  {
+   "kernel": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortExclusiveSumKernel<",
+   "stack": "fastmace/model/compile.py:330:lean_forward <- fastmace/model/forces.py:1194:_split_outputs <- fastmace/model/forces.py:1166:_outputs",
+   "per_step": 2.0,
+   "us_per_step": 2.8,
+   "graph_ids": {
+    "5": 10
+   }
+  },
+  {
+   "kernel": "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortExclusiveSumKernel<",
+   "stack": "(eager) via cudaLaunchKernel",
+   "per_step": 0.2,
+   "us_per_step": 0.6,
+   "graph_ids": {
+    "None": 1
+   }
+  }
+ ]
+}

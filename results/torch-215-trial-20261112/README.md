@@ -191,7 +191,7 @@ Step totals (µs per step):
 | Inductor | 2,473 (14.7%) | 382 (11.3%) |
 | Eager ATen / cuEq / memset / copy / cuBLAS | 527 / 345 / 241 / 141 / 50 | 86 / 49 / 26 / 61 / 32 |
 | **Not ours** (everything above that is not our kernels) | **3,778 (22.4%)** | **634 (18.8%)** |
-| In-step gaps between kernels | 210 (1.2%) | 154 (4.4%) |
+| Idle GPU between kernels, steady (after the window's first ms) | 53 (0.3%), of which 35 inside graphs | 26 (0.75%), of which 12 inside graphs |
 
 ### Ranked: time we don't own, by source line (µs per step, Ada)
 
@@ -207,7 +207,7 @@ Step totals (µs per step):
 | 8 | `kernels/triton/tf32x3_gemm.py:171` ← `compute_forces` | Inductor `clone/slice_backward` around the tf32x3 backward | 185 (1.1%) | 30 (0.9%) |
 | 9 | `rewrites/engine.py:427` (forward and backward) | Inductor edge geometry, `index_put`/`masked_fill`, scatter_add | 261 (1.5%) | 53 (1.6%) |
 | 10 | `kernels/triton/tabled_outer_sum.py:757` ← `compute_forces` | Inductor backward | 150 (0.9%) | 17 |
-| 11 | `compile.py:330 lean_forward` ← `forces.py:1194 _split_outputs` | eager ATen, cuEq and cuBLAS inside the graph (radix sort, energies gemv) | 225 (1.3%) | 78 (2.3%) |
+| 11 | `compile.py:330 lean_forward` ← `forces.py:1194 _split_outputs` | eager ATen, cuEq and cuBLAS inside the graph: the radix sort of `species_plan` (see below), the energies gemv | 225 (1.3%) | 78 (2.3%) |
 
 ### Per-step-constant work inside the graph (ours, but not needed every step)
 
@@ -234,18 +234,18 @@ Step totals (µs per step):
 
 | Ledger row | Earlier bound | Measured here, SrTiO3 / NbCl5 | How |
 | --- | --- | --- | --- |
-| `species-only-kernels` | 1.1–1.3% (kernel names) | **14 µs (0.09%) / 8 µs (0.25%)** | Inductor kernels whose origin has argmax/cumsum (`_to_copy_argmax_10`, `argmax_index_index_add_11`) + the node_attrs × reference-energy gemv. The name regex over-counted (0.68% on NbCl5). |
+| `species-only-kernels` | 1.1–1.3% (kernel names) | **126 µs (0.75%) / 57 µs (1.7%)** | `species_plan`'s stable argsort (`kernels/triton/species_gemm.py:249`, a radix sort; called from `mh1/modules.py:330 _composed` and `generic/modules.py:798` skip_tp; in the graph, every step): 112 / 49 µs. Plus Inductor argmax kernels (`_to_copy_argmax_10`, `argmax_index_index_add_11`) and the node_attrs × reference-energy gemv: 14 / 8 µs. All depend only on the species. |
 | `i0-copies-zero-fill` | — | **pure layout: 849 µs (5.0%) / 128 µs (3.8%)**; + the Memset of row 7: 192 / 17 µs. Upper bound with fused compute: 1,949 (11.6%) / 314 (9.3%) | "Pure layout" counts Inductor kernels whose origin ops are only cat/view/clone/transpose/slice/zeros (rows 1–2 mostly). The upper bound adds fused kernels that also add or gather. |
 | `launch-memsets` | — | **4 µs (0.02%) / 1 µs (0.03%)** | Eager fills and memsets outside the outer-sum Memset: nothing left. |
-| `launch-combo-sizerule` | — | small Inductor kernels: **37 µs over 22 launches / 60 µs over 31 launches**; all kernels under 5 µs: 207 µs (118 per step) / 194 µs (104 per step) | In-graph gaps between kernels: 46 / 13 µs. The remaining gap time is host-side between graphs and the eager steps: one 386 µs gap around the positions upload (120 kB H2D memcpy) in the SrTiO3 window; one 197 µs wait after a 24-byte copy in NbCl5's. |
+| `launch-combo-sizerule` | — | small Inductor kernels: **37 µs over 22 launches / 60 µs over 31 launches**; all kernels under 5 µs: 207 µs (118 per step) / 194 µs (104 per step) | Steady idle time: 53 / 26 µs per step, 35 / 12 µs of it inside graphs. Host-side gaps over 20 µs in steady state: 24.5 µs per step on SrTiO3, all in the eager neighbour-list rebuild (`aten::_unique2`, `remainder`, `to`); none on NbCl5. The large gaps in the first ms of the window are profiler start, not per step: the first `cudaMemcpyAsync` (aten::copy_, 386 / 372 µs on the host, a 120 kB / 47 kB DtoD positions copy) and the first `cudaGraphLaunch` (48–205 µs). `jobs/gaps_radix.py` lists them apart. |
 
 What this means:
 
-- **The species-only row is closed:** under 0.3% measured.
+- **The species-only row is not closed:** 0.75% / 1.7%, mostly `species_plan`'s argsort replayed every step. COUNT_PLAN, the counting sort, is off on the Ada. The plan depends only on species, so it could be built once per species change.
 - **Layout-only Inductor kernels are the largest block we don't own:** 3.8–5.0%. The `species_mm` boundary at
   `generic/modules.py:211` and the cat at `:530` account for most of it.
 - **The second largest is the per-step compose:** 1.8% / 9.8% on the Ada, and the clearest work removal.
-- **Small-kernel launch overhead in graphs is small:** under 0.4% of the step.
+- **Small-kernel launch overhead and host syncs are small in steady state:** small Inductor kernels and idle time are under 0.4% / 0.8% of the step.
 
 A100 (Alex job 4990485, cupti-python on native Linux): pending; it is queued and expected to start about
 21:47 CET.
