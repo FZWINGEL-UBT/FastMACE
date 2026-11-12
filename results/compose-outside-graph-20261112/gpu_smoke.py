@@ -66,7 +66,7 @@ def main(argv=None):
     for name in ("a", "b", "b2"):
         mh1.FirstInteractionReassociation.bind = (reference_kernels.compose_in_graph_bind if name == "a"
                                                   else library_bind)
-        before, adopts = dict(calls), mh1.CAPTURE_ADOPTS
+        before, adopts = dict(calls), mh1.CAPTURE_ADOPTS()
         field = ForceField(loaded, base, rewrites="auto")
         plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
         engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
@@ -85,7 +85,7 @@ def main(argv=None):
                         build_outside=built["outside"] - before["outside"],
                         steps_in_capture=calls["in_capture"] - built["in_capture"],
                         steps_outside=calls["outside"] - built["outside"],
-                        capture_adopts=mh1.CAPTURE_ADOPTS - adopts,
+                        capture_adopts=mh1.CAPTURE_ADOPTS() - adopts,
                         captures=getattr(engine, "capture_count", None), composed_tensors=len(weights)))
         del engine, field, plan
         torch.cuda.empty_cache()

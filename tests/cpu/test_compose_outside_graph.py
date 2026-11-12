@@ -51,15 +51,15 @@ def test_a_bind_inside_a_capture_keeps_the_cached_weights(monkeypatch):
     before = [w.clone() for w in _weights(reassociation)]
     held = _weights(reassociation)
     table.copy_(table.clone())  # a snapshot restore: the same values, a new version
-    adopts = mh1.CAPTURE_ADOPTS
+    adopts = mh1.CAPTURE_ADOPTS()
     _capturing(monkeypatch, True)
     reassociation.bind(table)
-    assert counter.calls == 1 and mh1.CAPTURE_ADOPTS == adopts + 1  # nothing composed into the graph
+    assert counter.calls == 1 and mh1.CAPTURE_ADOPTS() == adopts + 1  # nothing composed into the graph
     assert all(a is b for a, b in zip(_weights(reassociation), held))
     assert all(torch.equal(a, b) for a, b in zip(_weights(reassociation), before))
     assert torch.equal(message(), inline)  # bitwise the forward's own composition
     reassociation.bind(table)  # the version is adopted: a second bind is a plain hit
-    assert counter.calls == 1 and mh1.CAPTURE_ADOPTS == adopts + 1
+    assert counter.calls == 1 and mh1.CAPTURE_ADOPTS() == adopts + 1
 
 
 def test_outside_a_capture_a_new_version_composes_again_in_place(monkeypatch):
@@ -78,10 +78,10 @@ def test_a_changed_parameter_composes_again_also_inside_a_capture(monkeypatch, w
     linear, _, skip, _ = reassociation.compose_skip
     tensor = {"radial": message.radial.weight, "skip": skip.ws1, "linear": linear.weight_1}[which]
     tensor.mul_(1.25)  # a reload or an optimiser step: in place, a new version
-    adopts = mh1.CAPTURE_ADOPTS
+    adopts = mh1.CAPTURE_ADOPTS()
     _capturing(monkeypatch, True)
     reassociation.bind(table)
-    assert counter.calls == 2 and mh1.CAPTURE_ADOPTS == adopts
+    assert counter.calls == 2 and mh1.CAPTURE_ADOPTS() == adopts
     assert all(a is b for a, b in zip(_weights(reassociation), held))  # same addresses, new values
     expected = mh1.FirstInteractionReassociation._compose_weights(reassociation, table, reassociation._radial_weight())
     assert all(torch.equal(a, b) for a, b in zip(_weights(reassociation), expected))

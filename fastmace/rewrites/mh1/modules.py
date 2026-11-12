@@ -136,7 +136,12 @@ class FactoredRadialMLP(torch.nn.Module):
 
 # Proof counter (compose-outside-graph, 12 November 2026): binds inside a CUDA-graph capture that kept a table's cached
 # composed weights instead of composing them into the graph (``FirstInteractionReassociation.bind``).
-CAPTURE_ADOPTS = 0
+_CAPTURE_ADOPTS = [0]
+
+
+def CAPTURE_ADOPTS():  # noqa: N802 (the proof counter: --b-expect fastmace.rewrites.mh1.modules:CAPTURE_ADOPTS)
+    """Binds inside a capture so far that kept the cached composed weights."""
+    return _CAPTURE_ADOPTS[0]
 
 class FirstInteractionReassociation(torch.nn.Module):
     """First-interaction message without per-edge tensor-product weights (reassociate_first).
@@ -217,8 +222,7 @@ class FirstInteractionReassociation(torch.nn.Module):
             if entry[1] == table._version:
                 return entry
             if adopt:
-                global CAPTURE_ADOPTS
-                CAPTURE_ADOPTS += 1
+                _CAPTURE_ADOPTS[0] += 1
                 entry[1] = table._version
                 return entry
         with torch.no_grad():
