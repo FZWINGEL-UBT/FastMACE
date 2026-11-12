@@ -104,6 +104,9 @@ def parse_args(argv=None):
                    help="the last call under torch.profiler: kernel classes, the device's busy fraction and the "
                         "host operations with the most self time (tiled_corun.profile_call)")
     p.add_argument("--tag", default="")
+    p.add_argument("--digest", action="store_true",
+                   help="after every call, the SHA-256 of the energy, forces and stress bytes (digest in each call's "
+                        "record: bitwise comparisons between sources)")
     p.add_argument("--ledger", action="store_true",
                    help="after the build and after every call, record every live tensor and NumPy array by device, "
                         "dtype and shape, named where reachable from the user's force field, the evaluation field "
@@ -319,6 +322,19 @@ def memory_ledger(roots, depth=4):
         if not names.get(k) and nbytes >= 2**20 and "owners" not in group:
             group["owners"] = owners(obj)
     return sorted(groups.values(), key=lambda g: -g["bytes"])
+
+
+def output_digest(out):
+    """SHA-256 of a call's energy, forces and stress bytes (the forces a chunk at a time through the host)."""
+    import hashlib
+
+    h = hashlib.sha256()
+    h.update(out.energy.detach().cpu().numpy().tobytes())
+    for chunk in out.forces.detach().reshape(-1).split(1 << 24):
+        h.update(chunk.cpu().numpy().tobytes())
+    if out.stress is not None:
+        h.update(out.stress.detach().cpu().numpy().tobytes())
+    return h.hexdigest()
 
 
 def peak_live_set(snapshot, top=30):
@@ -541,6 +557,8 @@ def main(argv=None):
             # ``allocated`` is after the call (the tiled field keeps its global state between calls); the call's
             # true peak is what was allocated before it plus its peak above that.
             entry.update(allocated_before=int(before), total_peak=int(before) + entry["peak_above_before"])
+            if args.digest:
+                entry["digest"] = output_digest(out)
             calls.append(entry)
             record["calls"] = calls
             ledger(f"after call {call}")
