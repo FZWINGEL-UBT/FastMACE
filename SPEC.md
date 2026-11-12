@@ -3682,3 +3682,11 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Measured on OMAT-0 medium only. Other families on the A100 get the switches through the GPU sets; this is an open cell in defaults-by-gpu.
 - Suite on the branch tip e907e9dc (murphy, idle check incl. our jobs, 13:27 UTC): 5,730 passed, 206 skipped, 0 failed.
 - See `results/wprime-h200-20261111/README.md` Part 5.
+
+**Paper experiment 1: packed forward consistency (12 November 2026; owner "yes go ahead"; conductor): records and tools only, no default changes.**
+- Question: the packed forward (`PACKED8`) and the cubic backward are not exact derivatives of one another. Does that inconsistency show up in forces or in MD energy conservation? (a) defaults, (b) PACKED8 off, (c) autograd control (A100).
+- Probes (5060 Ti, A100): finite-difference gradients agree to about 3e-5 of |F|, closed-loop work about 1e-8 eV, knot-line jumps about 2e-5 eV: the float32 floor for (a), (b) and (c).
+- NVE drift, SrTiO3 10³: the run-to-run SD is 3.7e-6 meV/atom/ps at 300 K (7 runs, 100 ps, three GPU families) and 2.8e-5 at 1500 K (8 runs, 50 ps). The AR(1) standard errors understate this scatter about 4×. (a), (b) and (c) are indistinguishable. The one outlier, Ada 1500 K (a) at −4.8e-5, gave −7.5e-6 when rerun from the same state.
+- Cost of consistency (PACKED8 off), MD step b/a for the ab / ba orders, SrTiO3 then NbCl5: A100 1.083 / 1.080 and 1.057 / 1.053; 5060 Ti 1.102 / 1.102 and 1.064 / 1.066; RTX 4000 Ada 1.125 / 1.119 and 1.075 / 1.072.
+- Tools: `tools/run_manifest.py`, `tools/consistency_probe.py`, `tools/nve_energy.py`. Suite on c0b14126 (murphy, idle check incl. our jobs): 5,730 passed, 206 skipped, 0 failed.
+- See `results/paper-exp1-20261112/README.md`.
