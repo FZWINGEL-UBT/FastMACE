@@ -3707,3 +3707,9 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Items 3 (the outer-sum zero-fill, needed by the atomic accumulation) and 4 (`tf32x3_gemm.py:171`; 220 → 26 µs on the Ada with CUTLASS) wait for the A100 attribution.
 - A100 and H200: items 1–2 under the work-removal rule, not measured; item 5 changes neither.
 - Suite on `ba544546` (leeloo, idle check): 5,757 passed, 205 skipped, 0 failed; `tests/gpu` on the Ada: 6 failures, the same 6 as on main. See `results/step-layout-cleanup-20261112/README.md`.
+
+**PACKED8 per structure: no choice needed (12 November 2026; conductor, packed8-auto; records only, no default changed).**
+- The `packed8-table` row's 1.060 / 0.882 split belonged to S12's decode, superseded by packed8v2 (today's PACKED8); the row is closed as superseded. A slab census leaves the cold lattice as the only case (20 slabs at 0 K against 862 at 300 K).
+- Cold MD-step A/Bs, b = PACKED8 off (above 1: PACKED8 wins): RTX 4000 Ada SrTiO3 10³ 1 K 1.129 / 1.119, 50 K 1.126 / 1.119, 300 K 1.124 / 1.118; NbCl5 1 K 1.065 / 1.059, 300 K 1.075 / 1.076. A100 (Alex 4990120) SrTiO3 1 K 1.072 / 1.073, 50 K 1.087 / 1.089, 300 K 1.092 / 1.082; NbCl5 1 K 1.045 / 1.046, 300 K 1.050 / 1.052.
+- H200 below 50 K not measured (shelved, about $1 job ready as `results/packed8-auto-20261112/cold_ab.sh`; estimated loss at most about 1 % of the step).
+- Suite on `de9f0fab` (leto): 5,739 passed, 205 skipped, 0 failed (records only; code identical to main). See `results/packed8-auto-20261112/README.md`.
