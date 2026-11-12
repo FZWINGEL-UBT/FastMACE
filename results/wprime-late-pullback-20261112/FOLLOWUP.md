@@ -77,3 +77,11 @@ SrTiO3 10³, in both orders, and records the stress and forces of b against a. T
 accuracy (hydrostatic and full cell modes; H200 stress ratios 0.85 / 1.30 / 0.54).
 
 `loops_dump.py` prints the loop structure behind these counts.
+
+## Local RTX 5060 Ti check (12 Nov 2026, `local-5060ti/`)
+
+Through `tools/ci/local_gpu.py run` with the H200 plan alias (source 01bc2471; not evidence for the H200 or A100):
+- Kernel lab (SrTiO3 10³ capture): base (skip+hoist) 4,122.3 µs at 96 registers, lp 4,108.0 µs = 0.997 at 64
+  registers; dL/dv max 7.3e-7 (median edge 4.6e-7), dx 1.9e-7.
+- 3× float32 gate with LATE_PULLBACK on (NaCl, SrTiO3 3×3×3): passes; APPLIED advanced by 2 per build, no
+  expect failures; forces 0.82 / 0.80, stress 0.73 / 0.38 of the ASE float32 spread.
