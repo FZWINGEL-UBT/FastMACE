@@ -25,6 +25,7 @@ export TRITON_CACHE_DIR=$TMPDIR/triton TORCHINDUCTOR_CACHE_DIR=$TMPDIR/inductor 
 n=$(nproc); export OMP_NUM_THREADS=$n MKL_NUM_THREADS=$n TORCHINDUCTOR_COMPILE_THREADS=$n PYTHONUNBUFFERED=1
 cd $src || exit 4
 echo "weighted-ab job $SLURM_JOB_ID on $(hostname); source $SHA" > $out/job.txt
-OUT=$out bash results/wprime-h200-20261111/colab_weighted_a100.sh > $out/job.log 2>&1 < /dev/null
+# results/ is not in the slim tarball: the plan script is copied beside it
+OUT=$out bash $B/colab_weighted_a100.sh > $out/job.log 2>&1 < /dev/null
 echo "exit $?" >> $out/job.log
 rm -rf $TMPDIR/cache $TMPDIR/triton $TMPDIR/inductor $TMPDIR/xdg
