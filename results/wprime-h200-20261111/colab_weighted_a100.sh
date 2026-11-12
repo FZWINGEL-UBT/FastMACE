@@ -7,14 +7,18 @@ export EXPECT_GPU=A100
 M=fastmace.kernels.oeq_streaming.wprime_backward
 skw="skip-hoist-weighted|$M:SKIP_OUTSIDE=True $M:HOIST_DX=True $M:WEIGHTED_VECTOR=True"
 w="weighted|$M:WEIGHTED_VECTOR=True"
-export PACK="$skw;$w"
+sh="skip-hoist|$M:SKIP_OUTSIDE=True $M:HOIST_DX=True"
+# ENTRIES (optional): which of skw, w, sh to run, e.g. ENTRIES=sh (the follow-up: skip+hoist alone on the A100 plan)
+entries=()
+for e in ${ENTRIES:-skw w}; do entries+=("${!e}"); done
+export PACK=$(IFS=';'; echo "${entries[*]}")
 base=$OUT
 nvidia-smi --query-gpu=name,memory.total,clocks.max.sm,power.limit,driver_version --format=csv > $base/gpu.csv
 mkdir -p $base/ab-srtio3 $base/ab-nbcl5 $base/gate
 OUT=$base/ab-srtio3 bash tools/jobs/ab_pack.sh; echo "ab-srtio3 $?"; cat $base/ab-srtio3/run.log
 OUT=$base/ab-nbcl5 STRUCTURE=NbCl5 CELL=3x3x3 bash tools/jobs/ab_pack.sh; echo "ab-nbcl5 $?"; cat $base/ab-nbcl5/run.log
 win=""
-for entry in "$skw" "$w"; do
+for entry in "${entries[@]}"; do
   name=${entry%%|*}
   ratios=$(grep -h "end ab-$name-" $base/ab-srtio3/run.log $base/ab-nbcl5/run.log | grep -oE "b/a [0-9.]+" | cut -d' ' -f2)
   n=$(echo "$ratios" | grep -c .)

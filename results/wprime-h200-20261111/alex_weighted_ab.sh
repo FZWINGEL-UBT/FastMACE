@@ -2,7 +2,7 @@
 # WEIGHTED_VECTOR on the A100 (12 November 2026; Colab at 0 compute units, so Alex): colab_weighted_a100.sh's plan
 # against today's A100-SXM4-80GB defaults: MD-step A/B in both build orders (SrTiO3 10x10x10, NbCl5 3x3x3) for
 # skip+hoist+weighted and weighted alone, then the 3-structure force/stress gate for an entry under 1 in all four.
-# Usage: sbatch alex_weighted_ab.sh SHA   (slim source tarball $B/src-SHA.tar)
+# Usage: sbatch alex_weighted_ab.sh SHA [ENTRIES]   (slim source tarball $B/src-SHA.tar; ENTRIES default "skw w")
 #SBATCH --job-name=fm-weighted-ab
 #SBATCH -p a100 --gres=gpu:a100:1 -C a100_80
 #SBATCH --time=01:00:00
@@ -26,6 +26,6 @@ n=$(nproc); export OMP_NUM_THREADS=$n MKL_NUM_THREADS=$n TORCHINDUCTOR_COMPILE_T
 cd $src || exit 4
 echo "weighted-ab job $SLURM_JOB_ID on $(hostname); source $SHA" > $out/job.txt
 # results/ is not in the slim tarball: the plan script is copied beside it
-OUT=$out bash $B/colab_weighted_a100.sh > $out/job.log 2>&1 < /dev/null
+ENTRIES="${2:-skw w}" OUT=$out bash $B/colab_weighted_a100.sh > $out/job.log 2>&1 < /dev/null
 echo "exit $?" >> $out/job.log
 rm -rf $TMPDIR/cache $TMPDIR/triton $TMPDIR/inductor $TMPDIR/xdg
