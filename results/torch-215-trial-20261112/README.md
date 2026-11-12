@@ -292,11 +292,47 @@ sm_120); records in `splitlab-leto/`. Setup:
 - Triton 3.9 keeps the conversion in registers, for its own `tf32x3` and for the explicit split alike.
 - No PTX `cvt.rna.tf32` in the split, so the opt5-T01 double-rounding trap does not arise. The question is moot
   anyway.
-- Not tested, a different idea: Triton 3.8 `tf32x3` with 2 stages (32 KiB). It would need its own lab.
+- Correction: the lab compiled both kernels at 3 stages, but production `species_gemm` runs 2
+  (`species_gemm.NUM_STAGES`). Only `tf32x3_gemm` uses tile_rule's 3. Its 3-stage rows show the lowering, not
+  production's shared memory. The 2-stage question is screened in §6c.
 
 The ways to get the 717 µs remain:
 - Triton 3.9 itself (t9: torch 2.14.1 + Triton 3.9 on Python 3.11);
 - a hand-written MMA kernel, such as `species_gemm`'s NVRTC tensor-core path.
+
+## 6c. Screen: pipeline stages of the tf32x3 Triton GEMMs (Ada, closed)
+
+Run setup:
+
+- Machine: leto (RTX 4000 Ada).
+- Environment: production a (torch 2.14.1, Triton 3.8), production plan, b7c19b19.
+- Scripts: `jobs/stages_lab.py` via `jobs/stages.sh`; records in `stages-leto/`.
+
+The lab:
+
+- **Recording:** it records every Triton launch of both GEMMs in a real MD point. Calls outside the capture
+  give the inputs; calls inside the capture give the launches per step: 12 `tf32x3_gemm` + 10 `species_gemm` = 22,
+  the profile's count.
+- **Replay:** after the point's runs, it replays one step's launches with `num_stages` 3 and 2. That is 20 rounds
+  in ABBA order, the median of CUDA-event times.
+
+SrTiO3 10³, µs per step of GEMM time:
+
+| Kernel (production stages) | 3 stages | 2 stages | 2 / 3 (ABBA halves) |
+| --- | --- | --- | --- |
+| `tf32x3_gemm` (3) | 1962 | 2108 | 1.074 (1.073 / 1.069) |
+| `species_gemm` (2) | 1277 | 1336 | 1.047 (1.044 / 1.047) |
+
+Findings:
+
+- **2 stages for `tf32x3_gemm`:** 7.4% slower. Stop.
+- **3 stages for `species_gemm`, the reverse:** 4.5% faster, −60 µs per step. That is 1.8% of the GEMM time and
+  0.35% of the step, under the triage bound of 1%. Recorded, not A/B'd.
+- **NbCl5:** the lab's replay hit an illegal memory access, in the run and in its one retry. The failure is in
+  the replay ("stages FAILED" comes before the point's steady error), most likely an eager-sample species plan that
+  does not match the replayed grid. Production NbCl5 runs fine elsewhere.
+- **leto:** this point ran at 29.9 ms per step against about 17 ms on leeloo, so leto's GPU is slower in general.
+  The ratios are from one process and still hold.
 
 ## 7. Recommendations
 
