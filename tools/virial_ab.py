@@ -7,7 +7,13 @@ positions: side a = the switch off, side b = on, both built in one process in th
 the pattern given (abab or abba). Per side also: one profiled call (kernel time per atom, split-K GEMM kernels), and
 the stress and forces of b against a.
 
+With ``--a-constant`` / ``--b-constant MODULE:NAME=VALUE`` the sides instead differ by those module constants (set
+around each side's build and first compiled calls, as ``tools/ab_rewrites.py`` does; VIRIAL_ELEMENTWISE then stays
+at its default on both), and ``--b-expect MODULE:NAME`` names proof counters (an int, or a function returning one)
+that must advance over side b's build (exit 3 otherwise): the stress-mode A/B of any build-time switch.
+
 Usage: python tools/virial_ab.py --checkpoint PATH --structure CIF@NxNxN --output OUT.json [--order ab|ba]
+       [--a-constant M:N=V ...] [--b-constant M:N=V ...] [--b-expect M:N ...]
 """
 from __future__ import annotations
 
@@ -18,13 +24,47 @@ import time
 from pathlib import Path
 
 
-def build(fm, model, atoms, value):
+def parse_constant(item):
+    """MODULE:NAME=VALUE -> (module, name, value); VALUE True/False/None, an int, a float or a string."""
+    target, sep, text = item.partition("=")
+    module, colon, name = target.partition(":")
+    if not (sep and colon and module and name):
+        raise ValueError(f"{item!r}: expected MODULE:NAME=VALUE")
+    literal = {"True": True, "False": False, "None": None}
+    if text in literal:
+        return module, name, literal[text]
+    for kind in (int, float):
+        try:
+            return module, name, kind(text)
+        except ValueError:
+            pass
+    return module, name, text
+
+
+def counters(items):
+    import importlib
+
+    values = {item: getattr(importlib.import_module(item.split(":")[0]), item.split(":")[1]) for item in items}
+    return {item: value() if callable(value) else value for item, value in values.items()}
+
+
+def build(fm, model, atoms, value, constants=()):
+    """One side: VIRIAL_ELEMENTWISE = ``value`` (None: leave it) and ``constants`` [(module, name, value)] set
+    while the side builds and compiles, then restored."""
+    import importlib
+
     import torch
 
     from fastmace.rewrites import engine
 
     saved = engine.VIRIAL_ELEMENTWISE
-    engine.VIRIAL_ELEMENTWISE = value
+    if value is not None:
+        engine.VIRIAL_ELEMENTWISE = value
+    restore = []
+    for module, name, new in constants:
+        target = importlib.import_module(module)
+        restore.append((target, name, getattr(target, name)))
+        setattr(target, name, new)
     try:
         user = fm.ForceField(model, atoms, precision="float32")
         field = user._evaluator(atoms)[1]
@@ -34,6 +74,8 @@ def build(fm, model, atoms, value):
         torch.cuda.synchronize()
     finally:
         engine.VIRIAL_ELEMENTWISE = saved
+        for target, name, old in reversed(restore):
+            setattr(target, name, old)
     return dict(user=user, field=field, positions=positions, strain_path=getattr(field, "strain_path", None),
                 stress=out.stress.detach().double().cpu(), forces=out.forces.detach().double().cpu())
 
@@ -80,7 +122,13 @@ def main():
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
     p.add_argument("--blocks", type=int, default=6, help="Timed blocks per side")
     p.add_argument("--calls", type=int, default=20, help="Force calls per block")
+    p.add_argument("--a-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side a's module constants")
+    p.add_argument("--b-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side b's, as --a-constant")
+    p.add_argument("--b-expect", nargs="*", default=[], metavar="MODULE:NAME",
+                   help="Proof counters that must advance over side b's build (exit 3 otherwise)")
     args = p.parse_args()
+    constants = {"a": [parse_constant(c) for c in args.a_constant], "b": [parse_constant(c) for c in args.b_constant]}
+    switch = not (constants["a"] or constants["b"])  # no constants: the VIRIAL_ELEMENTWISE A/B
 
     import ase.io
     import torch
@@ -92,11 +140,16 @@ def main():
     if rep:
         atoms = atoms.repeat(tuple(int(x) for x in rep.split("x")))
     model = (fm.load(args.model, checkpoint=args.checkpoint) if args.checkpoint else fm.load(args.model))
-    sides = {}
+    sides, advanced = {}, {}
     for name in args.order:
-        sides[name] = build(fm, model, atoms, name == "b")
+        before = counters(args.b_expect)
+        sides[name] = build(fm, model, atoms, (name == "b") if switch else None, constants[name])
+        advanced[name] = {item: value - before[item] for item, value in counters(args.b_expect).items()}
+    failed = [item for item, value in advanced["b"].items() if value <= 0]
     rec = dict(gpu=torch.cuda.get_device_name(), atoms=len(atoms), order=args.order, pattern=args.pattern,
-               calls=args.calls, strain_path={k: str(v["strain_path"]) for k, v in sides.items()},
+               calls=args.calls, constants={k: [f"{m}:{n}={v}" for m, n, v in c] for k, c in constants.items()},
+               expect=advanced, expect_failed=failed,
+               strain_path={k: str(v["strain_path"]) for k, v in sides.items()},
                profile={k: profiled(v, atoms) for k, v in sides.items()})
     a, b = sides["a"], sides["b"]
     rec["stress_max_abs"] = float((b["stress"] - a["stress"]).abs().max())
@@ -113,7 +166,10 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(rec, indent=1))
     print(json.dumps({k: rec[k] for k in ("gpu", "atoms", "order", "strain_path", "profile", "stress_max_abs",
-                                         "stress_max", "forces_max_abs", "a_ms", "b_ms", "b_over_a")}))
+                                         "stress_max", "forces_max_abs", "a_ms", "b_ms", "b_over_a", "expect")}))
+    if failed:
+        print(f"EXPECT FAILED: {failed} did not advance over side b's build")
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":
