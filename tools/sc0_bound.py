@@ -60,7 +60,8 @@ class _Captured(Exception):
 
 
 def capture(args):
-    """(module, x in the kernel's layout, indices, natoms): interaction 0's symmetric contraction and its input."""
+    """(module, x in the kernel's layout, indices, natoms): product ``args.product``'s (default 0: interaction 0's)
+    symmetric contraction and its input."""
     import torch
 
     from fastmace.model import loading
@@ -70,10 +71,12 @@ def capture(args):
                           device="cuda:0", sha256=sha)
     calc = loaded.calculator
     model = calc.models[0]
-    found = [(n, m) for n, m in model.products[0].named_modules()
+    product = int(getattr(args, "product", 0) or 0)
+    found = [(n, m) for n, m in model.products[product].named_modules()
              if type(m).__name__ == "SymmetricContraction" and type(m).__module__.startswith("cuequivariance_torch")]
     if len(found) != 1:
-        raise SystemExit(f"expected one cuEq SymmetricContraction under products[0], found {[n for n, _ in found]}")
+        raise SystemExit(f"expected one cuEq SymmetricContraction under products[{product}], found "
+                         f"{[n for n, _ in found]}")
     name, sc = found[0]
     box = {}
 
@@ -97,7 +100,7 @@ def capture(args):
         x = sc.transpose_in(box["x"]).contiguous()
         weight = sc.weight if sc.projection is None else torch.einsum("zau,ab->zbu", sc.weight, sc.projection)
         weight = weight.flatten(1).detach().contiguous()
-    meta = dict(structure=structure, natoms=len(atoms), checkpoint_sha256=sha, module=f"products.0.{name}",
+    meta = dict(structure=structure, natoms=len(atoms), checkpoint_sha256=sha, module=f"products.{product}.{name}",
                 method=getattr(sc, "method", None), x_shape=list(x.shape), weight_shape=list(weight.shape),
                 indices_dtype=str(box["indices"].dtype), x_rms=float(x.pow(2).mean().sqrt()),
                 irreps_in=str(sc.irreps_in), irreps_out=str(sc.irreps_out), degree=sc.contraction_degree)

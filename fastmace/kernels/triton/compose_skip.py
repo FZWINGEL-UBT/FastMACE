@@ -72,7 +72,11 @@ JOINED_LAYOUT = None
 # A100 family (8 November 2026, results/h200-fastpath-20261108/round6-a100, NHR Alex A100-SXM4-80GB job 4963944;
 # OMAT-0 medium, Benchmark_loup, against the A100 defaults of main 11297d45, ab / ba): MD step b/a 0.9782 / 0.9784;
 # all three round-6 switches together 0.9590 / 0.9641. Bitwise, faster in both orders (decision 66).
-JOINED_LAYOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# NVIDIA RTX 4000 Ada Generation (step-layout-cleanup, 12 November 2026, results/step-layout-cleanup-20261112): the
+# joined layout on the Triton tf32x3 backend (``species_mm_rows`` reading and writing strided views; before, the
+# layout needed CUTLASS, so the 8 November Ada A/B above measured it inert). Bitwise; measured with the step's other
+# copy removals (README there).
+JOINED_LAYOUT_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 
 
 def compose_fast_default(name=None) -> bool:

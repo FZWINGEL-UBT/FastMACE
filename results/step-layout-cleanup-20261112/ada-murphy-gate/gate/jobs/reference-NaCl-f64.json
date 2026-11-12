@@ -1,0 +1,40 @@
+{
+  "kind": "reference",
+  "name": "reference-NaCl-f64",
+  "structure": "NaCl",
+  "reference": "f64",
+  "dtype": "float64",
+  "keys": [
+    "hydrostatic-0",
+    "hydrostatic-1",
+    "hydrostatic-2",
+    "full-0",
+    "full-1",
+    "full-2"
+  ],
+  "implementation": "fastmace.reference",
+  "fd_check": "/mnt/homes/zwingel/fm-slc/runs/ada-murphy-gate/gate/configs/NaCl.npz",
+  "model": "omat0-medium",
+  "label": "omat0-medium",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model",
+  "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+  "baseline": null,
+  "backend": "auto",
+  "md_dtype": "auto",
+  "main_args": "",
+  "rewrites": {},
+  "production_constants": [
+    "fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES=((8,0),(8,9),(9,0))",
+    "fastmace.kernels.cutlass.tf32x3:FAMILY_CAPABILITIES=((8,9),)",
+    "fastmace.kernels.cutlass.linear_div:LINEAR_DIV=True"
+  ],
+  "production_expect": [],
+  "engine_config": {},
+  "production_tf32": false,
+  "tiled_receivers": 0,
+  "tiled_mode": "eager",
+  "tiled_config": {},
+  "values": "/mnt/homes/zwingel/fm-slc/runs/ada-murphy-gate/gate/values/reference-NaCl-f64.npz",
+  "result": "/mnt/homes/zwingel/fm-slc/runs/ada-murphy-gate/gate/values/reference-NaCl-f64.json",
+  "configurations": "/mnt/homes/zwingel/fm-slc/runs/ada-murphy-gate/gate/configs/NaCl.npz"
+}

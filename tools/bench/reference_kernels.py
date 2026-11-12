@@ -138,3 +138,29 @@ def first_reassociation_joined(self, node_feats, node_attrs, edge_attrs, augment
 
 
 __all__ = ["edge_outer_sum_backward", "first_reassociation_joined", "gated_fused"]
+
+
+def no_bound_plan(module, rows):
+    """``species_gemm.bound_plan`` as on ``main`` at ``1d491a67`` (step-layout-cleanup, 12 November 2026): no plan
+    is bound, so every forward sorts the atoms by species itself (inside the captured step)."""
+    return None
+
+
+def reshape_copy(reshape, message):
+    """``generic.modules._reshaped`` as on ``main`` at ``1d491a67`` (step-layout-cleanup): MACE's
+    ``reshape_irreps``, a cat of the message's pieces (a copy), also where a view has its value."""
+    return reshape(message)
+
+
+def compose_in_graph_bind(self, species_feats):
+    """``FirstInteractionReassociation.bind`` as on ``main`` at ``236fa60c`` (compose-outside-graph, 12 November 2026):
+    a table whose version moved composes again also inside a CUDA-graph capture, so the captured step replays the
+    composition. Same weights, same addresses."""
+    if self._buffers.get("species_feats") is not species_feats:
+        self.register_buffer("species_feats", species_feats, persistent=False)
+    if species_feats is None or self.compose_skip is None or self.compose_radial is None:
+        return
+    entry = self.refresh_composed(species_feats)
+    for k, tensor in enumerate(entry[2]):
+        if self._buffers.get(f"composed_{k}") is not tensor:
+            self.register_buffer(f"composed_{k}", tensor, persistent=False)

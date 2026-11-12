@@ -1,0 +1,779 @@
+{
+ "created_utc": "2026-11-12T13:05:44+00:00",
+ "host": "leto",
+ "argv": [
+  "tools/nve_energy.py",
+  "nve",
+  "--config",
+  "b",
+  "--checkpoint",
+  "/mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model",
+  "--start",
+  "/mnt/homes/zwingel/fm-paper-exp1/state-300K.npz",
+  "--temperature-K",
+  "300",
+  "--ps",
+  "100",
+  "--output",
+  "/mnt/homes/zwingel/fm-paper-exp1/runs/nve300-leto/nve",
+  "--tag",
+  "b-300K"
+ ],
+ "fastmace_revision": "53add60119be811ec6761f331a59df29ae9ef505",
+ "config": "b",
+ "config_text": "PACKED8 off: forward and w' read the same float32 cubic",
+ "config_constants": {
+  "fastmace.kernels.oeq_streaming.spline_forward:PACKED8": false
+ },
+ "config_rewrites": {},
+ "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model",
+ "checkpoint_sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a",
+ "structure": "state /mnt/homes/zwingel/fm-paper-exp1/state-300K.npz sha256 dcf267b303be6df8c1c806e3b2f72f9cd9e5b797c5021e150c1a1d1a7a6629f8",
+ "natoms": 5000,
+ "formula": "O3000Sr1000Ti1000",
+ "cell": [
+  [
+   39.05,
+   0.0,
+   0.0
+  ],
+  [
+   0.0,
+   39.05,
+   0.0
+  ],
+  [
+   0.0,
+   0.0,
+   39.05
+  ]
+ ],
+ "versions": {
+  "python": "3.10.12",
+  "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.35",
+  "torch": "2.14.1+cu130",
+  "numpy": "2.2.6",
+  "ase": "3.27.0",
+  "mace-torch": "0.3.16",
+  "cuequivariance": "0.12.0",
+  "cuequivariance-torch": "0.12.0",
+  "cuequivariance-ops-torch-cu13": "0.12.0",
+  "openequivariance": "0.7.0",
+  "triton": "3.8.0"
+ },
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "cuda": "13.0",
+ "switches": {
+  "fastmace.kernels.oeq_streaming.spline_forward": {
+   "constants": {
+    "SPLINE_W": null,
+    "SPLINE_W_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "THREADS": 256,
+    "MIN_BLOCKS": null,
+    "PARTS": false,
+    "R128": null,
+    "R128_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "FACTOR_W": false,
+    "FACTOR_W_GPUS": [],
+    "CURSOR32": false,
+    "CURSOR32_GPUS": [],
+    "SHARED_LOCATOR": null,
+    "SHARED_LOCATOR_GPUS": [],
+    "STAGE_EDGES": null,
+    "STAGE_EDGES_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "STAGE_TILE": 32,
+    "PREFETCH_AHEAD": null,
+    "PREFETCH_AHEAD_GPUS": [
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "PREFETCH_AHEAD_DISTANCE": 2,
+    "PREFETCH_PATHS": 4,
+    "PACKED8": false,
+    "PACKED8_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "PACKED8_BITS": [
+     22,
+     20,
+     16
+    ],
+    "GEOM": null,
+    "GEOM_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA A100 80GB PCIe",
+     "NVIDIA H200"
+    ],
+    "BLOCK_ORDER": null,
+    "BLOCK_ORDER_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA A100 80GB PCIe"
+    ]
+   },
+   "resolved": {
+    "factor_w_default": false,
+    "cursor32_default": false,
+    "shared_locator_default": false,
+    "prefetch_ahead_default": 0,
+    "packed8_default": false,
+    "geom_default": false,
+    "stage_edges_default": true,
+    "r128_default": true,
+    "spline_w_default": true,
+    "block_order_default": false
+   }
+  },
+  "fastmace.kernels.oeq_streaming.wprime_backward": {
+   "constants": {
+    "REBUILD_PARTS": 1,
+    "REBUILD_BATCH": 4,
+    "STREAM_W": false,
+    "SLOPE_VECTOR": 0,
+    "TABLE_W": null,
+    "TABLE_W_GPUS": [
+     "NVIDIA GeForce RTX 5060 Ti",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "TABLE_W_VECTOR": 2,
+    "BLOCK_MESSAGE": null,
+    "BLOCK_MESSAGE_GPUS": [
+     "NVIDIA GeForce RTX 5060 Ti",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "BLOCK_LDG": null,
+    "BLOCK_LDG_GPUS": [],
+    "FACTORED": null,
+    "FACTORED_GPUS": [
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA GeForce RTX 5060 Ti",
+     "NVIDIA H200"
+    ],
+    "FACTORED_SCALE": false,
+    "HORNER": null,
+    "HORNER_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA GeForce RTX 5060 Ti",
+     "NVIDIA H200",
+     "NVIDIA RTX 4000 Ada Generation"
+    ],
+    "SCALAR_PATHS": null,
+    "SCALAR_PATHS_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "ESTRIN": null,
+    "ESTRIN_GPUS": [],
+    "FOLD_ALPHA": null,
+    "FOLD_ALPHA_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "MAX_REGISTERS": null,
+    "SMEM_SPILL": false,
+    "BUTTERFLY": null,
+    "BUTTERFLY_GPUS": [
+     "NVIDIA GeForce RTX 5060 Ti",
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation"
+    ],
+    "REDUX": null,
+    "REDUX_GPUS": [
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "TABLE_PAIRS": null,
+    "TABLE_PAIRS_GPUS": [],
+    "HOIST_SCALE": null,
+    "HOIST_SCALE_GPUS": [],
+    "STAGE_DOUT": null,
+    "STAGE_DOUT_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "STAGE_DOUT_CHUNK": 32,
+    "STAGE_QUADS": null,
+    "STAGE_QUADS_GPUS": [],
+    "STAGE_SH": null,
+    "STAGE_SH_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "STAGE_EDGES": null,
+    "STAGE_EDGES_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "SPLINE_VECTOR": null,
+    "EDGE_FORCE": null,
+    "EDGE_FORCE_GPUS": [],
+    "SKIP_OUTSIDE": null,
+    "SKIP_OUTSIDE_GPUS": [
+     "NVIDIA H200"
+    ],
+    "HOIST_DX": null,
+    "HOIST_DX_GPUS": [
+     "NVIDIA H200"
+    ],
+    "CHANNEL_VECTOR": null,
+    "SPLINE_VECTOR_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "TEMPLATE": "// oeq_projected_backward_wprime (FastMACE opt-9 OPT9-T03), adapted from the vendored\n// oeq_projected_backward (OpenEquivariance PR 223, BSD 3-Clause, see NOTICE.md).\nusing int64_t = signed long long;\nusing int32_t = int;\nusing scalar_t = {{ scalar }};\nusing acc_t = {{ scalar }};\n\nconstexpr int INPUT_DIM = {{ schedule.input_dim }};\nconstexpr int EDGE_DIM = {{ schedule.edge_dim }};\nconstexpr int OUTPUT_DIM = {{ schedule.output_dim }};\nconstexpr int WEIGHT_DIM = {{ schedule.weight_numel }};\nconstexpr int CHANNEL_DIM = {{ schedule.channels }};\nconstexpr int LOGICAL_GROUP_SIZE =\n    {{ schedule.launch_config.logical_cohort_width }};\nconstexpr int TERMS = {{ terms }};\nconstexpr int PADDED_TERMS = {{ padded_terms }};  // a q-major G' row: TERMS, then zero terms (SLOPE_VECTOR)\nconstexpr unsigned int FULL_MASK = 0xffffffffu;\n\n{%- if edge_force %}\n// EDGE_FORCE: edge_sh3's constants (fastmace/kernels/triton/edge_sh.py), l <= 3, component normalisation\nconstexpr float S3 = 1.7320508075688772f, S5 = 2.23606797749979f, S56 = 0.9128709291752769f;\nconstexpr float S38 = 0.6123724356957945f, C1 = 1.7320508075688772f, C2 = 2.23606797749979f;\nconstexpr float C3 = 2.6457513110645907f;\n{%- endif %}\n\n{%- macro edge_force_store(g) %}\n        {   // EDGE_FORCE: dL/dv[e] = (I - u u^T) / max(|v|, eps) . sum_c g_c dY_c/du (edge_sh3's backward), one lane\n            const float vx = vec[3 * e], vy = vec[3 * e + 1], vz = vec[3 * e + 2];\n            const float n = sqrtf(vx * vx + vy * vy + vz * vz), d = fmaxf(n, 1e-12f);\n            const float x = vx / d, y = vy / d, z = vz / d;\n            const float g1x = {{ g }}[1] * C1, g1y = {{ g }}[2] * C1, g1z = {{ g }}[3] * C1;\n            const float g20 = {{ g }}[4] * C2, g21 = {{ g }}[5] * C2, g22 = {{ g }}[6] * C2;\n            const float g23 = {{ g }}[7] * C2, g24 = {{ g }}[8] * C2;\n            const float g30 = {{ g }}[9] * C3, g31 = {{ g }}[10] * C3, g32 = {{ g }}[11] * C3;\n            const float g33 = {{ g }}[12] * C3, g34 = {{ g }}[13] * C3, g35 = {{ g }}[14] * C3;\n            const float g36 = {{ g }}[15] * C3;\n            const float s20 = S3 * x * z, s24 = S3 / 2.0f * (z * z - x * x);\n            const float y2 = y * y, x2z2 = x * x + z * z;\n            const float a = 4.0f * y2 - x2z2, b = 2.0f * y2 - 3.0f * x2z2;\n            const float gs20 = g20 + S56 * (g30 * z - g36 * x) + S5 * g31 * y;\n            const float gs24 = g24 + S56 * (g30 * x + g36 * z) + S5 * g35 * y;\n            const float ga = S38 * (g32 * x + g34 * z), gb = 0.5f * y * g33;\n            const float gy2 = g22 + 4.0f * ga + 2.0f * gb, gx2z2 = -0.5f * g22 - ga - 3.0f * gb;\n            const float gx = g1x + S3 * z * gs20 + S3 * y * g21 - S3 * x * gs24 + 2.0f * x * gx2z2\n                             + S56 * (g30 * s24 - g36 * s20) + S38 * a * g32;\n            const float gy = g1y + S3 * x * g21 + S3 * z * g23 + 2.0f * y * gy2 + S5 * (g31 * s20 + g35 * s24)\n                             + 0.5f * b * g33;\n            const float gz = g1z + S3 * x * gs20 + S3 * y * g23 + S3 * z * gs24 + 2.0f * z * gx2z2\n                             + S56 * (g30 * s20 + g36 * s24) + S38 * a * g34;\n            const float dot = n > 1e-12f ? x * gx + y * gy + z * gz : 0.0f;\n            dsh[3 * e + 0] = scalar_t((gx - x * dot) / d);\n            dsh[3 * e + 1] = scalar_t((gy - y * dot) / d);\n            dsh[3 * e + 2] = scalar_t((gz - z * dot) / d);\n        }\n{%- endmacro %}\n{% macro node_offset(start, component, irrep_dim) -%}\n    {%- if layout == \"ir_mul\" -%}\n        {{ start + component * schedule.channels }} + channel\n    {%- else -%}\n        {{ start + component }} + channel * {{ irrep_dim }}\n    {%- endif -%}\n{%- endmacro %}\n\n// One logical thread group owns an edge; each lane owns channels separated by LOGICAL_GROUP_SIZE.\n// dx and dsh as in oeq_projected_backward; in place of dweights, dr[e] = sum over the edge's weights of\n// dweights * w'(r_e), w' from the derivative table gprime [pairs * pieces, TERMS, WEIGHT_DIM] (q-major with\n// SLOPE_VECTOR: [pairs * pieces, WEIGHT_DIM, PADDED_TERMS]).\nextern \"C\" __global__ void oeq_projected_backward_wprime(\n    int64_t node_count,\n    int64_t edge_count,\n    const scalar_t* x,\n    const scalar_t* sh,\n    const scalar_t* weights,\n    const int32_t* senders,\n    const int32_t* receivers,\n{%- if blocks %}\n{%- for g in range(n_blocks) %}\n    const scalar_t* __restrict__ dout{{ g }},\n{%- endfor %}\n{%- else %}\n    const scalar_t* dout,\n{%- endif %}\n    scalar_t* dx,\n    scalar_t* dsh,\n    const scalar_t* lengths,\n    const int32_t* pairs,\n    const scalar_t* __restrict__ gprime,\n    const scalar_t* starts,\n    const scalar_t* scales,\n    const int32_t* bins,\n    scalar_t r_lo,\n    scalar_t bin_scale,\n    scalar_t r_max,\n    int32_t n_bins,\n    int32_t pieces,\n    scalar_t* dr{% if edge_force %},\n    const scalar_t* __restrict__ vec{% endif %}) {\n\n    const int lane = threadIdx.x % LOGICAL_GROUP_SIZE;\n    const int logical_group = threadIdx.x / LOGICAL_GROUP_SIZE;\n{%- if stage_dout %}\n    // STAGE_DOUT: this block's edges [c0, c1), walked by runs of equal receiver; per run the receiver's dout row is\n    // copied to shared memory once, then the warps take the run's edges.\n    __shared__ __align__(16) scalar_t stage_row[{{ stage_total }}];\n    const int64_t stage_c0 = int64_t(blockIdx.x) * {{ stage_chunk }};\n    const int64_t stage_c1 = stage_c0 + {{ stage_chunk }} < edge_count ? stage_c0 + {{ stage_chunk }} : edge_count;\n    {%- if stage_edges %}\n    // STAGE_EDGES: the chunk's edge features (the whole block, float4 where aligned) and per edge (warp 0, a lane per\n    // edge) sender, receiver, spline interval, t, 1 / h and the inside / sloped flags, once per block.\n    __shared__ __align__(16) scalar_t stage_esh[{{ stage_chunk }}][EDGE_DIM];\n    __shared__ int32_t stage_snd[{{ stage_chunk }}], stage_rcv[{{ stage_chunk }}], stage_slab[{{ stage_chunk }}];\n    __shared__ float stage_t[{{ stage_chunk }}], stage_sx[{{ stage_chunk }}];\n    __shared__ unsigned stage_flag[{{ stage_chunk }}];\n    const int stage_n = int(stage_c1 - stage_c0);\n    {\n        const scalar_t* src = sh + stage_c0 * EDGE_DIM;\n        scalar_t* dst = &stage_esh[0][0];\n        if (EDGE_DIM % 4 == 0 && (reinterpret_cast<unsigned long long>(src) & 15) == 0) {\n            for (int i = threadIdx.x; i < stage_n * (EDGE_DIM / 4); i += blockDim.x)\n                reinterpret_cast<float4*>(dst)[i] = __ldg(reinterpret_cast<const float4*>(src) + i);\n        } else {\n            for (int i = threadIdx.x; i < stage_n * EDGE_DIM; i += blockDim.x) dst[i] = __ldg(src + i);\n        }\n    }\n    if (threadIdx.x < {{ stage_chunk }}) {\n        const int k = threadIdx.x;\n        int32_t snd_k = -1, rcv_k = -1, slab_k = 0;\n        float t_k = 0.f, sx_k = 0.f;\n        unsigned flag_k = 0u;\n        if (k < stage_n) {\n            const int64_t e = stage_c0 + k;\n            snd_k = senders[e];\n            rcv_k = receivers[e];\n            const scalar_t r = lengths[e];\n            const scalar_t clamped = r > r_lo ? r : r_lo;\n{{ spline }}\n            t_k = t;\n            sx_k = sx_inv;\n            slab_k = int32_t(int64_t(pairs[e]) * pieces + iv);\n            flag_k = (r < r_max ? 1u : 0u) | (r < r_max && r >= r_lo ? 2u : 0u);\n        }\n        stage_snd[k] = snd_k;\n        stage_rcv[k] = rcv_k;\n        stage_slab[k] = slab_k;\n        stage_t[k] = t_k;\n        stage_sx[k] = sx_k;\n        stage_flag[k] = flag_k;\n    }\n    __syncthreads();\n    {%- endif %}\n    for (int64_t stage_s = stage_c0; stage_s < stage_c1;) {\n    int64_t stage_t1 = stage_c1;\n    {\n        {%- if stage_edges %}\n        const int32_t stage_r = stage_rcv[stage_s - stage_c0];\n        const int64_t stage_i = stage_s + 1 + lane;\n        const unsigned stage_b = __ballot_sync(FULL_MASK,\n                                               stage_i < stage_c1 && stage_rcv[stage_i - stage_c0] != stage_r);\n        {%- else %}\n        const int32_t stage_r = receivers[stage_s];\n        const int64_t stage_i = stage_s + 1 + lane;\n        const unsigned stage_b = __ballot_sync(FULL_MASK, stage_i < stage_c1 && receivers[stage_i] != stage_r);\n        {%- endif %}\n        if (stage_b) stage_t1 = stage_s + __ffs(stage_b);\n        if (stage_r >= 0 && stage_r < node_count) {\n            {%- if stage_quads %}\n            // STAGE_QUADS: quartet q of channel c at float4 q * CHANNEL_DIM + c.\n            for (int c = threadIdx.x; c < CHANNEL_DIM; c += blockDim.x) {\n                {%- for quad in stage_quads %}\n                {\n                    float4 v;\n                    {%- for g, width, offset in quad %}\n                    v.{{ \"xyzw\"[loop.index0] }} = __ldg(dout{{ g }} + int64_t(stage_r) * {{ width }} + {{ offset }} + c);\n                    {%- endfor %}\n                    {%- for k in range(quad | length, 4) %}\n                    v.{{ \"xyzw\"[k] }} = 0.f;\n                    {%- endfor %}\n                    reinterpret_cast<float4*>(stage_row)[{{ loop.index0 * schedule.channels }} + c] = v;\n                }\n                {%- endfor %}\n            }\n            {%- else %}\n            {%- for g, offset, width in stage_rows %}\n            {\n                const scalar_t* src = {{ \"dout\" ~ g if blocks else \"dout\" }} + int64_t(stage_r) * {{ width }};\n                if ({{ width % 4 }} == 0 && (reinterpret_cast<unsigned long long>(src) & 15) == 0) {\n                    for (int i = threadIdx.x; i < {{ width // 4 }}; i += blockDim.x)\n                        reinterpret_cast<float4*>(stage_row + {{ offset }})[i] =\n                            __ldg(reinterpret_cast<const float4*>(src) + i);\n                } else {\n                    for (int i = threadIdx.x; i < {{ width }}; i += blockDim.x)\n                        stage_row[{{ offset }} + i] = __ldg(src + i);\n                }\n            }\n            {%- endfor %}\n            {%- endif %}\n        }\n    }\n    __syncthreads();\n    for (int64_t e = stage_s + logical_group; e < stage_t1; e += blockDim.x / LOGICAL_GROUP_SIZE) {\n{%- else %}\n    const int64_t e =\n        int64_t(blockIdx.x) * (blockDim.x / LOGICAL_GROUP_SIZE) + logical_group;\n    if (e >= edge_count) return;\n{%- endif %}\n\n    {%- if stage_edges %}\n    // STAGE_EDGES: the edge's staged sender, receiver, features and spline interval.\n    const int stage_k = int(e - stage_c0);\n    const int32_t sender = stage_snd[stage_k];\n    const int32_t receiver = stage_rcv[stage_k];\n    {%- else %}\n    const int32_t sender = senders[e];\n    const int32_t receiver = receivers[e];\n    {%- endif %}\n    if (sender < 0 || sender >= node_count\n        || receiver < 0 || receiver >= node_count) {\n        // An edge with an out-of-range index contributes nothing: its dsh row and dr are written as zeros (the\n        // wrappers allocate dsh with empty_like, so a skipped row would hold garbage; kernel review, 5 November 2026).\n        {%- if edge_force %}\n        if (lane < 3) dsh[e * 3 + lane] = scalar_t(0);  // EDGE_FORCE: dL/dv[e]\n        {%- else %}\n        for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);\n        {%- endif %}\n        if (lane == 0) dr[e] = scalar_t(0);\n        {{ \"continue\" if stage_dout else \"return\" }};\n    }\n\n    const int64_t input_base = int64_t(sender) * INPUT_DIM;\n    const int64_t output_base = int64_t(receiver) * OUTPUT_DIM;\n    const int64_t edge_base = e * EDGE_DIM;\n    const int64_t weight_base = e * WEIGHT_DIM;\n    {%- if stage_edges %}\n    const scalar_t* sh_edge = stage_esh[stage_k];\n    {%- elif stage_sh %}\n    // STAGE_SH: the edge's features in shared memory once per edge; the channel passes read them from there.\n    __shared__ __align__(16) scalar_t stage_sh[{{ stage_sh }}][EDGE_DIM];\n    __syncwarp();  // the previous edge's reads are done\n    for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) stage_sh[logical_group][c] = __ldg(sh + edge_base + c);\n    __syncwarp();\n    const scalar_t* sh_edge = stage_sh[logical_group];\n    {%- endif %}\n\n    // The radial tables' piece of r and its Chebyshev argument; no slope at or beyond the cutoff, below r_lo.\n    {%- if stage_edges %}\n    const unsigned stage_f = stage_flag[stage_k];\n    const bool sloped = (stage_f & 2u) != 0u;\n    const float t = stage_t[stage_k], sx_inv = stage_sx[stage_k];\n    __syncwarp();  // the warp is converged for the end-of-edge reduction\n    {%- else %}\n    const scalar_t r = lengths[e];\n    const bool sloped = r < r_max && r >= r_lo;\n    const scalar_t clamped = r > r_lo ? r : r_lo;\n    {%- endif %}\n    {%- if stage_edges %}\n    {%- elif spline and shared_locator %}\n    // SHARED_LOCATOR: the slab, t and 1 / h from spline_locator's record (passed as bins), the same lookup.\n    const int4 loc = __ldg(reinterpret_cast<const int4*>(bins) + e);\n    const float t = __int_as_float(loc.y), sx_inv = __int_as_float(loc.z);\n    {%- elif spline %}\n    // SPLINE_W: the cubic spline's interval and t in [0, 1) (rewrites.radial.spline; pieces = its intervals).\n{{ spline }}\n    const int32_t piece = iv;\n    {%- else %}\n    int32_t bin = int32_t((clamped - r_lo) * bin_scale);\n    bin = bin < n_bins - 1 ? bin : n_bins - 1;\n    const int32_t piece = bins[bin];\n    const scalar_t t = (clamped - starts[piece]) * scales[piece] - scalar_t(1);\n    {%- endif %}\n    const scalar_t* g = gprime + {{ slab }} * PADDED_TERMS * WEIGHT_DIM;\n    {%- if horner %}\n    // HORNER: the value table holds power-basis coefficients in t; w and dw/dt by one dual Horner pass per weight.\n    const bool inside = {{ \"(stage_f & 1u) != 0u\" if stage_edges else \"r < r_max\" }};\n    const scalar_t sc = {{ \"sx_inv\" if spline else \"scales[piece]\" }};\n    {%- if estrin %}\n    // ESTRIN: the powers of t shared by every weight of the edge.\n    const scalar_t t2 = t * t, t4 = t2 * t2, two_t = t + t, four_t = two_t + two_t;\n    {%- endif %}\n    {%- else %}\n    scalar_t cheb[PADDED_TERMS];\n    cheb[0] = scalar_t(1);\n    if (PADDED_TERMS > 1) cheb[1] = t;\n    #pragma unroll\n    for (int k = 2; k < PADDED_TERMS; ++k) cheb[k] = scalar_t(2) * t * cheb[k - 1] - cheb[k - 2];\n    {%- endif %}\n    {%- if table_w and not horner %}\n    // TABLE_W: w from the value series (zero at or beyond the cutoff) and its r-derivative T_k'(x) * scale,\n    // T_k' = k U_(k-1).\n    const bool inside = r < r_max;\n    scalar_t dcheb[TERMS];\n    {\n        const scalar_t sc = scales[piece];\n        scalar_t um1 = scalar_t(0), u = scalar_t(1);  // U_(k-2), U_(k-1)\n        dcheb[0] = scalar_t(0);\n        #pragma unroll\n        for (int k = 1; k < TERMS; ++k) {\n            dcheb[k] = scalar_t(k) * u * sc;\n            const scalar_t un = scalar_t(2) * t * u - um1;\n            um1 = u;\n            u = un;\n        }\n    }\n    {%- endif %}\n\n    {%- if skip_outside %}\n    if (!inside) {  // SKIP_OUTSIDE: w = 0 at and beyond the cutoff (the padding edges): zeros, no channel loop\n        {%- if edge_force %}\n        if (lane < 3) dsh[e * 3 + lane] = scalar_t(0);  // EDGE_FORCE: dL/dv[e]\n        {%- else %}\n        for (int c = lane; c < EDGE_DIM; c += LOGICAL_GROUP_SIZE) dsh[e * EDGE_DIM + c] = scalar_t(0);\n        {%- endif %}\n        if (lane == 0) dr[e] = scalar_t(0);\n        {{ \"continue\" if stage_dout else \"return\" }};\n    }\n    {%- endif %}\n    acc_t edge_gradient[EDGE_DIM] = {acc_t(0)};\n    acc_t radial_gradient = acc_t(0);\n    for (int channel = lane; channel < CHANNEL_DIM;\n         channel += LOGICAL_GROUP_SIZE) {\n        {%- for slot in schedule.input_gradient_slots %}\n            acc_t {{ slot.name }} = acc_t(0);\n        {%- endfor %}\n        {%- if stage_quads %}\n        float4 {% for quad in stage_quads %}sq{{ loop.index0 }}{{ \", \" if not loop.last else \";\" }}{% endfor %}\n        {%- endif %}\n\n        {% for path in schedule.paths %}\n            {%- set path_index = loop.index0 %}\n            {% for edge_channel in range(path.edge_mul) %} {\n                const int weight_index =\n                    {{ path.weight_start + edge_channel * schedule.channels }} + channel;\n                const int64_t radial_weight_index = weight_base + weight_index;\n                {%- if table_w %}\n                scalar_t gv[PADDED_TERMS];\n                if ({{ \"true\" if skip_outside else \"inside\" }}) {\n                    {%- if table_pairs %}\n                    // TABLE_PAIRS: term pair k of weight q at (k * WEIGHT_DIM + q) float2s.\n                    const {{ vector_type }}* gq = reinterpret_cast<const {{ vector_type }}*>(g) + weight_index;\n                    {%- else %}\n                    const {{ vector_type }}* gq =\n                        reinterpret_cast<const {{ vector_type }}*>(g + weight_index * PADDED_TERMS);\n                    {%- endif %}\n                    #pragma unroll\n                    for (int k = 0; k < PADDED_TERMS / {{ slope_vector }}; ++k) {\n                        const {{ vector_type }} v = __ldg(gq + {{ \"k * WEIGHT_DIM\" if table_pairs else \"k\" }});\n                        {%- for component in \"xyzw\"[:slope_vector] %}\n                        gv[{{ slope_vector }} * k + {{ loop.index0 }}] = v.{{ component }};\n                        {%- endfor %}\n                    }\n                } else {\n                    #pragma unroll\n                    for (int k = 0; k < PADDED_TERMS; ++k) gv[k] = scalar_t(0);\n                }\n                {%- if horner and estrin %}\n                // ESTRIN: w = (g0 + g1 t) + t^2 (g2 + g3 t) + t^4 (g4 + g5 t);\n                // dw/dt = (g1 + 2 g2 t) + t^2 (3 g3 + 4 g4 t) + t^4 (5 g5).\n                const scalar_t radial_weight =\n                    fmaf(fmaf(fmaf(gv[5], t, gv[4]), t2, fmaf(gv[3], t, gv[2])), t2, fmaf(gv[1], t, gv[0]));\n                const scalar_t radial_dt =\n                    fmaf(fmaf(gv[5] * scalar_t(5), t2, fmaf(gv[4], four_t, gv[3] * scalar_t(3))), t2,\n                         fmaf(gv[2], two_t, gv[1]));\n                {%- elif horner %}\n                scalar_t radial_weight = gv[TERMS - 1];\n                scalar_t radial_dt = scalar_t(0);\n                #pragma unroll\n                for (int k = TERMS - 2; k >= 0; --k) {\n                    radial_dt = radial_dt * t + radial_weight;\n                    radial_weight = radial_weight * t + gv[k];\n                }\n                {%- else %}\n                scalar_t radial_weight = scalar_t(0);\n                #pragma unroll\n                for (int k = 0; k < TERMS; ++k) radial_weight += cheb[k] * gv[k];\n                {%- endif %}\n                {%- else %}\n                const scalar_t radial_weight = {{ \"__ldcs(weights + radial_weight_index)\" if stream_w\n                                                  else \"weights[radial_weight_index]\" }};\n                {%- endif %}\n                acc_t weight_gradient = acc_t(0);\n                {%- if factored %}\n                // FACTORED: per path u_i = sum c g_o y_j and v_j = sum c g_o x_i, then the weight gradient\n                // sum_i x_i u_i, dx_i += w u_i and dsh_j += w v_j (the same sums, regrouped).\n                {%- set scalar_path = scalar_paths and path.input_irrep_dim == 1\n                                      and (factored[path_index].alpha == 1.0 or fold_alpha) %}\n                {%- for i in factored[path_index].inputs %}\n                acc_t u_{{ i }} = acc_t(0);\n                {%- endfor %}\n                {%- if scalar_path %}\n                // SCALAR_PATHS: an l1 = 0 path's edge gradient w x0 c g_o added per term, without v_j.\n                const scalar_t weighted_input =\n                    radial_weight * x[input_base + {{ node_offset(path.input_start, 0, path.input_irrep_dim) }}];\n                {%- else %}\n                {%- for j in factored[path_index].edges %}\n                acc_t v_{{ j }} = acc_t(0);\n                {%- endfor %}\n                {%- endif %}\n                {%- endif %}\n\n                {% for output in path.outputs %} {\n                    {%- set slot = output.accumulator %}\n                    {%- if stage_quads %}\n                    {%- set qk = quad_of[slot.name] %}\n                    {%- if qk[1] == 0 and edge_channel == 0 %}\n                    sq{{ qk[0] }} = reinterpret_cast<const float4*>(stage_row)[{{ qk[0] * schedule.channels }} + channel];\n                    {%- endif %}\n                    const scalar_t output_gradient = sq{{ qk[0] }}.{{ \"xyzw\"[qk[1]] }};\n                    {%- elif blocks and stage_dout %}\n                    {%- set bk = blocks[slot.start] %}\n                    const scalar_t output_gradient = stage_row[{{ stage_offsets[bk[0]] }}\n                        + {{ bk[2] + slot.component * bk[3] }} + channel];\n                    {%- elif stage_dout %}\n                    const scalar_t output_gradient =\n                        stage_row[{{ node_offset(slot.start, slot.component, slot.irrep_dim) }}];\n                    {%- elif blocks %}\n                    {%- set bk = blocks[slot.start] %}\n                    {%- if block_ldg %}\n                    const scalar_t output_gradient = __ldg(dout{{ bk[0] }} + int64_t(receiver) * {{ bk[1] }}\n                        + {{ bk[2] + slot.component * bk[3] }} + channel);\n                    {%- else %}\n                    const scalar_t output_gradient = dout{{ bk[0] }}[int64_t(receiver) * {{ bk[1] }}\n                        + {{ bk[2] + slot.component * bk[3] }} + channel];\n                    {%- endif %}\n                    {%- else %}\n                    const int64_t output_index =\n                        output_base + {{ node_offset(slot.start, slot.component, slot.irrep_dim) }};\n                    const scalar_t output_gradient = dout[output_index];\n                    {%- endif %}\n\n                    {%- if factored %}\n                    {%- for term in output.terms %} {\n                        const scalar_t input_value =\n                            x[input_base\n                              + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }}];\n                        {%- if stage_sh %}\n                        const scalar_t edge_value =\n                            sh_edge[{{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];\n                        {%- else %}\n                        const scalar_t edge_value =\n                            sh[edge_base\n                               + {{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}];\n                        {%- endif %}\n                        {%- set fp = factored[path_index] %}\n                        {%- set ratio = term.coefficient / fp.alpha %}\n                        {%- set op = \"-=\" if fp.alpha != 1.0 and ratio < 0 else \"+=\" %}\n                        {%- set ratio = ratio | abs if fp.alpha != 1.0 else ratio %}\n                        {%- if (ratio - 1.0) | abs < 1e-12 %}\n                        const scalar_t scaled = output_gradient;\n                        {%- else %}\n                        const scalar_t scaled = output_gradient * {{ cpp_scalar_literal(ratio, scalar) }};\n                        {%- endif %}\n                        u_{{ term.input_component }} {{ op }} scaled * edge_value;\n                        {%- if scalar_path %}\n                        edge_gradient[{{ path.edge_start + term.edge_component + edge_channel * path.edge_irrep_dim }}]\n                            += weighted_input * scaled;\n                        {%- else %}\n                        v_{{ term.edge_component }} {{ op }} scaled * input_value;\n                        {%- endif %}\n                    } {%- endfor %}\n                    {%- else %}\n                    {% for term in output.terms %} {\n                        const int64_t input_index = input_base\n                            + {{ node_offset(path.input_start, term.input_component, path.input_irrep_dim) }};\n                        const int edge_component_index =\n                            {{ path.edge_start + term.edge_component }}\n                            + {{ edge_channel }} * {{ path.edge_irrep_dim }};\n\n                        const int64_t edge_index = edge_base + edge_component_index;\n                        const scalar_t input_value = x[input_index];\n                        const scalar_t edge_value = {{ \"sh_edge[edge_component_index]\" if stage_sh\n                                                       else \"sh[edge_index]\" }};\n\n                        weight_gradient += output_gradient * input_value\n                            * edge_value * {{ cpp_scalar_literal(term.coefficient, scalar) }};\n                        {{ term.input_accumulator.name }} += output_gradient\n                            * radial_weight * edge_value * {{ cpp_scalar_literal(term.coefficient, scalar) }};\n                        edge_gradient[edge_component_index] +=\n                            output_gradient * radial_weight * input_value\n                            * {{ cpp_scalar_literal(term.coefficient, scalar) }};\n                    } {%- endfor %}\n                    {%- endif %}\n                } {%- endfor %}\n                {%- if factored %}\n                {%- set alpha = 1.0 if fold_alpha else factored[path_index].alpha %}\n                {%- if alpha != 1.0 %}\n                // The path's common coefficient magnitude, applied once (FACTORED_SCALE).\n                const scalar_t alpha = {{ cpp_scalar_literal(alpha, scalar) }};\n                const scalar_t scaled_weight = radial_weight * alpha;\n                {%- else %}\n                const scalar_t scaled_weight = radial_weight;\n                {%- endif %}\n                {%- for i, slot in factored[path_index].inputs.items() %}\n                weight_gradient +=\n                    x[input_base + {{ node_offset(path.input_start, i, path.input_irrep_dim) }}] * u_{{ i }};\n                {{ slot }} += scaled_weight * u_{{ i }};\n                {%- endfor %}\n                {%- if alpha != 1.0 %}\n                weight_gradient *= alpha;\n                {%- endif %}\n                {%- if not scalar_path %}\n                {%- for j in factored[path_index].edges %}\n                edge_gradient[{{ path.edge_start + j + edge_channel * path.edge_irrep_dim }}] +=\n                    scaled_weight * v_{{ j }};\n                {%- endfor %}\n                {%- endif %}\n                {%- endif %}\n                if (sloped) {\n                    acc_t slope = acc_t(0);\n                    {%- if horner %}\n                    slope = {{ \"radial_dt\" if hoist_scale else \"radial_dt * sc\" }};\n                    {%- elif table_w %}\n                    #pragma unroll\n                    for (int k = 1; k < TERMS; ++k) slope += dcheb[k] * gv[k];\n                    {%- elif slope_vector %}\n                    const {{ vector_type }}* gq =\n                        reinterpret_cast<const {{ vector_type }}*>(g + weight_index * PADDED_TERMS);\n                    #pragma unroll\n                    for (int k = 0; k < PADDED_TERMS / {{ slope_vector }}; ++k) {\n                        const {{ vector_type }} v = __ldg(gq + k);\n                        {%- for component in \"xyzw\"[:slope_vector] %}\n                        slope += cheb[{{ slope_vector }} * k + {{ loop.index0 }}] * v.{{ component }};\n                        {%- endfor %}\n                    }\n                    {%- else %}\n                    #pragma unroll\n                    for (int k = 0; k < TERMS; ++k)\n                        slope += cheb[k] * __ldg(g + k * WEIGHT_DIM + weight_index);\n                    {%- endif %}\n                    radial_gradient += weight_gradient * slope;\n                }\n            } {%- endfor %}\n        {%- endfor %}\n\n        {%- for slot in schedule.input_gradient_slots %}\n            {{ atomic_add }}(\n                dx + input_base + {{ node_offset(slot.start, slot.component, slot.irrep_dim) }},\n                scalar_t({{ slot.name }}));\n        {%- endfor %}\n    }\n    {%- if hoist_scale %}\n    radial_gradient *= sc;  // HOIST_SCALE: the piece scale once per edge\n    {%- endif %}\n\n    {%- if redux %}\n    // REDUX: each component's 32 partials summed in fixed point (redux.sync); lane 0 writes dsh[e, :] and dr[e].\n    {%- if edge_force %}\n    float edge_sum[EDGE_DIM];\n    {%- endif %}\n    #pragma unroll\n    for (int component = 0; component <= EDGE_DIM; ++component) {\n        const float v = float(component < EDGE_DIM ? edge_gradient[component] : radial_gradient);\n        unsigned ex = __reduce_max_sync(FULL_MASK, __float_as_uint(fabsf(v)) >> 23);\n        const bool finite = ex < 255u;\n        ex = ex < 30u ? 30u : (finite ? ex : 254u);\n        const float scale = __uint_as_float((278u - ex) << 23), inverse = __uint_as_float((ex - 24u) << 23);\n        const int total = __reduce_add_sync(FULL_MASK, finite ? __float2int_rn(v * scale) : 0);\n        {%- if edge_force %}\n        const float sum = finite ? float(total) * inverse : __int_as_float(0x7fffffff);\n        if (component < EDGE_DIM) edge_sum[component] = sum;\n        else if (lane == 0) dr[e] = scalar_t(sum);\n        {%- else %}\n        if (lane == 0) {\n            const float sum = finite ? float(total) * inverse : __int_as_float(0x7fffffff);\n            if (component < EDGE_DIM) dsh[edge_base + component] = scalar_t(sum);\n            else dr[e] = scalar_t(sum);\n        }\n        {%- endif %}\n    }\n    {%- if edge_force %}\n    if (lane == 0) {{ edge_force_store(\"edge_sum\") }}\n    {%- endif %}\n    {%- elif butterfly %}\n    // BUTTERFLY: reduce-scatter the edge gradient; lane c << SHIFT writes dsh[e, c], lane 0 dr[e].\n    constexpr int SHIFT = {{ 5 - butterfly_steps }};\n    #pragma unroll\n    for (int step = 0; step < {{ butterfly_steps }}; ++step) {\n        const int half = (EDGE_DIM / 2) >> step, offset = 16 >> step;\n        const bool upper = (lane & offset) != 0;\n        #pragma unroll\n        for (int i = 0; i < EDGE_DIM / 2; ++i) {\n            if (i < half) {\n                const acc_t send = upper ? edge_gradient[i] : edge_gradient[i + half];\n                const acc_t keep = upper ? edge_gradient[i + half] : edge_gradient[i];\n                edge_gradient[i] = keep + __shfl_xor_sync(FULL_MASK, send, offset, 32);\n            }\n        }\n    }\n    #pragma unroll\n    for (int offset = (1 << SHIFT) >> 1; offset > 0; offset >>= 1)\n        edge_gradient[0] += __shfl_xor_sync(FULL_MASK, edge_gradient[0], offset, 32);\n    #pragma unroll\n    for (int offset = 16; offset > 0; offset >>= 1)\n        radial_gradient += __shfl_xor_sync(FULL_MASK, radial_gradient, offset, 32);\n    {%- if edge_force %}\n    float edge_sum[EDGE_DIM];\n    #pragma unroll\n    for (int c = 0; c < EDGE_DIM; ++c) edge_sum[c] = __shfl_sync(FULL_MASK, edge_gradient[0], c << SHIFT, 32);\n    if (lane == 0) {{ edge_force_store(\"edge_sum\") }}\n    {%- else %}\n    if ((lane & ((1 << SHIFT) - 1)) == 0) dsh[edge_base + (lane >> SHIFT)] = scalar_t(edge_gradient[0]);\n    {%- endif %}\n    if (lane == 0) dr[e] = scalar_t(radial_gradient);\n    {%- else %}\n    // Reduce within the logical 32-thread edge owner. Lane 0 writes dsh[e, :] and dr[e].\n    for (int offset = 16; offset > 0; offset >>= 1) {\n        for (int component = 0; component < EDGE_DIM; ++component)\n            edge_gradient[component] +=\n                {{ shfl_down_width(\"edge_gradient[component]\", \"offset\") }};\n        radial_gradient += {{ shfl_down_width(\"radial_gradient\", \"offset\") }};\n    }\n\n    if (lane == 0) {\n        {%- if edge_force %}\n        {{ edge_force_store(\"edge_gradient\") }}\n        {%- else %}\n        for (int component = 0; component < EDGE_DIM; ++component)\n            dsh[edge_base + component] = scalar_t(edge_gradient[component]);\n        {%- endif %}\n        dr[e] = scalar_t(radial_gradient);\n    }\n    {%- endif %}\n{%- if stage_dout %}\n    }  // STAGE_DOUT: the run's edges\n    __syncthreads();  // every warp is done with the row before the next copy\n    stage_s = stage_t1;\n    }  // STAGE_DOUT: the runs\n{%- endif %}\n}\n"
+   },
+   "resolved": {
+    "spline_vector_default": 2,
+    "block_message_default": true,
+    "block_ldg_default": false,
+    "factored_default": true,
+    "horner_default": true,
+    "scalar_paths_default": false,
+    "table_pairs_default": false,
+    "hoist_scale_default": false,
+    "fold_alpha_default": false,
+    "estrin_default": false,
+    "stage_dout_default": true,
+    "stage_sh_default": true,
+    "stage_edges_default": true,
+    "skip_outside_default": false,
+    "hoist_dx_default": false,
+    "channel_vector_default": 0,
+    "edge_force_default": false,
+    "stage_quads_default": false,
+    "redux_default": false,
+    "butterfly_default": true,
+    "max_registers_default": 0
+   }
+  },
+  "fastmace.kernels.oeq_streaming.fused_forward": {
+   "constants": {
+    "BATCH": 8,
+    "RECEIVERS_PER_CHUNK": 2,
+    "TAIL_EDGES": 64,
+    "W_TILE_REGISTERS": 40,
+    "MAX_WARPS": 12,
+    "MIN_WARPS": 4,
+    "CHANNEL_BLOCK": 32,
+    "BLOCKS_PER_SM": 2,
+    "SKIP_ZERO_COLUMN": null,
+    "SKIP_ZERO_COLUMN_GPUS": [
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA A100 80GB PCIe",
+     "NVIDIA H200"
+    ],
+    "STREAM_STORE_W": false,
+    "TENSOR_CORES": null,
+    "TENSOR_CORES_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA A100 80GB PCIe",
+     "NVIDIA H200"
+    ],
+    "TC_STRIDE": 40,
+    "TC_PRESPLIT": false,
+    "TC_PSTRIDE": 36,
+    "TC_RSTRIDE": 36,
+    "PREFETCH": null,
+    "PREFETCH_GPUS": [],
+    "VEC_SH": null,
+    "VEC_SH_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA GeForce RTX 5060 Ti",
+     "NVIDIA H200"
+    ],
+    "VEC_A": null,
+    "VEC_A_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "DEGREE_PARTS": null,
+    "DEGREE_PARTS_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "TC_WFRAG": null,
+    "TC_WFRAG_SPLIT": null,
+    "LANE_INDICES": null,
+    "W_GROUP": null,
+    "WFRAG_REGION": null,
+    "A_SPLIT": null,
+    "X_LATE": null,
+    "K_PIPE": null,
+    "CG_FOLD": null,
+    "A_LD128": null,
+    "TP_NOFLUSH": null,
+    "WS_FORWARD": null,
+    "WS_FORWARD_GPUS": [
+     "NVIDIA H200"
+    ],
+    "TC_TP": null,
+    "TC_TP_SPLIT": "round",
+    "TC_TP_GPUS": [],
+    "TC_WFRAG_SPLIT_GPUS": [],
+    "LANE_INDICES_GPUS": [
+     "NVIDIA H200"
+    ],
+    "W_GROUP_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "WFRAG_REGION_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "A_SPLIT_GPUS": [],
+    "X_LATE_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "K_PIPE_GPUS": [],
+    "CG_FOLD_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "A_LD128_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "TP_NOFLUSH_GPUS": [
+     "NVIDIA A100-SXM4-80GB"
+    ],
+    "TC_WFRAG_GPUS": [
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "WGMMA": null,
+    "WGMMA_GPUS": [],
+    "WGMMA_EDGES": 16,
+    "WGMMA_WARPS": 8,
+    "WGMMA_BLOCKS_PER_SM": 1,
+    "WGMMA_PIPELINED": false,
+    "SH_LDS4": null,
+    "SH_LDS4_GPUS": [
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "W_GROUP_HELPERS": "// W_GROUP: a warp pair's named barrier (64 threads) and its vote (bar.red.or: any lane's pred).\n__device__ __forceinline__ void group_sync(int barrier) {\n    asm volatile(\"bar.sync %0, 64;\" :: \"r\"(barrier) : \"memory\");\n}\n__device__ __forceinline__ int group_any(int pred, int barrier) {\n    int any;\n    asm volatile(\"{\\n.reg .pred p, q;\\nsetp.ne.b32 q, %1, 0;\\nbar.red.or.pred p, %2, 64, q;\\n\"\n                 \"selp.b32 %0, 1, 0, p;\\n}\\n\" : \"=r\"(any) : \"r\"(pred), \"r\"(barrier) : \"memory\");\n    return any;\n}\n",
+    "TC_SPLIT": "mask",
+    "TC_HELPERS": "// 3xTF32: x = hi + lo, both TF32 (TC_SPLIT); a product keeps hi*hi + hi*lo + lo*hi.\n__device__ __forceinline__ void split_tf32(float x, unsigned& hi, unsigned& lo) {\n    // split\n}\n__device__ __forceinline__ void mma_tf32(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {\n    asm volatile(\"mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, \"\n                 \"{%8, %9}, {%0, %1, %2, %3};\"\n                 : \"+f\"(d[0]), \"+f\"(d[1]), \"+f\"(d[2]), \"+f\"(d[3])\n                 : \"r\"(a[0]), \"r\"(a[1]), \"r\"(a[2]), \"r\"(a[3]), \"r\"(b[0]), \"r\"(b[1]));\n}\n",
+    "TC_FP16_HELPERS": "// 3xFP16 (tc=\"fp16\"): x = big + 2^-11 small, both FP16 (rounded to nearest); low k packed first.\n__device__ __forceinline__ void split_f16x2(float x0, float x1, unsigned& hi, unsigned& lo) {\n    asm(\"cvt.rn.f16x2.f32 %0, %1, %2;\" : \"=r\"(hi) : \"f\"(x1), \"f\"(x0));\n    float b0, b1;\n    asm(\"{.reg .b16 l, u; mov.b32 {l, u}, %2; cvt.f32.f16 %0, l; cvt.f32.f16 %1, u;}\"\n        : \"=f\"(b0), \"=f\"(b1) : \"r\"(hi));\n    asm(\"cvt.rn.f16x2.f32 %0, %1, %2;\" : \"=r\"(lo) : \"f\"((x1 - b1) * 2048.f), \"f\"((x0 - b0) * 2048.f));\n}\n__device__ __forceinline__ void mma_f16(float (&d)[4], const unsigned (&a)[4], const unsigned (&b)[2]) {\n    asm volatile(\"mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 {%0, %1, %2, %3}, {%4, %5, %6, %7}, \"\n                 \"{%8, %9}, {%0, %1, %2, %3};\"\n                 : \"+f\"(d[0]), \"+f\"(d[1]), \"+f\"(d[2]), \"+f\"(d[3])\n                 : \"r\"(a[0]), \"r\"(a[1]), \"r\"(a[2]), \"r\"(a[3]), \"r\"(b[0]), \"r\"(b[1]));\n}\n// The power of two that maps a largest magnitude m into [2^13, 2^14) (1 for m = 0).\n__device__ __forceinline__ float fp16_scale(float m) {\n    if (!(m > 0.f)) return 1.f;\n    int e;\n    frexpf(m, &e);\n    int s = 14 - e;\n    s = s < -126 ? -126 : (s > 127 ? 127 : s);\n    return __int_as_float((127 + s) << 23);\n}\n",
+    "CP_ASYNC_HELPERS": "// PREFETCH: 4-byte cp.async global -> shared, zero-filled when bytes = 0 (src then unread).\n__device__ __forceinline__ void cp_async4(float* dst, const float* src, int bytes) {\n    const unsigned d = (unsigned)__cvta_generic_to_shared(dst);\n    asm volatile(\"cp.async.ca.shared.global [%0], [%1], 4, %2;\\n\" :: \"r\"(d), \"l\"(src), \"r\"(bytes) : \"memory\");\n}\n__device__ __forceinline__ void cp_async_commit() { asm volatile(\"cp.async.commit_group;\\n\" ::: \"memory\"); }\n__device__ __forceinline__ void cp_async_wait1() { asm volatile(\"cp.async.wait_group 1;\\n\" ::: \"memory\"); }\n__device__ __forceinline__ void cp_async_wait0() { asm volatile(\"cp.async.wait_group 0;\\n\" ::: \"memory\"); }\n",
+    "AW_LINE": "\nconstexpr int AW = KP + 4;  // wgmma: a's staging row stride"
+   },
+   "resolved": {}
+  },
+  "fastmace.rewrites.radial": {
+   "constants": {
+    "MACE_VERSIONS": ">=0.3.16,<0.3.17",
+    "R_LO": 0.3,
+    "R_PHYSICAL": 1.0,
+    "DEGREE": 5,
+    "INITIAL_PIECES": 8,
+    "MAX_DEPTH": 9,
+    "TOLERANCE": 1e-07,
+    "FLOOR": 1e-06,
+    "DEGREE_64": 16,
+    "TOLERANCE_64": 3e-13,
+    "FLOOR_64": 0.1,
+    "CERTIFY_BOUND_64": 1e-12,
+    "R_LO_64": 0.25,
+    "PIECE_BUCKET": 16,
+    "SYMMETRIC_PAIRS": null,
+    "SYMMETRIC_PAIRS_GPUS": [
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA H200"
+    ],
+    "CERTIFY_POINTS": 6000,
+    "FIXED_SPECIES_SUPERSET": "fixed_species_superset",
+    "CACHE_KIND": "radial-tables",
+    "CACHE_FORMAT": 1,
+    "TABLE_TENSORS": [
+     "coef",
+     "dcoef",
+     "starts",
+     "scales",
+     "bins"
+    ],
+    "TABLE_SCALARS": [
+     "r_lo",
+     "bin_scale",
+     "r_max",
+     "fit_error"
+    ],
+    "W_TABLE_MAX_BYTES": 2147483648,
+    "RECOMPUTE_CHECK_ROWS": 256,
+    "RECOMPUTE_KERNEL": "rebuild"
+   },
+   "resolved": {
+    "symmetric_pairs_default": true
+   }
+  },
+  "fastmace.rewrites.radial.spline": {
+   "constants": {
+    "BAND_EDGES": [
+     0.5,
+     0.75,
+     1.0,
+     1.5,
+     2.0,
+     2.5
+    ],
+    "BASE_INTERVALS": 255,
+    "TARGET": 0.5,
+    "ROUNDS": 8,
+    "SPLINE_FORMAT": 1,
+    "CACHE_KIND": "radial-tables"
+   },
+   "resolved": {}
+  },
+  "fastmace.neighbors.skin": {
+   "constants": {
+    "DEFAULT_SKIN_A": 0.3,
+    "ASYNC_EARLY_BUILD": false,
+    "OVERFLOW_DISPLACEMENT_A": 1000000.0,
+    "BUILD_CHUNK": 262144,
+    "SORT_KEYS_ONLY": true,
+    "EDGE_INDEX_INT32": null,
+    "COMPACT_CHUNK": 4194304,
+    "SORT_BY_LENGTH": null,
+    "SORT_BY_LENGTH_GPUS": [
+     "NVIDIA H200",
+     "NVIDIA A100-SXM4-80GB",
+     "NVIDIA A100 80GB PCIe",
+     "NVIDIA RTX 4000 Ada Generation",
+     "NVIDIA GeForce RTX 5060 Ti"
+    ],
+    "LENGTH_BINS": 4096,
+    "MAX_CPU_CELL_LIST_BINS": 134217728
+   },
+   "resolved": {
+    "sort_by_length_default": true
+   }
+  }
+ },
+ "wprime_attached": [
+  {
+   "spline": {
+    "grid": [
+     [
+      0.3,
+      0.5,
+      157
+     ],
+     [
+      0.5,
+      0.75,
+      112
+     ],
+     [
+      0.75,
+      1.0,
+      87
+     ],
+     [
+      1.0,
+      1.5,
+      124
+     ],
+     [
+      1.5,
+      2.0,
+      54
+     ],
+     [
+      2.0,
+      2.5,
+      31
+     ],
+     [
+      2.5,
+      6.0,
+      166
+     ]
+    ],
+    "r_max": 6.0,
+    "r_lo": 0.3,
+    "certificate": 0.4829565241814643
+   },
+   "spline_packed": false,
+   "spline_block": true,
+   "forward_packed8": false,
+   "forward_shared_locator": false,
+   "table_w": true,
+   "horner": true
+  }
+ ],
+ "environment": {
+  "CUDA_CACHE_DISABLE": "1",
+  "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto/inductor",
+  "FASTMACE_HYBRID_PYTHON": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "FASTMACE_SOURCE_COMMIT": "53add60119be811ec6761f331a59df29ae9ef505",
+  "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/ResearchModule",
+  "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto/triton",
+  "TORCHINDUCTOR_COMPILE_THREADS": "4",
+  "FASTMACE_CACHE": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto",
+  "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+  "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+  "CUDA_HOME": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto/oeq/cuda-runtime",
+  "CUDA_PATH": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto/oeq/cuda-runtime",
+  "PYTORCH_NVCC": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto/oeq/cuda-runtime/bin/nvcc",
+  "TORCH_EXTENSIONS_DIR": "/mnt/homes/zwingel/fm-paper-exp1/cache-leto/oeq/torch-extensions-6rhigp0d",
+  "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": "1",
+  "TORCHINDUCTOR_FX_GRAPH_CACHE": "1",
+  "TORCHINDUCTOR_AUTOGRAD_CACHE": "1"
+ },
+ "plan": {
+  "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Ti Sr  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 608.615 K  (MD only: phase 1a's skin and headroom; rule 11 would give skin 0.8 A, headroom 1.18 (fastest of 5000 atoms at 608.615 K, lightest mass 15.999 u, 1 fs: 0.0249 A per step, 16 steps per rebuild) (it applies to MC and species-change workloads))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (no species changes: species-dependent rewrites are built for the superset (SPEC \u00a79.3 rule 8))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (5000 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (auto: OpenEquivariance builds and the process allows it (SPEC \u00a79.4))\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = off  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.fold_cutoff = off  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.density_first = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok (GENERIC_REASSOCIATE)))\n  RewriteConfig.joint_radial_input = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = off  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok (GENERIC_REASSOCIATE)))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.chunked_conv_backward = on  (auto (on_with_streaming_conv_and_fused_folded_backward): stage 1: on (with streaming_conv and fused_folded_backward); stage 2: supported (ok (generic folded path)); stage 2: on, generic model on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.fused_folded_forward = on  (auto (on_for_mh1_float32_unless_reproducible_and_for_omat0_with_wprime_on_decision_66_gpus): stage 1: on (with chunked_conv_backward); stage 2: supported (ok (generic folded path)); stage 2: on with wprime_backward, omat0-medium on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.radial_tables = on  (auto (on_with_fold_cutoff_unless_reproducible): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, generic radial tables on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.w_tables = off  (auto (on_for_mh1_float64_on_measured_gpus_decision_65): stage 1: on (with fold_cutoff); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.wprime_backward = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with fold_cutoff); stage 2: supported (ok (generic radial tables)); stage 2: on, omat0-medium (generic) on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.recompute_conv_weights = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_without_it): off: on only when memory would not be enough without it: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (CAP-T07))\n  RewriteConfig.recompute_first_table = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights): off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (rebuild-a))\n  RewriteConfig.recompute_first_layer = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_first_table): off: on only when memory would not be enough with recompute_first_table on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (results/rung-b-20261109))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = off  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.segment_gemm = off  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.gate_epilogue = off  (auto (on_with_segment_gemm_for_mh1_on_decision_66_gpus): stage 1: on (with segment_gemm); stage 2: off, not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.recompute_node_segments = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_conv_weights): off: on only when memory would not be enough with recompute_conv_weights on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (CAP-T08))\n  RewriteConfig.recompute_node_region = off  (auto (on_by_rule_12_when_the_plan_does_not_fit_with_recompute_node_segments): off: on only when memory would not be enough with recompute_node_segments on: rule 12 for a cell that cannot fit, or a rebuild after an out-of-memory error at build or capture (ninth list item 2))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: off, tf32x3_gemms reroutes the block products)\n  RewriteConfig.species_skip = on  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = off  (auto (on_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)))\n  RewriteConfig.fold_readout_tail = off  (auto (on_with_block_linear_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: off, not supported by the model (the last interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',) (its skip_tp is element-dependent)))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables (generic: species_skip)); stage 2: supported (ok (generic: no skip term in the first product)); stage 2: on, generic fold on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.species_residual = off  (auto (never_automatic): off: only an explicit 'on' enables it (fp32 profile, opt-in))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.save_transcendentals = off  (auto (on_for_mh1_float64_on_measured_gpus_decision_65): transcendental ops saved for the backward, not recomputed (ideas-20261027 D3); off: float32 plan, decision 65)\n  RewriteConfig.tf32x3_gemms = on  (auto (on_for_mh1_and_omat0_float32_unless_reproducible_on_decision_66_gpus): stage 1: on (with block_linear); stage 2: on, omat0-medium on a measured GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  EngineConfig.fp64_emulation = off  (auto (on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible): float32 plan: no float64 matrix products)\n  EngineConfig.fp64_emulation_mantissa_bits = dynamic  (auto (dynamic_decision_65_d1_suspended_after_recapture_defect): no effect: fp64_emulation is off)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.cueq_projected = off  (auto (on_with_tf32x3_gemms_on_listed_gpus_unless_model_excluded_decision_66): not a listed GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.sc_generated = on  (auto (on_with_tf32x3_gemms_on_listed_gpus_decision_66): with tf32x3_gemms on a listed GPU, decision 66 (NVIDIA RTX 4000 Ada Generation))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = NVE  (NVE, fixcm=True (fastmace.integrators, scheme 'nve'))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  EngineConfig.force_graphs = fit  (auto (fit_when_capturing_on_cuda_else_keep): CUDA graphs: one force graph when the next padded size would not fit the free memory (CAP-T01))\n  EngineConfig.memory_probe = near-limit  (auto (near_limit_for_md_on_cuda): MD with CUDA graphs: rule 12's ambiguous memory choices are measured on a replica)\n  NeighbourConfig.edge_index_int32 = on  (auto (on_for_decision_66_gpus): gate and A/B passed on this GPU)\n  NeighbourConfig.skin = 0.3 A  (auto (rule_11_skin_from_workload): phase 1a's skin: rule 11 sizes only MC and species-change workloads; rule 11 would give 0.8 A)\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.15 and edge_bucket_fraction as given; rule 11 would give 1.18)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04))\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): the force precision: no MC moves, no MC energies)\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 0.96 GiB (run; run 0.96, build 0.23) at 390225 edges, 5000 atoms, float32 (activations 5562 MiB, workspace 160 MiB, weights (pristine and execution copy) 69 MiB); needs 0.96 of 19.38 GiB free)\n  requested: PrecisionConfig.dtype=float32",
+  "enabled": [
+   "reassociate_first",
+   "fused_folded_backward",
+   "segmented_first_sum",
+   "streaming_conv",
+   "chunked_conv_backward",
+   "fused_folded_forward",
+   "radial_tables",
+   "wprime_backward",
+   "block_linear",
+   "grouped_linear",
+   "merged_residual",
+   "species_skip",
+   "single_graph_strain",
+   "fold_product_linear",
+   "tf32x3_gemms",
+   "sort_receivers",
+   "gpu_neighbour_list"
+  ],
+  "auto_options_off": {
+   "density_first": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "joint_radial_input": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "gated_rows": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "segment_gemm": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "gate_epilogue": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "folded_backward_tiles": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "species_tables": "the first interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "fold_readout_tail": "the last interaction is not ('RealAgnosticResidualNonLinearInteractionBlock',) (its skip_tp is element-dependent)",
+   "fold_cutoff": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "factor_species": "interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensityResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+   "grouped_launch": "tf32x3_gemms reroutes the block products",
+   "fx_e3nn_linear": "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+   "polar_graph_sums": "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+  },
+  "neighbours": {
+   "skin": 0.3,
+   "sort_receivers": "on",
+   "gpu_neighbour_list": "on",
+   "edge_multiple": 256,
+   "edge_bucket_fraction": 0.05,
+   "capacity_headroom": 1.15,
+   "headroom": "fixed",
+   "d3_skin": 1.0,
+   "edge_index_int32": "on"
+  },
+  "engine": {
+   "backend": "hybrid",
+   "compile_mode": "default",
+   "device": "cuda:0",
+   "pipelined": "on",
+   "async_output": "on",
+   "speculative_graph": false,
+   "pipeline_edge_margin": 0.0,
+   "pipeline_rebuild_fraction": 0.8,
+   "cueq_conv_fusion": "off",
+   "first_derivative_only": true,
+   "unfuse_full_addmm": true,
+   "dynamo_cache_size_limit": 64,
+   "expandable_segments": "on",
+   "fp64_emulation": "off",
+   "fp64_emulation_mantissa_bits": "dynamic",
+   "empty_cache_before_capture": true,
+   "warmup_in_graph_pool": true,
+   "dynamic_edges": true,
+   "model_template_cache": true,
+   "overlap_rebuild": true,
+   "step_graph": false,
+   "fused_integrator": true,
+   "recapture_budget": 64,
+   "graph_variant_cap": 64,
+   "force_graphs": "fit",
+   "memory_probe": "near-limit"
+  },
+  "precision": {
+   "dtype": "float32",
+   "tf32": false,
+   "float64_energy": true,
+   "mc_energy": "float32"
+  },
+  "integrator": {
+   "ensemble": "nve",
+   "scheme": "nve",
+   "dof": "fastmace",
+   "parameters": [],
+   "timestep_fs": 1.0,
+   "friction": 0.02,
+   "seed": 1,
+   "fixcm": true,
+   "fixcm_projection": "mass_weighted",
+   "noise_batch": 256,
+   "pressure_GPa": 0.0,
+   "cell_mode": "hydrostatic",
+   "barostat_tau_fs": null,
+   "barostat_mass_factor": 1.0,
+   "ase_trace_drag_all_elements": false,
+   "temperature_K": null,
+   "external_stress_GPa": null,
+   "disable_cell_langevin": false
+  }
+ },
+ "md": {
+  "mode": "nve",
+  "steps": 100000,
+  "timestep_fs": 1.0,
+  "ps": 100.0,
+  "every": 100,
+  "temperature_target_K": 300.0,
+  "setup_s": 26.072466979036108,
+  "seconds": 2048.4745164380874,
+  "ms_per_step": 20.484745164380875,
+  "neighbour_rebuilds": 13452,
+  "engine_info": {
+   "rebuilds_beside": 13452,
+   "fused_integrator": "integrator VelocityVerlet, not Langevin",
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 371642,
+   "edge_bucket": 18688,
+   "edge_sizes_used": [
+    373760
+   ],
+   "neighbour_rebuilds": 13452,
+   "graphs": [
+    "ACP",
+    "('B', 373760)"
+   ],
+   "pool_resets": 0,
+   "capture_memory": [
+    {
+     "key": "ACP",
+     "warmup_in_pool": false,
+     "max_reserved_after_warmup_MiB": 1242.0,
+     "max_reserved_after_capture_MiB": 1242.0
+    },
+    {
+     "key": "('B', 373760)",
+     "warmup_in_pool": false,
+     "max_reserved_after_warmup_MiB": 1242.0,
+     "max_reserved_after_capture_MiB": 1242.0
+    }
+   ],
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 13452,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "force_graphs": "fit",
+   "force_graph_releases": 0,
+   "force_graph_floor": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false,
+     "s": 0.043465893948450685
+    },
+    {
+     "step": 0,
+     "key": "('B', 373760)",
+     "reason": "first capture",
+     "counted": false,
+     "s": 0.12068279692903161
+    }
+   ],
+   "invalidations": [],
+   "captures": 2,
+   "capture_seconds": 0.1641486908774823,
+   "recapture_seconds": 0.0
+  },
+  "start_temperature_K": 304.36848756207564,
+  "end_temperature_K": 303.22259266173666,
+  "temperature_first_tenth_K": 302.7519723424663,
+  "temperature_last_tenth_K": 302.22383234332347,
+  "mean_temperature_K": 302.61222972821366,
+  "dof": 14997,
+  "integrator": "NVE",
+  "friction_per_fs": null,
+  "seed": 1
+ },
+ "start_state": "state /mnt/homes/zwingel/fm-paper-exp1/state-300K.npz sha256 dcf267b303be6df8c1c806e3b2f72f9cd9e5b797c5021e150c1a1d1a7a6629f8",
+ "result": {
+  "drift_meV_per_atom_per_ps": 3.966888913369626e-06,
+  "drift_se": 6.996335882395542e-07,
+  "drift_se_ar1": 9.489265947966816e-07,
+  "residual_rho1": 0.29567600810999156,
+  "rms_meV_per_atom": 0.0006389937832094766,
+  "range_meV_per_atom": 0.004592035861783472,
+  "std_meV_per_atom": 0.0006491939533211146,
+  "potential_std_meV_per_atom": 0.3132127203109113,
+  "samples": 1001,
+  "finite": true
+ },
+ "timing": {
+  "schedule": "100000 steps in runs of 100, one sample after each run",
+  "estimator": "wall clock over the whole NVE run"
+ }
+}
