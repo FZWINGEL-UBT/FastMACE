@@ -2,7 +2,7 @@
 # Colab A100 (12 Nov 2026, conductor follow-up): WEIGHTED_VECTOR against today's A100 defaults, alone and with
 # SKIP_OUTSIDE + HOIST_DX. MD-step A/B in both build orders on Benchmark_loup SrTiO3 10x10x10 and NbCl5 3x3x3
 # (ab_pack v1); then the 3-structure force/stress gate (gate_pack v1) for an entry with all four b/a under 1.
-# Run by fastmace_colab.py ($OUT set); the VM is stopped after the job.
+# Run by fastmace_colab.py or alex_weighted_ab.sh ($OUT set).
 export EXPECT_GPU=A100
 M=fastmace.kernels.oeq_streaming.wprime_backward
 skw="skip-hoist-weighted|$M:SKIP_OUTSIDE=True $M:HOIST_DX=True $M:WEIGHTED_VECTOR=True"
