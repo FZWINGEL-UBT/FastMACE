@@ -125,7 +125,12 @@ Same recipe as §6a (`jobs/ada.sh prof`: t215 `profile_point.py` with `comment_o
   route has no cat, clone or sort kernel (Inductor code), where the old route has its cat.
 - `test_compose_outside_graph.py`: the regression test above. `test_compose_skip.py`, `test_gpu_models.py`: the Ada in
   `JOINED_LAYOUT_GPUS`.
-- Targeted CPU runs on murphy (CUDA hidden): 61 + 67 passed; GPU tests 28 passed. Full suite: see SPEC entry.
+- The full GPU suite (murphy) found one defect, fixed on `ba544546`: the plan's refresh copied its column tuple to the
+  device, which a species refresh captured inside an attempt graph cannot do
+  (`test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction`). The columns now live on the device
+  from setup. The refresh is not part of the MD step, so the A/Bs and profiles above (on earlier commits) stand.
+- Targeted CPU runs on murphy (CUDA hidden): 61 + 67 passed; GPU tests 28 passed, then 45 with item 5. Full suites:
+  CPU `tests/cpu` on `ba544546` (leeloo, idle check, CUDA hidden, `-n 8 -m "not acceptance"`): 5,757 passed, 205 skipped, 0 failed. GPU `tests/gpu` (murphy, RTX 4000 Ada): 464 passed, 290 skipped, 2 xfailed, 6 failed; the same 6 fail on main `1d491a67` on the same host (template cache and tiny cueq float64 registry tests, a missing results/opt-T06-probes script, `test_subtile_products_use_simt_ieee`).
 
 ## Items 3 and 4 (not started; conductor: wait for the A100 attribution)
 

@@ -3706,4 +3706,4 @@ See `results/first-interaction-20261111/` and `tools/first_interaction_lab.py`.
 - Item 6, product 1 through SC_GENERATED / SC_FACTORED: lab bound about 10 µs (0.07 %) against today's Ada with LINEAR_DIV, under the 2 % bar; not built. Census sm_80 / sm_89 / sm_90: no spills.
 - Items 3 (the outer-sum zero-fill, needed by the atomic accumulation) and 4 (`tf32x3_gemm.py:171`; 220 → 26 µs on the Ada with CUTLASS) wait for the A100 attribution.
 - A100 and H200: items 1–2 under the work-removal rule, not measured; item 5 changes neither.
-- SUITE_RESULT See `results/step-layout-cleanup-20261112/README.md`.
+- Suite on `ba544546` (leeloo, idle check): 5,757 passed, 205 skipped, 0 failed; `tests/gpu` on the Ada: 6 failures, the same 6 as on main. See `results/step-layout-cleanup-20261112/README.md`.
