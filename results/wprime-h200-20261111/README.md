@@ -199,3 +199,7 @@ Reading:
 - All three together give 2.6-3.0 %.
 - H200: census only. weighted on top of skip+hoist saves 33 instructions per edge (-1.7 % of the kernel, about
   0.5 % of the step) at the same register class. That is under the bar, so there is no H200 run.
+
+Decision (conductor, decision 66, 12 Nov): the A100 family adopts SKIP_OUTSIDE + HOIST_DX + WEIGHTED_VECTOR, through
+`SKIP_OUTSIDE_GPUS` (HOIST_DX shares it) and `WEIGHTED_VECTOR_GPUS`. WEIGHTED_VECTOR yields to LATE_PULLBACK
+(`weighted_vector_on`), which is on for the H200 only, so the guard changes nothing on the A100 today.

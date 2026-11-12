@@ -323,10 +323,19 @@ def test_skip_outside_lab_form_is_the_template():
     assert wt.variant(wp.render(_edge16(), "float", 4, **options), "skip+vec2").count("if (!inside) {") == 1
 
 
+A100_H200_FAMILIES = (("NVIDIA H200", True), ("NVIDIA H200 NVL", True), ("NVIDIA A100-SXM4-80GB", True),
+                      ("NVIDIA A100-SXM4-40GB", True), ("NVIDIA A100-PCIE-40GB", True), ("NVIDIA A100 80GB PCIe", True),
+                      ("NVIDIA GeForce RTX 5060 Ti", False), ("NVIDIA RTX 4000 Ada Generation", False))
+
+
 def test_skip_outside_default(monkeypatch):
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", None)
     assert not wp.skip_outside_default(torch.device("cpu"))
-    assert set(wp.SKIP_OUTSIDE_GPUS) == {"NVIDIA H200"}  # H200 MD step 0.9889 / 0.9926, 0.9823 / 0.9811 (12 Nov)
+    # H200 MD step 0.9889 / 0.9926, 0.9823 / 0.9811; the A100 plan 0.9849 / 0.9828, 0.9751 / 0.9751 (12 Nov)
+    assert set(wp.SKIP_OUTSIDE_GPUS) == {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"}
+    for name, on in A100_H200_FAMILIES:
+        monkeypatch.setattr(wp, "_device_name", lambda device, name=name: name)
+        assert wp.skip_outside_default(None) is on and wp.hoist_dx_default(None) is on, name
     monkeypatch.setattr(wp, "_device_name", lambda device: "NVIDIA H200")
     assert wp.skip_outside_default(None)
     monkeypatch.setattr(wp, "SKIP_OUTSIDE", False)  # an A/B side's choice wins over the set
@@ -338,7 +347,6 @@ def test_skip_outside_default(monkeypatch):
 def test_skip_outside_and_hoist_dx_together_only():
     """SKIP_OUTSIDE and HOIST_DX win on the H200 together only (lab 0.973; alone 1.021 and 0.999): one GPU set."""
     assert wp.HOIST_DX_GPUS is wp.SKIP_OUTSIDE_GPUS
-    assert "NVIDIA A100-SXM4-80GB" not in wp.SKIP_OUTSIDE_GPUS  # A100 lab: both 1.025
 
 
 def test_skip_outside_compiles_with_nvrtc():
@@ -426,9 +434,30 @@ def test_weighted_vector_source():
 
 def test_weighted_vector_default(monkeypatch):
     monkeypatch.setattr(wp, "WEIGHTED_VECTOR", None)
-    assert not wp.weighted_vector_default(torch.device("cpu")) and len(wp.WEIGHTED_VECTOR_GPUS) == 0
+    assert not wp.weighted_vector_default(torch.device("cpu"))
+    # the A100 family (decision 66, 12 Nov: with SKIP_OUTSIDE + HOIST_DX 0.9742 / 0.9730, 0.9710 / 0.9701); not the H200
+    assert set(wp.WEIGHTED_VECTOR_GPUS) == {"NVIDIA A100-SXM4-80GB"}
+    for name, on in A100_H200_FAMILIES:
+        monkeypatch.setattr(wp, "_device_name", lambda device, name=name: name)
+        assert wp.weighted_vector_default(None) is (on and "A100" in name), name
     monkeypatch.setattr(wp, "WEIGHTED_VECTOR", True)
     assert wp.weighted_vector_default(torch.device("cpu"))
+
+
+def test_weighted_vector_yields_to_late_pullback(monkeypatch):
+    """WEIGHTED_VECTOR is off under LATE_PULLBACK (its block parser is not checked against weighted sources) and on
+    FACTORED kernels only; the A100 is not in LATE_PULLBACK_GPUS, so the guard changes nothing there today."""
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", None)
+    monkeypatch.setattr(wp, "_device_name", lambda device: "NVIDIA A100-SXM4-80GB")
+    assert wp.weighted_vector_on(None, True, False)
+    assert not wp.weighted_vector_on(None, True, True) and not wp.weighted_vector_on(None, False, False)
+    assert "NVIDIA A100-SXM4-80GB" not in wp.LATE_PULLBACK_GPUS
+    monkeypatch.setattr(wp, "WEIGHTED_VECTOR", True)  # an A/B side's True still yields to LATE_PULLBACK
+    assert not wp.weighted_vector_on(None, True, True)
+    import inspect  # WPrimeBackward decides LATE_PULLBACK before the render and passes it to the guard
+    init = inspect.getsource(wp.WPrimeBackward.__init__)
+    assert init.index("self.late_pullback = (") < init.index("weighted_vector_on(device, self.factored, "
+                                                              "self.late_pullback)") < init.index("render(")
 
 
 def test_weighted_vector_compiles_with_nvrtc():
@@ -450,7 +479,7 @@ def test_hoist_dx_and_channel_vector_defaults(monkeypatch):
     monkeypatch.setattr(wp, "HOIST_DX", None)
     monkeypatch.setattr(wp, "CHANNEL_VECTOR", None)
     assert not wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 0
-    assert set(wp.HOIST_DX_GPUS) == {"NVIDIA H200"} and len(wp.CHANNEL_VECTOR_GPUS) == 0
+    assert set(wp.HOIST_DX_GPUS) == {"NVIDIA H200", "NVIDIA A100-SXM4-80GB"} and len(wp.CHANNEL_VECTOR_GPUS) == 0
     monkeypatch.setattr(wp, "HOIST_DX", True)
     monkeypatch.setattr(wp, "CHANNEL_VECTOR", 2)
     assert wp.hoist_dx_default(cpu) and wp.channel_vector_default(cpu) == 2

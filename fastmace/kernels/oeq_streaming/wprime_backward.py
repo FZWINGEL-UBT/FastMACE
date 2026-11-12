@@ -318,9 +318,10 @@ EDGE_FORCE_GPUS = GPUModels(())
 # 5.5e-10, dr 6.9e-8 relative), so rounding. None: on for SKIP_OUTSIDE_GPUS; True / False: an A/B side's choice.
 # On the H200 together with HOIST_DX only (both sets hold the same GPUs): H200 lab (OMAT-0 medium, SrTiO3 10x10x10)
 # skip 1.021, hoist 0.999, both 0.973 (1,042.3 -> 1,014.2 us); MD step b/a SrTiO3 10x10x10 0.9889 / 0.9926, NbCl5
-# 0.9823 / 0.9811; force/stress gate passed (NaCl, SrTiO3 3x3x3). A100: both 1.025, off.
+# 0.9823 / 0.9811; force/stress gate passed (NaCl, SrTiO3 3x3x3). A100 family (decision 66, 12 Nov; Alex, the A100
+# plan): 0.9849 / 0.9828, 0.9751 / 0.9751, gate passes (the lab's 1.025 ran the H200 plan through the alias).
 SKIP_OUTSIDE = None
-SKIP_OUTSIDE_GPUS = GPUModels(("NVIDIA H200",))
+SKIP_OUTSIDE_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
 # The same lane (wprime_tuning's post-render transforms; float32 FACTORED kernels with STAGE_DOUT). HOIST_DX: the dx
 # atomics' address as one pointer per lane (exact; sm_90 census 2,198 -> 2,141, 80 registers). CHANNEL_VECTOR 2 / 4:
 # that many consecutive channels per lane with vector dout, x and dx accesses (rounding: each lane's dsh and dr sums in
@@ -332,13 +333,30 @@ HOIST_DX_GPUS = SKIP_OUTSIDE_GPUS
 # SCALAR_PATHS' weighted input for the paths whose edge sums v_j have more than 3 components (OMAT-0 interaction 2:
 # 1x2->1, 1x3->2, 1x2->3; conductor review idea 1, 12 November 2026): dsh_j += s (w x_i) per term instead of
 # v_j += s x_i and dsh_j += w v_j. Rounding (another FP32 order). sm_80 census with SKIP_OUTSIDE + HOIST_DX:
-# 1,976 -> 1,942 instructions per edge and lane, 128 -> 96 registers; sm_90 1,990 -> 1,957, 96 -> 95.
-# None: on for WEIGHTED_VECTOR_GPUS (none yet); True / False: an A/B side's choice.
+# 1,976 -> 1,942 instructions per edge and lane, 128 -> 96 registers on the H200 plan (the A100 plan: 1,874 -> 1,842,
+# 96 -> 96); sm_90 1,990 -> 1,957, 96 -> 95.
+# A100 (decision 66, 12 November 2026; Alex A100-SXM4-80GB, the A100 plan): with SKIP_OUTSIDE + HOIST_DX MD step b/a
+# SrTiO3 10x10x10 0.9742 / 0.9730, NbCl5 0.9710 / 0.9701 (alone 0.9950 / 0.9914, 0.9971 / 0.9950); gate passes.
+# H200: census only (about 0.5 % of the step). Off under LATE_PULLBACK (WPrime).
+# None: on for WEIGHTED_VECTOR_GPUS; True / False: an A/B side's choice.
 WEIGHTED_VECTOR = None
-WEIGHTED_VECTOR_GPUS = GPUModels(())
+WEIGHTED_VECTOR_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB",))
 CHANNEL_VECTOR = None
 CHANNEL_VECTOR_GPUS = MappingProxyType({})  # device name -> 2 or 4
 SPLINE_VECTOR_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# Late pullback (outside review, 12 November 2026; results/wprime-late-pullback-20261112, wprime_pullback): every path
+# in N1's Cartesian form with the geometry differentiated once per edge after the channel reduction. The STAGE_DOUT
+# prologue stages q = M g; per lane G = sum w grad phi (3) and R = sum dw/dt phi; G / sqrt(3) goes into the l = 1 dsh
+# slots and R into dr, so the outputs and the autograd graph are unchanged. Rounding. sm_90 census (OMAT-0 medium,
+# prologue included): 2,026 -> 1,826 instructions per edge, 96 -> 56 registers; sm_80 2,010 -> 1,799, 128 -> 64.
+# None: on for LATE_PULLBACK_GPUS; True / False: an A/B side's choice (float32 FACTORED kernels with STAGE_DOUT,
+# BLOCK_MESSAGE, HORNER and covered paths only; without CHANNEL_VECTOR, STAGE_QUADS and EDGE_FORCE).
+# NVIDIA H200 (decision 66, 12 November 2026; OMAT-0 medium only, on top of SKIP_OUTSIDE + HOIST_DX): lab 0.859
+# (1,010.9 -> 868.9 us, 96 -> 56 registers); MD step b/a SrTiO3 10x10x10 0.9597 / 0.9612, NbCl5 0.9848 / 0.9825;
+# force/stress gate passed (NaCl, NbCl5, SrTiO3 3x3x3). Other H200 variants get it through GPUModels' family match.
+# A100: open (Alex job 4988692).
+LATE_PULLBACK = None
+LATE_PULLBACK_GPUS = GPUModels(("NVIDIA H200",))
 
 
 def spline_vector_default(device):
@@ -1350,7 +1368,17 @@ class WPrimeBackward:
                             and not self.shared_locator and stage_edges_default(device, model_label))
         self.edge_force = bool(edge_force)  # EDGE_FORCE: dL/dv [E, 3] through dsh; the vectors after dr
         self.skip_outside = self.table_w and skip_outside_default(device)
-        self.weighted_vector = bool(self.factored) and weighted_vector_default(device)
+        self.hoist_dx, self.channel_vector = hoist_dx_default(device), channel_vector_default(device)
+        if HOIST_DX is None:  # the default: with SKIP_OUTSIDE only (they win together), where it was measured
+            self.hoist_dx = (self.hoist_dx and self.skip_outside and scalar == "float" and bool(self.factored)
+                             and bool(self.stage_dout))
+        self.late_pullback = (late_pullback_default(device) and not self.channel_vector and not self.stage_quads
+                              and not self.edge_force and self.stage_dout and self.table_w and self.horner
+                              and bool(self.factored) and scalar == "float" and kernels.output_dim > 0)
+        if self.late_pullback:  # decided before the render: WEIGHTED_VECTOR yields to it
+            from fastmace.kernels.oeq_streaming import wprime_pullback
+            self.late_pullback = wprime_pullback.supported(kernels.schedule, scalar, blocks)
+        self.weighted_vector = weighted_vector_on(device, self.factored, self.late_pullback)
         self.launches = 0  # host-side launch count (tests: the EDGE_FORCE kernel ran)
         self.source = render(kernels.schedule, scalar, self.terms, vector=self.vector, table_w=self.table_w,
                              blocks=blocks, block_ldg=block_ldg_default(device), factored=self.factored,
@@ -1361,10 +1389,9 @@ class WPrimeBackward:
                              spline=self.spline, stage_quads=self.stage_quads, shared_locator=self.shared_locator,
                              stage_sh=self.stage_sh, stage_edges=self.stage_edges, edge_force=self.edge_force,
                              skip_outside=self.skip_outside, weighted_vector=self.weighted_vector)
-        self.hoist_dx, self.channel_vector = hoist_dx_default(device), channel_vector_default(device)
-        if HOIST_DX is None:  # the default: with SKIP_OUTSIDE only (they win together), where it was measured
-            self.hoist_dx = (self.hoist_dx and self.skip_outside and scalar == "float" and bool(self.factored)
-                             and bool(self.stage_dout))
+        if self.late_pullback:  # LATE_PULLBACK (wprime_pullback; before wprime_tuning)
+            from fastmace.kernels.oeq_streaming import wprime_pullback
+            self.source = wprime_pullback.apply(self.source, kernels.schedule, blocks, self.fold_alpha)
         if self.hoist_dx or self.channel_vector:  # HOIST_DX / CHANNEL_VECTOR (wprime_tuning; raise where unmatched)
             from fastmace.kernels.oeq_streaming import wprime_tuning
             self.source = wprime_tuning.apply(self.source, self.hoist_dx, self.channel_vector)
@@ -1898,6 +1925,11 @@ def skip_outside_default(device):
     return bool(SKIP_OUTSIDE) if SKIP_OUTSIDE is not None else _device_name(device) in SKIP_OUTSIDE_GPUS
 
 
+def late_pullback_default(device):
+    """``LATE_PULLBACK`` on ``device``: the constant when set, else on for ``LATE_PULLBACK_GPUS``."""
+    return bool(LATE_PULLBACK) if LATE_PULLBACK is not None else _device_name(device) in LATE_PULLBACK_GPUS
+
+
 def hoist_dx_default(device):
     """``HOIST_DX`` on ``device``: the constant when set, else on for ``HOIST_DX_GPUS``."""
     return bool(HOIST_DX) if HOIST_DX is not None else _device_name(device) in HOIST_DX_GPUS
@@ -1906,6 +1938,13 @@ def hoist_dx_default(device):
 def weighted_vector_default(device):
     """``WEIGHTED_VECTOR`` on ``device``: the constant when set, else on for ``WEIGHTED_VECTOR_GPUS``."""
     return bool(WEIGHTED_VECTOR) if WEIGHTED_VECTOR is not None else _device_name(device) in WEIGHTED_VECTOR_GPUS
+
+
+def weighted_vector_on(device, factored, late_pullback):
+    """Whether a w' kernel on ``device`` takes WEIGHTED_VECTOR: ``weighted_vector_default`` on a FACTORED kernel, and
+    never under LATE_PULLBACK (it rewrites every path into its Cartesian form; its block parser is not checked
+    against weighted sources; conductor, 12 November 2026)."""
+    return bool(factored) and not late_pullback and weighted_vector_default(device)
 
 
 def channel_vector_default(device):
@@ -2151,7 +2190,7 @@ class WPrime(torch.nn.Module):
 __all__ = ["EDGE_FORCE", "EDGE_FORCE_GPUS", "edge_force_default", "edge_force_supported",
            "SKIP_OUTSIDE", "SKIP_OUTSIDE_GPUS", "skip_outside_default", "HOIST_DX", "HOIST_DX_GPUS",
            "hoist_dx_default", "WEIGHTED_VECTOR", "WEIGHTED_VECTOR_GPUS",
-           "weighted_vector_default", "CHANNEL_VECTOR", "CHANNEL_VECTOR_GPUS", "channel_vector_default",
+           "weighted_vector_default", "weighted_vector_on", "CHANNEL_VECTOR", "CHANNEL_VECTOR_GPUS", "channel_vector_default",
            "streaming_conv_wprime_backward_force", "BLOCK_LDG", "BLOCK_LDG_GPUS",
            "BLOCK_MESSAGE", "BLOCK_MESSAGE_GPUS", "FACTORED", "FACTORED_GPUS",
            "ESTRIN", "ESTRIN_GPUS", "FOLD_ALPHA", "FOLD_ALPHA_GPUS", "FOLD_ALPHA_MODEL_OFF_GPUS", "FACTORED_SCALE", "HORNER", "HORNER_GPUS", "MAX_REGISTERS", "MAX_REGISTERS_GPUS", "SCALAR_PATHS", "SMEM_SPILL",

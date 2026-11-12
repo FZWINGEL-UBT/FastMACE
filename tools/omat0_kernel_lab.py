@@ -750,6 +750,10 @@ __device__ __forceinline__ int fm_unordered(int pr) {{
         # or beyond the cutoff before the channel loop (exact), the dx address hoisted (exact), N channels per lane
         # with vector dout / x / dx accesses (rounding: each lane's dsh and dr sums in another channel order).
         **_wprime_h200_variants(),
+        # Late pullback (12 November 2026, results/wprime-late-pullback-20261112; fastmace wprime_pullback): every path in
+        # the Cartesian form, G and R per lane, the geometry once per edge; dsh holds G / sqrt(3) in its l = 1 slots, so it
+        # is compared as the edge-vector gradient J^T dsh + n dr (kind "pullback").
+        **_late_pullback_variants(kernel),
     }
 
 
@@ -762,6 +766,16 @@ def _wprime_h200_variants():
     kinds = {"skip": "rounding", "hoist": "exact", "skip+hoist": "rounding", "vec2": "rounding", "skip+vec2": "rounding",
              "vec4": "rounding", "skip+vec4": "rounding"}
     return {f"h2-{name}": (kind, make(name), ()) for name, kind in kinds.items()}
+
+
+def _late_pullback_variants(kernel):
+    if kernel is None:
+        return {}
+    from fastmace.kernels.oeq_streaming import wprime_pullback
+
+    def make(direct):
+        return lambda s: wprime_pullback.apply(s, kernel.schedule, kernel.blocks, kernel.fold_alpha, direct)
+    return {"lp": ("pullback", make((0, 1, 2, 3)), ())}
 
 
 def _restrict_all(s):
@@ -2370,6 +2384,35 @@ def compare(name, base, other):
     return result
 
 
+def compare_edge_vector(base, other):
+    """A "pullback" variant against the base: dL/dv = J^T dsh + n dr in the sh frame (float64; J of e3nn's component
+    harmonics l <= 3 at n = sh[:, 1:4] / sqrt(3), v = n r) for the edges inside the cutoff, and dx."""
+    import torch
+    from e3nn import o3
+
+    from fastmace.kernels.oeq_streaming.wprime_pullback import sh_frame
+    r_max = float(base[16])
+
+    def edge_vector(args):
+        sh, r = args[1].double(), args[8].double().reshape(-1)
+        inside = (r < r_max) & (r > 0)
+        n = sh[inside, 1:4] / 3.0 ** 0.5
+        n = n / n.norm(dim=-1, keepdim=True)
+        v = (n * r[inside, None]).requires_grad_(True)
+        frame = sh_frame().to(v.device)
+        y = torch.cat([o3.spherical_harmonics(l, v @ frame.T, normalize=True, normalization="component")
+                       for l in range(4)], -1)
+        (g,) = torch.autograd.grad((y * args[7].double()[inside]).sum(), v)
+        return (g + n * args[17].double()[inside, None]).detach()
+
+    a, b = edge_vector(base), edge_vector(other)
+    scale = float(a.abs().max()) or 1.0
+    edge = ((a - b).norm(dim=-1) / a.norm(dim=-1).clamp_min(1e-30 * scale))
+    dx_scale = float(base[6].abs().max()) or 1.0
+    return {"dv": f"max|d|/max|a| = {float((a - b).abs().max()) / scale:.2e}, median edge {float(edge.median()):.2e}",
+            "dx": f"max|d|/max|a| = {float((base[6] - other[6]).abs().max()) / dx_scale:.2e}"}
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--checkpoint", type=Path, required=True)
@@ -2516,6 +2559,8 @@ def main(argv=None):
                                 if reference in snapshots else dict(error=f"the reference {reference} did not run"))
             elif variant != "base" and b["kind"] in ("exact", "rounding") and "launch" in built["base"]:
                 b["compare"] = compare(name, base_args, shared_args)
+            elif variant != "base" and b["kind"] == "pullback" and "launch" in built["base"]:
+                b["compare"] = compare_edge_vector(base_args, shared_args)
         snapshots = None
         if any(v.startswith(("sx-", "B-spline")) for v in built):  # the sx-layout lab: stop before any timing
             _sx_layout_lab().check_before_timing(name, built)
