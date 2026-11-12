@@ -78,3 +78,8 @@ ahead ([a100-alex/](a100-alex/), a0731, source 4f02f077, 21 min).
 - `slab_census.py`: the offline census (`python results/packed8-auto-20261112/slab_census.py > slab_census.json`).
 - `cold_ab.sh`: the A/B; `ada_run.sh`: its workstation wrapper (environment, GPU-idle check);
   `alex_packed8_cold.sh`: its Alex sbatch wrapper (slim source tarball of 4f02f077).
+
+## CPU suite
+
+Full `tests/cpu` on the merged tip de9f0fab (git archive), leto, GPU hidden, `-n 8 -m "not acceptance"`: 5,739 passed,
+205 skipped, 0 failed (13 min, 12 November 2026).
