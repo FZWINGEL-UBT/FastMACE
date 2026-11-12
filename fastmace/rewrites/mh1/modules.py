@@ -242,6 +242,11 @@ class FirstInteractionReassociation(torch.nn.Module):
             entry[1], entry[3] = table._version, params
         return entry
 
+    def plan_columns(self):
+        """The node_attrs columns of the species plan ``_composed`` builds (the skip's), or None when it builds none:
+        the force field builds the plan outside the step and binds it (``species_gemm.bind_plan``)."""
+        return self.compose_skip[2].columns if self.compose_skip is not None else None
+
     def composed_buffers(self, table):
         """The cached composed weights of ``table`` (``refresh_composed``), or ``()`` when none are cached: the
         force field registers them as derived state beside the table, so that a snapshot restore (a capture's
@@ -253,11 +258,16 @@ class FirstInteractionReassociation(torch.nn.Module):
         """The versions of every tensor the composition reads besides the table: the radial last layer, the
         interaction's linear and skip (``compose_skip``) and the nested rotation. A reload or an optimiser step
         writes them in place and moves their versions; nothing in an MD step does."""
+        from fastmace.kernels.triton.species_gemm import PLAN_BUFFERS
+
         tensors = []
         modules = [self.compose_radial] + ([self.compose_skip[0], self.compose_skip[2]] if self.compose_skip else [])
         for module in modules:
             if isinstance(module, torch.nn.Module):
-                tensors += list(module.parameters()) + list(module.buffers())
+                # Not the species plan bound onto the skip (step-layout-cleanup): no input of the composition, and a
+                # capture's snapshot restore moves its versions, which recomposed inside the captured step.
+                tensors += list(module.parameters()) + [buffer for name, buffer in module.named_buffers()
+                                                        if name.rpartition(".")[2] not in PLAN_BUFFERS]
             elif module is not None:  # a plain record of tensors (the CPU tests' radial layer)
                 tensors += [value for value in vars(module).values() if isinstance(value, torch.Tensor)]
         if self.nested_rotation is not None:
@@ -311,7 +321,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
         joined = (summed_fn is not None and self.joined_layout and self.compose_skip is not None and rows is None
                   and self.compose_joined and self.tf32x3
-                  and getattr(self, "tf32x3_backend", None) == "cutlass")
+                  and getattr(self, "tf32x3_backend", None) in ("cutlass", "triton"))  # Triton: strided launches
         if joined:  # JOINED_LAYOUT: [nodes, (l, m), slots, k]; _composed reads each path's rows in place
             summed, width = summed_fn(key, nodes * slots, inner=slots)
             return self._composed(summed.view(nodes, dim, slots, width), node_attrs, x, weight, nodes, slots, width,
@@ -370,15 +380,19 @@ class FirstInteractionReassociation(torch.nn.Module):
         output blocks (ir_mul, path order). ``joined`` (``JOINED_LAYOUT``): ``summed`` is [nodes, (l, m), slots,
         k], and the paths are read in place as row groups (``species_mm_rows``)."""
         from fastmace.kernels.triton import compose_skip
-        from fastmace.kernels.triton.species_gemm import (joined_rows, species_mm, species_mm_joined, species_mm_rows,
-                                                         species_plan)
+        from fastmace.kernels.triton.species_gemm import (bound_plan, joined_rows, species_mm, species_mm_joined,
+                                                         species_mm_rows, species_plan)
 
         if torch.is_grad_enabled() and (weight.requires_grad or x.requires_grad):
             raise RuntimeError("compose_skip has no gradient for the weights: inference only (frozen parameters)")
         linear, linear_products, skip, products = self.compose_skip
-        onehot = node_attrs[:nodes, skip.columns]
-        kind = onehot.argmax(dim=1)
-        order, counts = species_plan(kind, onehot.shape[1], counting=self.count_plan)
+        plan = bound_plan(self, nodes) if node_attrs.shape[0] == nodes else None  # the force field's (outside the step)
+        if plan is not None:
+            kind, order, counts = plan
+        else:
+            onehot = node_attrs[:nodes, skip.columns]
+            kind = onehot.argmax(dim=1)
+            order, counts = species_plan(kind, onehot.shape[1], counting=self.count_plan)
         if not self.tf32x3:
             precision = "ieee"
         else:

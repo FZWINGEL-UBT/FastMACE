@@ -305,6 +305,11 @@ def _composed_by_table():
     (registered just before) recomposes them in place."""
 
 
+def _refreshed_with_kind():
+    """The refresh of a species plan's order and counts (``ForceField._derived``): none of their own, the plan's kind
+    entry (registered just before) rebuilds all three in place."""
+
+
 def _shape_only_one_hot(indices, num_classes):
     """A zero-width stand-in for ``mace.tools.torch_tools.to_one_hot`` (no storage), on the host: the batch derives
     its ``batch`` vector from it (on the meta device that vector was meta too and could not be read)."""
@@ -706,6 +711,7 @@ class MACEForceField:
             cell, calc.r_max, self._device, self._dtype, neighbours,
             sender_groups=self._sender_groups if segmented and sort_receivers else None,
             group_count=len(self.superset), variable_cell=self._compute_stress, model_label=_table_label(loaded))
+        self._setup_plans()
         self._setup_tables()
         if self._compute_stress:
             # Fixed-address cell that MACE's stress path reads (set_cell refills it).
@@ -886,6 +892,44 @@ class MACEForceField:
             self._tables.append((index, interaction.first_reassociation, table, refresh))
         self._bind_streaming_count()
 
+    def _setup_plans(self):
+        """The species plans (``species_gemm.plan_of``: kind, order, counts) of the modules that group their
+        products by species (``plan_columns``), one per distinct column set, built here once and refreshed with the
+        species (``_derived``) instead of inside every call: the stable argsort replayed every captured step
+        (step-layout-cleanup, 12 November 2026). None where the one-hot is released (the tiled call's rows are
+        tiles, and their forwards build their own)."""
+        import torch
+
+        from fastmace.kernels.triton.species_gemm import plan_of
+
+        self._plans = []  # (column tuple, (kind, order, counts), [modules])
+        self._plan_columns = {}  # column tuple -> the columns on the one-hot's device (the refresh is captured)
+        if self.node_attrs_released:
+            return
+        model = getattr(self.model, "_orig_mod", self.model)
+        groups = {}
+        for module in model.modules():
+            columns = getattr(module, "plan_columns", lambda: None)()
+            if columns is None:
+                continue
+            key = tuple(int(c) for c in torch.as_tensor(columns).tolist())
+            if key not in groups:
+                with torch.no_grad():
+                    plan = tuple(t.clone() for t in plan_of(self.data["node_attrs"], columns))
+                groups[key] = (key, plan, [])
+                self._plan_columns[key] = torch.as_tensor(key, dtype=torch.int64, device=self.data["node_attrs"].device)
+                self._plans.append(groups[key])
+            groups[key][2].append(module)
+
+    def _refresh_plan(self, key, plan):
+        from fastmace.kernels.triton.species_gemm import plan_of
+
+        if self.node_attrs_released:  # the one-hot was dropped; nothing binds the plan any more
+            return
+        columns = self._plan_columns[key]  # no host-to-device copy: species refreshes run inside attempt graphs
+        for dst, src in zip(plan, plan_of(self.data["node_attrs"], columns)):
+            dst.copy_(src)
+
     def check_species(self, numbers):
         """Raise ``SpeciesNotInSuperset`` unless every atomic number of ``numbers`` ((N,)) is in the superset.
 
@@ -955,6 +999,13 @@ class MACEForceField:
             out.append(("node_e0", self.data[energy64.NODE_E0_KEY], self._refresh_node_e0, ("species",)))
         # Registered whether or not this list sorts by sender group, so that it never goes stale.
         out.append(("sender_groups", self._sender_groups, self._refresh_sender_groups, ("species",)))
+        # The species plans of the grouped products (``_setup_plans``), after the one-hot they read: refreshed with
+        # the species, and restored with them by a snapshot (a capture's warm-up, a rejected transaction).
+        for group, (key, plan, _) in enumerate(getattr(self, "_plans", ())):
+            out.append((f"species_plan.{group}.kind", plan[0],
+                        lambda key=key, plan=plan: self._refresh_plan(key, plan), ("species",)))
+            out += [(f"species_plan.{group}.{part}", tensor, _refreshed_with_kind, ("species",))
+                    for part, tensor in zip(("order", "counts"), plan[1:])]
         if self._has_total["total_charge"]:
             out.append(("total_charge", self.data["total_charge"], self._refresh_total_charge, ("charges",)))
         if self._has_total["total_spin"]:
@@ -1025,7 +1076,7 @@ class MACEForceField:
 
     # ------------------------------------------------------------------ graph level
 
-    def _bind_streaming_count(self, block_order=True):
+    def _bind_streaming_count(self, block_order=True, plans=True):
         """Point the streaming interactions at this force field's edge count, and the reassociated
         first interaction at its sender-feature table (host-side pointer swaps).
 
@@ -1036,6 +1087,8 @@ class MACEForceField:
         ``block_order=False`` (the tiled call, whose kernels run per tile over fewer rows): no
         whole-system BLOCK_ORDER order is built (int32 [N], 4 B/atom); the kernels launch with the
         identity of their rows, which gives the same message (any permutation does).
+
+        ``plans=False`` (the tiled call): the species plans are unbound; a tile's forward builds its own.
         """
         # A copy that follows another force field (``follow``) reads that force field's edges and count.
         count = (self.neighbours if self._leader is None else self._leader.neighbours).count
@@ -1044,6 +1097,10 @@ class MACEForceField:
                 module.register_buffer("streaming_count", count, persistent=False)
         for _, reassociation, table, _ in self._tables:
             reassociation.bind(table)
+        from fastmace.kernels.triton.species_gemm import bind_plan
+        for _, plan, modules in getattr(self, "_plans", ()):  # the species plans (whole-system calls only)
+            for module in modules:
+                bind_plan(module, plan if plans and not self.node_attrs_released else None)
         ordered = self._ordered_spline_kernels()
         if not block_order:
             for kernel in ordered:

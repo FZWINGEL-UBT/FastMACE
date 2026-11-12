@@ -73,6 +73,7 @@ def test_joined_products_in_tf32x3_equal_the_dense_op(monkeypatch):
     # The joined products are Triton's; on the CUTLASS backend (the A100) GatedRows does not use them, so the dense
     # op is compared on Triton too.
     monkeypatch.setattr(tf32x3_gemm, "CUTLASS_CAPABILITIES", ())
+    monkeypatch.setattr(tf32x3_gemm, "CUTLASS_GPUS", ())
 
     atoms, dims, muls = 50, (1, 3), (64, 32)
     generator = torch.Generator(device="cuda").manual_seed(2)

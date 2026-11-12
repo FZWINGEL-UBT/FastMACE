@@ -118,3 +118,24 @@ def test_registry_restores_the_weights_with_the_table(monkeypatch):
 def test_composed_buffers_of_an_unknown_table_are_empty():
     reassociation, _ = _composing()
     assert reassociation.composed_buffers(torch.zeros(3, 4)) == ()
+
+
+def test_a_restored_species_plan_on_the_skip_composes_nothing(monkeypatch):
+    """step-layout-cleanup: the force field binds the species plan onto the skip (``species_gemm.bind_plan``) and the
+    capture's snapshot restore copies it back (new versions). The plan is no input of the composition, so the captured
+    bind still adopts (the 2.15 attribution of c6511d8e showed the compose GEMMs back in the graph)."""
+    from fastmace.kernels.triton.species_gemm import bind_plan
+
+    reassociation, message, inline, table, counter = _bound(monkeypatch)
+    skip = reassociation.compose_skip[2]
+    kind = torch.tensor([0, 1, 2, 2, 1, 0, 2])
+    order, counts = torch.argsort(kind, stable=True).to(torch.int32), torch.tensor([2, 2, 3], dtype=torch.int32)
+    bind_plan(skip, (kind, order, counts))
+    reassociation.bind(table)  # the plan's first binding is no parameter change either
+    assert counter.calls == 1
+    for tensor in (kind, order, counts, table):
+        tensor.copy_(tensor.clone())  # the capture's snapshot restore: the same values, new versions
+    _capturing(monkeypatch, True)
+    reassociation.bind(table)
+    assert counter.calls == 1
+    assert torch.equal(message(), inline)
