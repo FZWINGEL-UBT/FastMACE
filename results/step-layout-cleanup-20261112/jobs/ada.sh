@@ -5,7 +5,8 @@
 #           reshape_irreps as a copy, JOINED_LAYOUT off; side b the branch (plan bound, views, joined layout on the
 #           Triton backend).
 #   jl-ab / jl-ba  JOINED_LAYOUT alone (side a off, side b the Ada default on), the same protocol
-#   prof    the torch 2.15 attribution (t215 profile_point.py + attribution.py, PYSTACKS=1, cupti-python) of the
+#   ld-* / lds-*  item 5: side b the CUTLASS backend on sm_89 with LINEAR_DIV (lds: and SEGMENT_ROWS), a today's default
+#   prof    (PROFC: extra --constant items, e.g. item 5's side b) the torch 2.15 attribution (t215 profile_point.py + attribution.py, PYSTACKS=1, cupti-python) of the
 #           new step, SrTiO3 10x10x10 and NbCl5 3x3x3
 # Usage: setsid nohup bash ada.sh SRC OUT JOB... > OUT.out 2>&1 < /dev/null &
 # Before each job: no process on the GPU, and no process of another user or ours above 50 % CPU (LC_ALL=C).
@@ -42,6 +43,8 @@ write('$OUT/SrTiO3.cif', cs.base_cell('SrTiO3')[1])" >> $OUT/cif.log 2>&1)
 ST=$OUT/SrTiO3.cif
 K="fastmace.kernels.triton.species_gemm:bound_plan=no_bound_plan fastmace.rewrites.generic.modules:_reshaped=reshape_copy"
 A="fastmace.kernels.triton.compose_skip:JOINED_LAYOUT=False"
+# item 5 (conductor, 12 November 2026): the CUTLASS tf32x3 backend on sm_89, as ada-5060-screen built it
+KC="fastmace.kernels.triton.tf32x3_gemm:CUTLASS_CAPABILITIES=((8,0),(8,9),(9,0))"
 for job in "$@"; do
   idle "$job" || exit 3
   note "start $job"
@@ -56,6 +59,12 @@ for job in "$@"; do
            (prod_env; cd $SRC && $E/bin/python tools/ab_rewrites.py --output $OUT/$job --checkpoint $CK               --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5               --a-constant $A > $OUT/$job.log 2>&1 < /dev/null
             echo "$job exit=$? $(grep -h -E 'b/a' $OUT/$job.log | tr '
 ' ' ' | cut -c1-600)") | tee -a "$log" ;;
+    ld-ab|ld-ba|lds-ab|lds-ba) order=${job#*-}; pattern=$([ $order = ab ] && echo abab || echo abba)
+           B5=$KC; B5="$B5 fastmace.kernels.cutlass.linear_div:LINEAR_DIV=True"
+           [ ${job%%-*} = lds ] && B5="$B5 fastmace.kernels.cutlass.segment_rows:SEGMENT_ROWS=True"
+           (prod_env; cd $SRC && $E/bin/python tools/ab_rewrites.py --output $OUT/$job --checkpoint $CK               --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5               --b-constant $B5 > $OUT/$job.log 2>&1 < /dev/null
+            echo "$job exit=$? $(grep -h -E 'b/a' $OUT/$job.log | tr '
+' ' ' | cut -c1-600)") | tee -a "$log" ;;
     prof) for st in SrTiO3:10x10x10 NbCl5:3x3x3; do s=${st%%:*}; c=$OUT/pcache-$s; rm -rf $c; mkdir -p $c
             (cd $SRC && export ENVROOT=$H/environments PYTHONPATH=$SRC FM_SRC=$SRC FASTMACE_MODELS=$H/ResearchModule/Models \
               FASTMACE_STRUCTURES=$H/ResearchModule TMPDIR=$OUT/tmp PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
@@ -64,7 +73,7 @@ for job in "$@"; do
               TRITON_CACHE_DIR=$c/triton MACE_COMPILE_CACHE=$c/compile XDG_CACHE_HOME=$c/xdg PROFILE_TAG=attr-$s
              timeout 1500 bash $T/jobs/py-c.sh $T/jobs/profile_point.py point --structure $s --repeat ${st#*:} \
               --model omat0-medium --precision float32 --output $OUT/points/$s --warmup 200 --steps 200 --timestep-fs 1 \
-              --constant "torch._inductor.config:comment_origin=True" > $OUT/attr-$s.log 2>&1
+              --constant "torch._inductor.config:comment_origin=True" ${PROFC:-} > $OUT/attr-$s.log 2>&1
              echo "prof $s exit=$? $(grep -a '^point' $OUT/attr-$s.log | cut -c1-160)"
              ENVROOT=$H/environments bash $T/jobs/py-c.sh $T/jobs/attribution.py $OUT/profile/trace-attr-$s.json.gz \
                $OUT/profile/pystacks-attr-$s.json $c/inductor 5 $OUT/attribution-$s.json > $OUT/attribution-$s.log 2>&1
