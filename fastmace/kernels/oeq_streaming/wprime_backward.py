@@ -65,8 +65,10 @@ TABLE_W_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Gen
 # MH-1 (its w' is built with generic=False) by label, on these GPU models (decision 66; fastmace/mh1-catchup,
 # results/mh1-catchup-20261112): MD step b/a in both build orders against the GPU's MH-1 defaults, b = TABLE_W=True,
 # NaCl / NbCl5 3x3x3, 6 x 256 steps. RTX 4000 Ada (leto, 12 November 2026): 0.9640 / 0.9663, 0.9694 / 0.9669; 3x float32
-# gate passes (forces 0.95 / 1.00 / 1.00 of the ASE float32 reference). POLAR-1 (the same class) was not measured.
-TABLE_W_MH1_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
+# gate passes (forces 0.95 / 1.00 / 1.00 of the ASE float32 reference). A100-SXM4-80GB (Alex 4990788, 12 November
+# 2026, every A100 model, GPUModels): 0.9320 / 0.9248, 0.9463 / 0.9458 (SKIP_OUTSIDE off: 0.9301 / 0.9242, 0.9494 /
+# 0.9499); gate passes (forces 0.92 / 1.05 / 1.00). POLAR-1 (the same class) was not measured.
+TABLE_W_MH1_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB"))
 TABLE_W_MH1_LABELS = ("mh1-r2scan", "mh1-omat", "mh1-mp")  # the MH-1 checkpoint's heads (one backbone)
 TABLE_W_VECTOR = 2
 # The message in linear_1's block layout (OMAT-0 work, 4 November 2026): with TABLE_W and the fused forward, the

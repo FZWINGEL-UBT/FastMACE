@@ -70,8 +70,8 @@ def test_table_w_default(monkeypatch):
 
 
 def test_table_w_default_for_mh1(monkeypatch):
-    """MH-1 (generic=False) takes TABLE_W by label on TABLE_W_MH1_GPUS (decision 66, fastmace/mh1-catchup);
-    POLAR-1 (the same class) and unlabelled models do not."""
+    """MH-1 (generic=False) takes TABLE_W by label on TABLE_W_MH1_GPUS (the Ada and every A100; decision 66,
+    fastmace/mh1-catchup); POLAR-1 (the same class) and unlabelled models do not."""
     assert set(wprime_backward.TABLE_W_MH1_LABELS) == {"mh1-r2scan", "mh1-omat", "mh1-mp"}
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
     cuda = torch.device("cuda", 0)
@@ -80,8 +80,12 @@ def test_table_w_default_for_mh1(monkeypatch):
     assert not wprime_backward.table_w_default(cuda, generic=False, model_label="polar1-m")
     assert not wprime_backward.table_w_default(cuda, generic=False)
     assert not wprime_backward.table_w_default(torch.device("cpu"), generic=False, model_label="mh1-r2scan")
-    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA L4")
-    assert not wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-r2scan")
+    for a100 in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"):  # every A100 model (Alex 4990788)
+        monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=a100: name)
+        assert wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-mp")
+    for other in ("NVIDIA L4", "NVIDIA H200"):  # the H200: not measured for MH-1
+        monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=other: name)
+        assert not wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-r2scan")
     monkeypatch.setattr(wprime_backward, "TABLE_W", False)
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
     assert not wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-r2scan")
