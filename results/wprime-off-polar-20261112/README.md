@@ -130,6 +130,12 @@ then the pre-12-November source again, bitwise. An A/B side's `WEIGHTED_VECTOR =
 
 Cost: one Alex A100 job, about 55 min (A/B 34 min, gate 19 min, staging 1 min).
 
+## Suite
+
+Full `tests/cpu` on the merged tip `aa8db8d3` (main `7222cfba` merged; leto, GPU idle, `-n 8 -m "not acceptance"`):
+5,764 passed, 206 skipped, 0 failed. (A first run on `b93eb72c`, leeloo, failed one new test: a monkeypatch leaked
+between loop iterations; the helper now resets the switches per call.)
+
 ## Files
 
 - `plan_check.py` / `.json`: which plans run w′.
