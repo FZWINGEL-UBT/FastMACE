@@ -433,3 +433,17 @@ def test_dynamo_calls_a_dynamo_constant_at_trace_time():
     x = torch.ones(3)
     assert torch.equal(scaled(x), 2 * x) and torch.equal(scaled(x), 2 * x)
     assert calls == [0]
+
+
+def test_the_ada_takes_the_cutlass_backend_with_linear_div():
+    """step-layout-cleanup item 5 (12 November 2026, decision 66): the RTX 4000 Ada's products on CUTLASS (the sm_80
+    cubin, by model: no other sm_89 GPU was measured) with LINEAR_DIV; MD step 0.9364 / 0.9335 SrTiO3 10x10x10,
+    0.8912 / 0.8887 NbCl5 3x3x3 against the Triton backend."""
+    from fastmace.kernels.cutlass import linear_div, tf32x3
+    from fastmace.kernels.triton import tf32x3_gemm
+
+    ada = "NVIDIA RTX 4000 Ada Generation"
+    assert ada in tf32x3_gemm.CUTLASS_GPUS and ada in tf32x3.FAMILY_GPUS and ada in linear_div.LINEAR_DIV_GPUS
+    for other in ("NVIDIA L4", "NVIDIA GeForce RTX 5060 Ti"):
+        assert other not in tf32x3_gemm.CUTLASS_GPUS and other not in tf32x3.FAMILY_GPUS
+    assert (8, 9) not in tf32x3_gemm.CUTLASS_CAPABILITIES and tf32x3.FAMILY_CAPABILITIES == ()

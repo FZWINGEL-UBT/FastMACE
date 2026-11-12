@@ -83,14 +83,30 @@ def test_the_joined_layout_compiles_without_layout_copies():
     assert torch.equal(old(x), new(x))
 
 
-def test_the_family_constant_loads_the_sm80_cubin_on_another_8x(monkeypatch):
-    """Item 5's A/B side (CUTLASS on the RTX 4000 Ada, compute capability 8.9): ``FAMILY_CAPABILITIES`` lets an 8.x
-    device without its own cubin load the sm_80 one; by default it does not."""
+def test_the_family_sets_load_the_sm80_cubin_on_another_8x(monkeypatch):
+    """Item 5 (CUTLASS on the RTX 4000 Ada, compute capability 8.9): ``FAMILY_CAPABILITIES`` or ``FAMILY_GPUS`` lets
+    an 8.x device without its own cubin load the sm_80 one; with both empty it does not."""
     from fastmace.kernels.cutlass import tf32x3
 
     capability = tuple(torch.cuda.get_device_capability())
     if capability[0] != 8 or capability in tf32x3.CUBINS:
         pytest.skip("needs an 8.x device without its own cubin")
+    monkeypatch.setattr(tf32x3, "FAMILY_GPUS", ())
     assert not tf32x3.available("cuda")
     monkeypatch.setattr(tf32x3, "FAMILY_CAPABILITIES", (capability,))
     assert tf32x3.available("cuda")
+    monkeypatch.setattr(tf32x3, "FAMILY_CAPABILITIES", ())
+    monkeypatch.setattr(tf32x3, "FAMILY_GPUS", (torch.cuda.get_device_name(),))
+    assert tf32x3.available("cuda")
+
+
+def test_the_ada_runs_its_products_on_cutlass_by_default():
+    """The RTX 4000 Ada's default after item 5: the CUTLASS backend (by model, the sm_80 cubin) with LINEAR_DIV."""
+    from fastmace.kernels.cutlass import linear_div
+    from fastmace.kernels.triton import tf32x3_gemm
+
+    name = torch.cuda.get_device_name()
+    if name != "NVIDIA RTX 4000 Ada Generation":
+        pytest.skip("the RTX 4000 Ada's default")
+    assert tf32x3_gemm.backend("cuda") == "cutlass"
+    assert linear_div.linear_div_default(name)

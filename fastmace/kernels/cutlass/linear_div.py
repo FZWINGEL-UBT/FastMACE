@@ -30,7 +30,9 @@ from fastmace.kernels.gpu_models import GPUModels
 LINEAR_DIV = None
 # MD-step A/Bs (6 November 2026, 7264f56f; OMAT-0 medium, SrTiO3 10x10x10, both build orders): H200 0.9912 /
 # 0.9934, A100-SXM4-80GB 0.9896 / 0.9891. Bitwise at kernel level (output, input and density gradients).
-LINEAR_DIV_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB"))
+# RTX 4000 Ada (12 November 2026, step-layout-cleanup item 5, with its CUTLASS backend): 0.9364 / 0.9335 SrTiO3,
+# 0.8912 / 0.8887 NbCl5 against the Triton backend.
+LINEAR_DIV_GPUS = GPUModels(("NVIDIA H200", "NVIDIA A100-SXM4-80GB", "NVIDIA RTX 4000 Ada Generation"))
 
 
 # h200-fastpath (bitwise): the backward's divided gradient written as contiguous segment blocks in one kernel
