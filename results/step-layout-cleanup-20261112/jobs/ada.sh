@@ -65,6 +65,12 @@ for job in "$@"; do
            (prod_env; cd $SRC && $E/bin/python tools/ab_rewrites.py --output $OUT/$job --checkpoint $CK               --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6               --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5               --b-constant $B5 > $OUT/$job.log 2>&1 < /dev/null
             echo "$job exit=$? $(grep -h -E 'b/a' $OUT/$job.log | tr '
 ' ' ' | cut -c1-600)") | tee -a "$log" ;;
+    sp-ab|sp-ba) order=${job#sp-}; pattern=$([ $order = ab ] && echo abab || echo abba)
+           # item 5 follow-up: LINEAR_DIV_SPLIT (the divided gradient as contiguous blocks in one kernel) on top of
+           # CUTLASS + LINEAR_DIV, both sides on CUTLASS + LINEAR_DIV
+           B5="$KC fastmace.kernels.cutlass.linear_div:LINEAR_DIV=True"
+           (prod_env; cd $SRC && $E/bin/python tools/ab_rewrites.py --output $OUT/$job --checkpoint $CK --model omat0-medium --structures $ST@10x10x10 NbCl5 --warmup 200 --block 256 --blocks 6 --order $order --pattern $pattern --timestep-fs 1 --a-neighbours skin=0.5 --b-neighbours skin=0.5 --a-constant $B5 --b-constant $B5 fastmace.kernels.cutlass.linear_div:LINEAR_DIV_SPLIT=True > $OUT/$job.log 2>&1 < /dev/null
+            echo "$job exit=$? $(grep -h -E 'b/a' $OUT/$job.log | tr -s '[:space:]' ' ' | cut -c1-600)") | tee -a "$log" ;;
     gate) # the 3x float32 force / stress gate of side b's constants (GATEC), as ada-5060-screen's gate.sh: OMAT-0
           # medium, NaCl and NbCl5 3x3x3, against the float64 reference
           (prod_env; export FASTMACE_STRUCTURES=$H/ResearchModule; cd $SRC && $E/bin/python tools/force_stress_gate.py               --output $OUT/gate --engine fastmace --model omat0-medium --checkpoint $CK               --structures-root $FASTMACE_STRUCTURES --structures NaCl NbCl5 --repeat 3 3 3               --production-constant ${GATEC:?set GATEC} > $OUT/gate.log 2>&1 < /dev/null
