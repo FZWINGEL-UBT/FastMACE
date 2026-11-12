@@ -2079,6 +2079,23 @@ def test_released_species_maps_are_uint8_with_the_same_values():
         assert torch.equal(field._species_index.long(), species)
         assert torch.equal(field._sender_groups.long(), groups)
         assert torch.equal(field.node_e0(), e0)
+        # The neighbour list's groups are the force field's tensor, not an int64 copy beside it (8 bytes per atom),
+        # and its edges the same.
+        assert field.neighbours.sender_groups is field._sender_groups
+        count = int(kept.neighbours.count)
+        assert int(field.neighbours.count) == count
+        for ours, theirs in zip(field.neighbours.edges(count), kept.neighbours.edges(count)):
+            assert torch.equal(ours, theirs)
+
+
+def test_the_tiled_call_drops_the_whole_system_block_order():
+    """``_bind_streaming_count(block_order=False)`` (the tiled call's bind): the whole-system BLOCK_ORDER order is
+    not kept unbound (4 bytes per atom); a call that binds it builds it again."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    field._block_order = torch.arange(len(atoms), dtype=torch.int32)
+    field._bind_streaming_count(block_order=False, plans=False)
+    assert field._block_order is None
 
 
 def test_large_caps_join_a_default_budget_of_host_state_calls_only(monkeypatch):
