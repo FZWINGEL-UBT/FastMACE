@@ -1704,11 +1704,15 @@ class TiledForceField:
             bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + (skin if kept is not None else 0.0))
             if not self._reusing:
                 bins.bin(positions)
-            # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device).
-            positions64 = positions.to(device=self.device, dtype=torch.float64) if kept is not None else None
+            # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device). Host rows
+            # (TILE_HOST_ROWS): none on the device; each tile's test gathers its own rows on the host (the same
+            # values, as the tile lists' search), and no TILE_FILTER32 (its float32 copy is whole-system too).
+            host_rows = kept is not None and _tile_list().rows_on_host(positions, self.device)
+            positions64 = (None if kept is None else positions if host_rows
+                           else positions.to(device=self.device, dtype=torch.float64))
             # TILE_FILTER32: float32 positions (12 bytes per atom) and the band of squared lengths tested again
             # in float64; the float64 shifts of the 27 one-byte unit codes
-            fast = kept is not None and self._reusing and self._speed(TILE_FILTER32)
+            fast = kept is not None and self._reusing and not host_rows and self._speed(TILE_FILTER32)
             if fast:
                 positions32 = positions64.to(torch.float32)
                 codes = torch.arange(27, device=self.device)
@@ -1757,7 +1761,14 @@ class TiledForceField:
                         return _filter32(positions32, positions64, shifts27, band, cutoff, sender, receiver, unit,
                                          packed.long(), bins.float_dtype)
                 shifts64 = times_3x3(unit.to(torch.float64), bins.cell)
-                vectors = positions64[receiver] - positions64[sender] + shifts64
+                if host_rows:  # the tile's rows only, gathered on the host
+                    rows = torch.unique(torch.cat([receivers.long(), sender.long()]))  # sorted
+                    here = positions64[rows.cpu()].to(self.device)
+                    vectors = here[torch.searchsorted(rows, receiver.long())] \
+                        - here[torch.searchsorted(rows, sender.long())] + shifts64
+                    del rows, here
+                else:
+                    vectors = positions64[receiver] - positions64[sender] + shifts64
                 keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
                 del vectors
                 return sender[keep], receiver[keep], unit[keep], shifts64[keep].to(bins.float_dtype)

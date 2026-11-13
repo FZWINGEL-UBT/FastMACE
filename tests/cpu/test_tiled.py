@@ -2049,6 +2049,40 @@ def test_host_rows_call_is_bitwise_the_device_rows_call(mode, monkeypatch):
         assert np.array_equal(host[1], device[1]) and np.array_equal(host[2], device[2])
 
 
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_host_rows_kept_lists_are_bitwise_the_device_rows(mode, monkeypatch):
+    """Host rows with kept lists (``list_reuse``): the kept lists' float64 distance test gathers each tile's rows on
+    the host instead of a whole-system float64 copy on the device (24 bytes per atom; the 397.5M go/no-go's first
+    call): the calls that search and the calls that reuse the kept lists, energy, forces and stress bitwise the
+    device-rows calls."""
+    from fastmace.model import tiled as tiled_module
+    from fastmace.neighbors import tile_list
+
+    monkeypatch.setattr(tiled_module, "TILE_LOCAL_FRAME", True)
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    rng = np.random.default_rng(3)
+    steps = [atoms.copy() for _ in range(3)]
+    for step in steps[1:]:  # within the skin: the kept lists are reused
+        step.positions = step.positions + rng.uniform(-0.02, 0.02, step.positions.shape)
+    results, reused = {}, {}
+    for host in (False, True):
+        if host:
+            monkeypatch.setattr(tile_list, "rows_on_host", lambda positions, device: True)
+            monkeypatch.setattr(tile_list, "CHUNK", 1000)
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse_floor=0))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[host], reused[host] = [], []
+        for step in steps:
+            results[host].append(tiled.evaluate(step, stress=True))
+            reused[host].append(tiled.last["list_reused"])
+    assert reused[True] == reused[False] and any(reused[True])
+    for device, host in zip(results[False], results[True]):
+        assert host[0] == device[0]
+        assert np.array_equal(host[1], device[1]) and np.array_equal(host[2], device[2])
+
+
 def test_host_positions_need_the_tile_lists_and_are_a_view():
     """``_prepare_one_off(host=True)``: refused with the global list (it compacts on the device); without it the
     atoms' own float64 array, not a copy."""
