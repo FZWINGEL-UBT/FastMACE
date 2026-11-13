@@ -1,0 +1,106 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-11-12T20:22:30.257330+00:00",
+  "host": "a0934",
+  "python": "/tmp/4990788.alex/mh1/envs/mace_cueq_oeq_torch215_prof/bin/python",
+  "fastmace_commit": "236fa60c",
+  "torch": "2.15.0+cu132",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "model": "mh1-r2scan",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "3x3x3",
+  "natoms": 1944,
+  "volume_A3": 55909.94847866195,
+  "steps": 300,
+  "warmup": 300,
+  "timestep_fs": 0.5,
+  "temperature_K": 300.0,
+  "status": "error",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 84680048640,
+      "outside_allocator": 445448192
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 84680048640,
+    "cuda_total_bytes": 85125496832,
+    "windows": null
+  },
+  "rewrites": {},
+  "constants": [
+    "torch._inductor.config:comment_origin=True"
+  ],
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "builtins.RuntimeError",
+    "message": "record_py_stacks=True could not register CUPTI node-creation callbacks. This requires cupti-python, CUPTI >= 13.3, and a CUPTI subscription not already held by another profiler (e.g. Kineto or Nsight Systems). Disable record_py_stacks and use backend='auto' to capture without stacks.",
+    "tried_to_allocate": null,
+    "stage": "capture",
+    "frames": [
+      "tools/bench/capacity_scan.py:416 run_point: sim = fm.Simulation(atoms, field, seed=args.seed,",
+      "fastmace/simulation.py:687 __init__: gate=options.gate, moves=moves).run(failure)",
+      "fastmace/planner/fallback.py:1273 run: raise failure.error",
+      "fastmace/simulation.py:735 _build_and_prepare: self._engine.prepare()",
+      "fastmace/engine/graph.py:389 prepare: self._captured(key)",
+      "fastmace/engine/graph.py:1241 _captured: self._capture(key)",
+      "fastmace/engine/graph.py:1390 _capture: with torch.cuda.graph(graph, pool=self._pool, stream=side):",
+      "/tmp/4990788.alex/mh1/envs/mace_cueq_oeq_torch215_prof/lib/python3.11/site-packages/torch/cuda/graphs.py:1400 __enter__: raise RuntimeError("
+    ],
+    "memory": {
+      "max_allocated": 3743898624,
+      "max_reserved": 4330618880,
+      "allocated": 215168000,
+      "reserved": 251658240,
+      "inactive_split_bytes": 0,
+      "active_bytes": 3743898624,
+      "reserved_bytes": 4330618880,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 84313047040,
+      "outside_allocator": 560791552
+    },
+    "causes": []
+  },
+  "times": {
+    "load_s": 48.130590254906565
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}

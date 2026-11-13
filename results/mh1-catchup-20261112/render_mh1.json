@@ -1,0 +1,191 @@
+{
+ "problem": {
+  "irreps_in1": "128x0e+128x1o",
+  "irreps_in2": "1x0e+1x1o+1x2e+1x3o",
+  "irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+  "instructions": [
+   [
+    "0",
+    "0",
+    "0",
+    "uvu",
+    "True"
+   ],
+   [
+    "1",
+    "1",
+    "1",
+    "uvu",
+    "True"
+   ],
+   [
+    "0",
+    "1",
+    "2",
+    "uvu",
+    "True"
+   ],
+   [
+    "1",
+    "0",
+    "3",
+    "uvu",
+    "True"
+   ],
+   [
+    "1",
+    "2",
+    "4",
+    "uvu",
+    "True"
+   ],
+   [
+    "0",
+    "2",
+    "5",
+    "uvu",
+    "True"
+   ],
+   [
+    "1",
+    "1",
+    "6",
+    "uvu",
+    "True"
+   ],
+   [
+    "1",
+    "3",
+    "7",
+    "uvu",
+    "True"
+   ],
+   [
+    "0",
+    "3",
+    "8",
+    "uvu",
+    "True"
+   ],
+   [
+    "1",
+    "2",
+    "9",
+    "uvu",
+    "True"
+   ]
+  ],
+  "interactions": 2
+ },
+ "layout": "ir_mul",
+ "variants": {
+  "a100-slope": {
+   "flags": {
+    "table_w": false,
+    "factored": true,
+    "horner": false,
+    "fold_alpha": false,
+    "scalar_paths": true,
+    "butterfly": true,
+    "redux": false,
+    "stage_dout": true,
+    "stage_sh": 4,
+    "stage_edges": false,
+    "skip_outside": false,
+    "hoist_dx": false,
+    "late_pullback": false,
+    "weighted_vector": true,
+    "channel_vector": 0
+   },
+   "lines": 1388,
+   "weighted_paths": [
+    4,
+    5,
+    7,
+    8,
+    9
+   ]
+  },
+  "a100-tablew": {
+   "flags": {
+    "table_w": true,
+    "factored": true,
+    "horner": true,
+    "fold_alpha": true,
+    "scalar_paths": true,
+    "butterfly": true,
+    "redux": false,
+    "stage_dout": true,
+    "stage_sh": 4,
+    "stage_edges": false,
+    "skip_outside": true,
+    "hoist_dx": true,
+    "late_pullback": false,
+    "weighted_vector": true,
+    "channel_vector": 0
+   },
+   "lines": 1563,
+   "weighted_paths": [
+    4,
+    5,
+    7,
+    8,
+    9
+   ]
+  },
+  "h200-slope": {
+   "flags": {
+    "table_w": false,
+    "factored": true,
+    "horner": false,
+    "fold_alpha": false,
+    "scalar_paths": true,
+    "butterfly": true,
+    "redux": false,
+    "stage_dout": true,
+    "stage_sh": 4,
+    "stage_edges": false,
+    "skip_outside": false,
+    "hoist_dx": false,
+    "late_pullback": false,
+    "weighted_vector": false,
+    "channel_vector": 0
+   },
+   "lines": 1436,
+   "weighted_paths": [
+    4,
+    5,
+    7,
+    8,
+    9
+   ]
+  },
+  "h200-tablew": {
+   "flags": {
+    "table_w": true,
+    "factored": true,
+    "horner": true,
+    "fold_alpha": true,
+    "scalar_paths": true,
+    "butterfly": true,
+    "redux": false,
+    "stage_dout": true,
+    "stage_sh": 4,
+    "stage_edges": false,
+    "skip_outside": true,
+    "hoist_dx": true,
+    "late_pullback": false,
+    "weighted_vector": false,
+    "channel_vector": 0
+   },
+   "lines": 1611,
+   "weighted_paths": [
+    4,
+    5,
+    7,
+    8,
+    9
+   ]
+  }
+ }
+}

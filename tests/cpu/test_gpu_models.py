@@ -69,6 +69,28 @@ def test_table_w_default(monkeypatch):
     assert wprime_backward.table_w_default(torch.device("cpu"), generic=False)
 
 
+def test_table_w_default_for_mh1(monkeypatch):
+    """MH-1 (generic=False) takes TABLE_W by label on TABLE_W_MH1_GPUS (the Ada and every A100; decision 66,
+    fastmace/mh1-catchup); POLAR-1 (the same class) and unlabelled models do not."""
+    assert set(wprime_backward.TABLE_W_MH1_LABELS) == {"mh1-r2scan", "mh1-omat", "mh1-mp"}
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
+    cuda = torch.device("cuda", 0)
+    assert wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-r2scan")
+    assert wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-omat")
+    assert not wprime_backward.table_w_default(cuda, generic=False, model_label="polar1-m")
+    assert not wprime_backward.table_w_default(cuda, generic=False)
+    assert not wprime_backward.table_w_default(torch.device("cpu"), generic=False, model_label="mh1-r2scan")
+    for a100 in ("NVIDIA A100-SXM4-80GB", "NVIDIA A100 80GB PCIe"):  # every A100 model (Alex 4990788)
+        monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=a100: name)
+        assert wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-mp")
+    for other in ("NVIDIA L4", "NVIDIA H200"):  # the H200: not measured for MH-1
+        monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=other: name)
+        assert not wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-r2scan")
+    monkeypatch.setattr(wprime_backward, "TABLE_W", False)
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA RTX 4000 Ada Generation")
+    assert not wprime_backward.table_w_default(cuda, generic=False, model_label="mh1-r2scan")
+
+
 def test_block_message_default(monkeypatch):
     """BLOCK_MESSAGE: on for the RTX 5060 Ti, the RTX 4000 Ada and every A100, off elsewhere; the constant overrides."""
     assert wprime_backward.BLOCK_MESSAGE is None
@@ -232,6 +254,13 @@ def test_segment_rows_default(monkeypatch):
                      ("NVIDIA GeForce RTX 5060 Ti", False), ("NVIDIA RTX 4000 Ada Generation", False)):
         monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None, name=name: name)
         assert segment_rows.segment_rows_default(torch.device("cuda", 0)) is on, name
+    # MH-1's off-list (fastmace/mh1-catchup): off on every A100 for its three heads, on for OMAT-0
+    monkeypatch.setattr(torch.cuda, "get_device_name", lambda device=None: "NVIDIA A100 80GB PCIe")
+    assert set(segment_rows.SEGMENT_ROWS_MODEL_OFF_GPUS) == {"mh1-r2scan", "mh1-omat", "mh1-mp"}
+    assert not segment_rows.segment_rows_default(torch.device("cuda", 0), "mh1-omat")
+    assert segment_rows.segment_rows_default(torch.device("cuda", 0), "omat0-medium")
+    monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", True)
+    assert segment_rows.segment_rows_default(torch.device("cuda", 0), "mh1-r2scan")
     monkeypatch.setattr(segment_rows, "SEGMENT_ROWS", False)
     assert not segment_rows.segment_rows_default(torch.device("cuda", 0))
     assert segment_rows.SEGMENT_GROUPED is None and not segment_rows.segment_grouped_default("cpu")
@@ -433,6 +462,24 @@ def test_dynamo_calls_a_dynamo_constant_at_trace_time():
     x = torch.ones(3)
     assert torch.equal(scaled(x), 2 * x) and torch.equal(scaled(x), 2 * x)
     assert calls == [0]
+
+
+def test_recompute_conv_weights_beside_table_w():
+    """recompute_conv_weights beside an MH-1 w' with TABLE_W (no stored w): the rebuild kernels are not attached
+    (attach_rebuild refuses TABLE_W), and the rung still applies (memory rescue, rule 12)."""
+    import types
+
+    class RealAgnosticResidualNonLinearInteractionBlock:  # the factored class, by name
+        pass
+
+    calls = []
+    interaction = RealAgnosticResidualNonLinearInteractionBlock()
+    interaction.chunked_backward_edges = 4096
+    interaction.fused_folded_forward = object()
+    interaction.streaming_kernels = object()
+    interaction.wprime_backward = types.SimpleNamespace(table_w=True, attach_rebuild=lambda *a: calls.append(a))
+    names = radial.attach_recompute(types.SimpleNamespace(interactions=[interaction]))
+    assert calls == [] and names == ["interactions.0 (TABLE_W: the forward stores no w)"]
 
 
 def test_the_ada_takes_the_cutlass_backend_with_linear_div():

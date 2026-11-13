@@ -556,6 +556,12 @@ DECISION_66_STOCK_FIRST_TABLES_GPUS = GPUModels(("NVIDIA A100-SXM4-80GB", "NVIDI
 # gate SrTiO3 forces 0.93, NaCl 0.83 (every A100 model, GPUModels). The H200 is not measured and keeps it off.
 DECISION_66_EDGE_INDEX_INT32_GPUS = GPUModels(("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation",
                                                "NVIDIA A100-SXM4-80GB"))
+# Per-model exclusions: model label -> GPUs where edge_index_int32 stays off. MH-1 on the A100 (fastmace/mh1-catchup,
+# results/mh1-catchup-20261112), b = int32 off against the defaults, both build orders: Alex 4990788 NaCl 3x3x3
+# 0.9878 / 0.9863, NbCl5 0.9944 / 0.9958; on the TABLE_W base (Alex 4991719) 0.9819 / 0.9857, 0.9985 / 0.9961. Exact
+# (indices only).
+DECISION_66_EDGE_INDEX_INT32_MODEL_OFF_GPUS = MappingProxyType({
+    label: GPUModels(("NVIDIA A100-SXM4-80GB",)) for label in ("mh1-r2scan", "mh1-omat", "mh1-mp")})
 DECISION_66_GENERIC_FOLD_PRODUCT_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation", "NVIDIA A100-SXM4-80GB",
                                                    "NVIDIA H200", "NVIDIA GeForce RTX 5060 Ti"))
 
@@ -1049,10 +1055,12 @@ class FixedPlanner:
             if probing else "no MD on CUDA: nothing to probe"))
         int32_request = self.neighbours.edge_index_int32
         measured = getattr(hardware, "name", None) in DECISION_66_EDGE_INDEX_INT32_GPUS
-        edge_index_int32 = int32_request if int32_request != "auto" else _toggle(measured)
+        model_off = getattr(hardware, "name", None) in DECISION_66_EDGE_INDEX_INT32_MODEL_OFF_GPUS.get(model_label, ())
+        edge_index_int32 = int32_request if int32_request != "auto" else _toggle(measured and not model_off)
         book.decide("NeighbourConfig.edge_index_int32", edge_index_int32, _why(
             int32_request, AUTO_RULES["NeighbourConfig.edge_index_int32"],
-            "gate and A/B passed on this GPU" if measured
+            f"slower for {model_label} on this GPU (decision 66 per-model off-list)" if measured and model_off
+            else "gate and A/B passed on this GPU" if measured
             else f"not a measured GPU ({getattr(hardware, 'name', None)})"))
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
                                        evaluation=evaluation, mc=mc, optimizer=optimizer)
