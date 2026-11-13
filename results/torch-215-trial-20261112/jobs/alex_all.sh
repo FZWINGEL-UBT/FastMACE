@@ -32,10 +32,14 @@ build() { local name=$1 py=$2; shift 2
 $UV python install 3.11.16 3.10.12 >> $L/build.log 2>&1
 build mace_cueq_oeq_torch215 3.11.16 -r $L/req.txt "torch==2.15.0+cu132" nvidia-cuda-crt==13.2.86 \
   --extra-index-url https://download.pytorch.org/whl/cu132 --index-strategy unsafe-best-match || exit 3
+# 4990792 died here (exit 3 after 2 min): torch 2.14.1+cu130 pins cuda-toolkit[cublas]==13.0.3 -> nvidia-cublas
+# 13.1.1.3.*, so swapping the pin in the freeze is unsatisfiable. Build from the production freeze, then override
+# cuBLAS with --no-deps; a failed variant is skipped, never fatal for the attribution part.
 for v in 134:13.4.1.3 138:13.8.2.12; do
-  sed "s/^nvidia-cublas==.*/nvidia-cublas==${v#*:}/" $L/prod-freeze.txt > $L/req-cublas${v%%:*}.txt
-  build mace_cueq_oeq_cublas${v%%:*} 3.10.12 -r $L/req-cublas${v%%:*}.txt \
-    --extra-index-url https://download.pytorch.org/whl/cu130 --index-strategy unsafe-best-match || exit 3
+  build mace_cueq_oeq_cublas${v%%:*} 3.10.12 -r $L/prod-freeze.txt \
+    --extra-index-url https://download.pytorch.org/whl/cu130 --index-strategy unsafe-best-match \
+    && $UV pip install -q --python $L/envs/mace_cueq_oeq_cublas${v%%:*}/bin/python --no-deps nvidia-cublas==${v#*:} \
+      >> $L/build.log 2>&1 || echo "SKIP cublas${v%%:*}"
 done
 grep -v -i -E '^(exceptiongroup|tomli)==' $L/prod-freeze.txt > $L/req-t9.txt
 build mace_cueq_oeq_triton39 3.11.16 -r $L/req-t9.txt --extra-index-url https://download.pytorch.org/whl/cu130   --index-strategy unsafe-best-match || exit 3
