@@ -153,6 +153,11 @@ TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in floa
 # tiles' form: each padded slot gets its float64 rows gathered on the host and copied in (``_fill``; an eager tile
 # gathers its own), the values ``positions64[nodes]`` reads on the device. False: the bins and offsets as before.
 TILE_HOST_ROWS = True
+# TILE_HOST_ROWS_KEPT (exact; 13 November 2026, results/billion-atoms-20261111/census-leto): with host positions, the
+# kept lists' float64 distance test gathers each tile's rows on the host instead of a whole-system float64 copy on
+# the device (24 bytes per atom in any call that keeps lists; the 397.5M go/no-go's first call carried it).
+# TILE_FILTER32 is off with it (its float32 copy is whole-system too). False: the device copy, as before.
+TILE_HOST_ROWS_KEPT = True
 # TILE_WHOLE_BLOCK_ORDER (A/B only; billion-atom step 1): True binds the whole-system BLOCK_ORDER receiver order in the
 # tiled call as before (int32 [N], 4 B/atom; its per-tile kernels never read it). False (default): not built.
 TILE_WHOLE_BLOCK_ORDER = False
@@ -1707,7 +1712,8 @@ class TiledForceField:
             # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device). Host rows
             # (TILE_HOST_ROWS): none on the device; each tile's test gathers its own rows on the host (the same
             # values, as the tile lists' search), and no TILE_FILTER32 (its float32 copy is whole-system too).
-            host_rows = kept is not None and _tile_list().rows_on_host(positions, self.device)
+            host_rows = (kept is not None and bool(TILE_HOST_ROWS_KEPT)
+                         and _tile_list().rows_on_host(positions, self.device))
             positions64 = (None if kept is None else positions if host_rows
                            else positions.to(device=self.device, dtype=torch.float64))
             # TILE_FILTER32: float32 positions (12 bytes per atom) and the band of squared lengths tested again
