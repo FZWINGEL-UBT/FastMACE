@@ -1,0 +1,110 @@
+{
+  "tool": "capacity_scan",
+  "created_utc": "2026-11-12T14:28:34.335227+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq_torch215/bin/python",
+  "fastmace_commit": "b7c19b19",
+  "torch": "2.15.0+cu132",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "model": "omat0-medium",
+  "structure": "NbCl5",
+  "precision": "float32",
+  "repeat": "3x3x3",
+  "natoms": 1944,
+  "volume_A3": 55909.94847866195,
+  "steps": 1000,
+  "warmup": 200,
+  "timestep_fs": 1.0,
+  "temperature_K": 300.0,
+  "status": "error",
+  "phases": {
+    "load": {
+      "max_allocated": 0,
+      "max_reserved": 0,
+      "allocated": 0,
+      "reserved": 0,
+      "inactive_split_bytes": 0,
+      "active_bytes": 0,
+      "reserved_bytes": 0,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15894315008,
+      "outside_allocator": 1180434432
+    }
+  },
+  "start": {
+    "cuda_free_bytes": 15894315008,
+    "cuda_total_bytes": 17074749440,
+    "windows": {
+      "used_MiB": 2297,
+      "total_MiB": 16311
+    }
+  },
+  "rewrites": {},
+  "constants": [
+    "fastmace.kernels.oeq_streaming.runtime:NVRTC='/home/fzwin/fm-t215/census/nvrtc-13.0.88/nvidia/cu13/lib/libnvrtc.so.13'"
+  ],
+  "engine": {},
+  "neighbours": {},
+  "environment": {
+    "CUDA_LAUNCH_BLOCKING": null,
+    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+  },
+  "failure": {
+    "phase": "build",
+    "type": "subprocess.CalledProcessError",
+    "message": "Command '['/home/fzwin/environments/mace_cueq_oeq_torch215/bin/python', '-c', \"import ctypes, os, sys\\nctypes.CDLL(sys.argv[1], mode=ctypes.RTLD_GLOBAL)\\nfrom fastmace.kernels.oeq_streaming import runtime\\nimport ast\\na = ast.literal_eval(open(sys.argv[2]).read())\\nopen(sys.argv[3], 'wb').write(runtime.compile_cubin(*a))\\n\", '/home/fzwin/fm-t215/census/nvrtc-13.0.88/nvidia/cu13/lib/libnvrtc.so.13', '/home/fzwin/fm-t215/matrix/tmp/tmpdtixuv4n/args.py', '/home/fzwin/fm-t215/matrix/tmp/tmpdtixuv4n/out.cubin']' returned non-zero exit status 1.",
+    "tried_to_allocate": null,
+    "stage": null,
+    "frames": [
+      "fastmace/model/compile.py:295 compile_model: prepare(private)",
+      "fastmace/model/forces.py:594 prepare: self.applied = registry.apply(private, resolution, context, original=source, check=check)",
+      "fastmace/rewrites/registry.py:686 apply: detail = self._records[name].apply(model, context)",
+      "fastmace/rewrites/generic/__init__.py:290 apply_streaming: attach_streaming_kernels(interaction)",
+      "fastmace/rewrites/mh1/modules.py:678 attach_streaming_kernels: interaction.streaming_kernels = StreamingKernels(",
+      "fastmace/kernels/oeq_streaming/runtime.py:144 __init__: cubin = compile_cubin(self.source, torch.cuda.get_device_capability(), extra_options)",
+      "fastmace/kernels/oeq_streaming/runtime.py:100 compile_cubin: return _compile_elsewhere(source, capability, extra_options, suffix)",
+      "fastmace/kernels/oeq_streaming/runtime.py:90 _compile_elsewhere: subprocess.run([sys.executable, \"-c\", helper, NVRTC, args, cubin], check=True, env=env,",
+      "/home/fzwin/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/subprocess.py:571 run: raise CalledProcessError(retcode, process.args,"
+    ],
+    "memory": {
+      "max_allocated": 160999424,
+      "max_reserved": 182452224,
+      "allocated": 83372544,
+      "reserved": 182452224,
+      "inactive_split_bytes": 0,
+      "active_bytes": 160999424,
+      "reserved_bytes": 182452224,
+      "alloc_retries": 0,
+      "segments": 0,
+      "cuda_free": 15544090624,
+      "outside_allocator": 1348206592
+    },
+    "causes": []
+  },
+  "times": {
+    "load_s": 3.142420478994609
+  },
+  "warnings": [
+    "UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.",
+    "PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'",
+    "PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'",
+    "PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'"
+  ]
+}
