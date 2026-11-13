@@ -59,7 +59,7 @@ CUTLASS cubin load, torch.compile, CUDA-graph capture, OMAT-0 force call, and Si
 - Gate (`tools/force_stress_gate.py`, SrTiO3 3x3x3 and NbCl5, 3x float32 bound against the 2.14.1 reference): b
   passes on the Ada.
   - SrTiO3 energy ratio 3.5 against a's own 4.3; the bound is the 0.01 eV floor.
-  - Matrix gates (b, t9, c4, c8) on the A100: §5.
+  - Matrix gates (b, t9, c4, c8) on the A100: not measured (§5).
 
 ## 3. A/B: torch 2.15 against 2.14.1 (one process per run, ABAB then BABA, 200 warmup + 1000 steps)
 
@@ -127,7 +127,35 @@ Microseconds per MD step, SrTiO3 10^3:
 
 ## 5. CUDA library matrix
 
-(filled from `*/matrix/run.log` when the runs finish: leeloo, local 5060 Ti, Alex A100 job 4989438)
+One process per variant and structure, all variants forward then reversed (f1, r1). Each cell is the mean of the
+two passes in ms per step, then the change against production `a`. Cross-process noise is about 3%, so only
+changes that both passes agree on, and that the same-process A/B of §3 confirms, count. Table from
+`jobs/matrix_table.py */matrix/run.log`.
+
+| Variant | Ada SrTiO3 10³ | Ada NbCl5 | 5060 Ti SrTiO3 10³ | 5060 Ti NbCl5 |
+| --- | --- | --- | --- | --- |
+| a: production 2.14.1, cuBLAS 13.1.1, NVRTC 13.0, Triton 3.8 | 17.17 | 3.77 | 15.74 | 3.31 |
+| c4: cuBLAS 13.4.1 | 17.18 (+0.0%) | 3.76 (-0.3%) | 15.81 (+0.4%) | 3.39 (+2.3%, passes 3.32 / 3.46) |
+| c8: cuBLAS 13.8.2 | 17.18 (+0.1%) | 3.75 (-0.5%) | 15.62 (-0.8%) | 3.33 (+0.6%) |
+| t9: Triton 3.9 on Python 3.11 | **16.54 (-3.7%)** | **3.46 (-8.1%)** | 15.63 (-0.7%) | 3.33 (+0.3%) |
+| n2: our kernels by NVRTC 13.2 | 17.36 (+1.1%) | 3.76 (-0.1%) | 15.86 (+0.8%) | 3.37 (+1.5%) |
+| n4: NVRTC 13.4 | 17.34 (+1.0%) | 3.76 (-0.1%) | 15.79 (+0.3%) | 3.38 (+2.0%) |
+| n5: NVRTC 13.5 | 17.37 (+1.2%) | 3.76 (-0.1%) | 15.90 (+1.0%) | 3.38 (+2.1%) |
+| b: torch 2.15 | 16.69 (-2.8%) | 3.50 (-7.2%) | 15.92 (+1.1%) | 3.38 (+2.1%) |
+| b0: torch 2.15, our kernels by NVRTC 13.0 | 16.51 (-3.9%) | 3.46 (-8.1%) | failed | failed |
+
+- **The whole 2.15 gain on the Ada is Triton 3.9:** t9 alone reaches it, and b0 (2.15 without the NVRTC change)
+  equals t9. b minus b0 is the NVRTC 13.2 cost, +1% on SrTiO3, the same as n2 on production.
+- **cuBLAS changes nothing** beyond noise on either GPU.
+- **Every newer NVRTC is slower or equal on sm_89 and sm_120;** none is faster.
+- **The 5060 Ti gains from nothing.** Its Triton GEMMs are not on the critical path (§4).
+- **b0 on the 5060 Ti** failed in the NVRTC 13.0 child compile of the torch 2.15 environment (`runtime.py:90`
+  `_compile_elsewhere`); not analysed, since the Ada b0 already answers the question.
+
+**A100: not measured.** Alex job 4990792 (matrix, gates, census run and step attribution in one job) failed in its
+environment setup on 12 November: the cuBLAS-variant build pinned a cuBLAS that torch 2.14.1 forbids. The fixed
+script is `jobs/alex_all.sh` (1ab751a3). It is not resubmitted while the owner's hold on new Alex jobs stands
+(12 November). On the A100 only the offline census below exists.
 
 ### Offline NVRTC census, sm_80 / sm_90 (`jobs/census_nvrtc.py`, leto, CPU only)
 
@@ -247,8 +275,9 @@ What this means:
 - **The second largest is the per-step compose:** 1.8% / 9.8% on the Ada, and the clearest work removal.
 - **Small-kernel launch overhead and host syncs are small in steady state:** small Inductor kernels and idle time are under 0.4% / 0.8% of the step.
 
-A100 (Alex job 4990485, cupti-python on native Linux): pending; it is queued and expected to start about
-21:47 CET.
+A100: not measured. Job 4990485 failed (CUPTI 13.2 too old for `record_py_stacks`), and its replacement 4990792
+failed in environment setup (§5). The fixed one-job script `jobs/alex_all.sh` waits, unsubmitted, until the owner
+lifts the hold on new Alex jobs. `jobs/layout_rows.py` then prints the A100 rows that step-layout-cleanup asked for.
 
 ## 6b. Falsifier: Triton 3.9's tf32x3 gain on Triton 3.8 by an explicit register split (Ada, closed)
 
@@ -337,21 +366,27 @@ Findings:
 ## 7. Recommendations
 
 1. **Stay on 2.14.1.**
-2. **Ada and other GPUs where Triton runs tf32x3 (bound: about 700 us, 4% of the Ada step):**
-   - Either rewrite the tf32x3 `gemm` so that Triton 3.8 splits in registers (explicit hi/lo split, three tf32
-     `tl.dot`) and check its shared memory and registers against Triton 3.9's;
-   - or adopt Triton 3.9 alone if t9 holds up (needs Python 3.11).
-   - The idea goes through ledger triage (kernel lab next).
-3. **Pin no cuBLAS:** no effect on the Ada.
+2. **Ada and other GPUs where Triton runs tf32x3 (measured: t9 -3.7% SrTiO3 10³, -8.1% NbCl5, §5):**
+   - The cheap route, an explicit register split on Triton 3.8, is closed (§6b: no shared-memory saving).
+   - Fewer pipeline stages are closed too (§6c).
+   - What remains is Triton 3.9 alone (needs Python 3.11 for production, plus its own gate and A/B) or a
+     hand-written MMA kernel.
+3. **Pin no cuBLAS:** no effect beyond noise on the Ada or the 5060 Ti.
 4. **NVRTC stays 13.0 on consumer GPUs**: 13.2 is 4-7% slower on w' backward for sm_89 and sm_120.
 5. **A later migration must:** add `nvidia-cuda-crt`, re-pin save_transcendentals, and keep NVRTC 13.0 for our
    kernels or fix the sm_89/sm_120 regression.
+6. **Work removal found by the attribution (§6a, handed to step-layout-cleanup):** build `species_plan` once per
+   species change, not every step; move the per-step compose out of the graph; remove the layout copies at
+   `generic/modules.py:211`/`:530` and `tabled_outer_sum.py:739`/`:757`.
+7. **A100: not measured.** Run the fixed one-job script (`jobs/alex_all.sh`) once the owner lifts the Alex hold.
 
 ## Files
 
 - `jobs/`: all scripts.
   - `job.sh`: compat, cold, A/B, profiles, gate.
-  - `matrix.sh`, `ws_matrix.sh`, `alex_matrix.sh`: the library matrix.
+  - `matrix.sh`, `ws_matrix.sh`, `alex_matrix.sh`: the library matrix; `matrix_table.py`: the §5 table.
+  - `alex_all.sh`: the one A100 job (attribution, then matrix, gates and census); not run.
+  - `attribution.py`, `gaps_radix.py`, `layout_rows.py`: §6a; `split_lab.py`: §6b; `stages_lab.py`: §6c.
   - `profile_point.py`, `kernel_category.py`, `analyze.py`.
   - `census_nvrtc.py`, `nvrtc_census.sh`.
   - env builds: `cublas.sh`, `cublas138.sh`, `triton39.sh`, `local_build.sh`.

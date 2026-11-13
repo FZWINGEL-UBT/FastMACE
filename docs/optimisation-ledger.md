@@ -1044,6 +1044,9 @@ ab / ba. "Device" is the plain schedule with the state on the device; "wave" the
 | [ext-torchsim](#ext-torchsim) | TorchSim 0.6.2 comparison | none | FM | MEASUREMENT | 2026-10-25 | FastMACE 3.8–10× faster | [TorchSim](validation/comparisons/torchsim-comparison-20261025.md) |
 | [ext-alchemi](#ext-alchemi) | NVIDIA ALCHEMI 0.2.0 comparison | none | FM | MEASUREMENT | 2026-10-26 | 2.74–9.62× faster | [ALCHEMI](validation/comparisons/alchemi-comparison-20261025.md) |
 | [ext-stock-ase](#ext-stock-ase) | Stock ASE comparison (phase 4) | none | FM | MEASUREMENT | phase 4 (date not recorded) | 10–23× NaCl, 6–12× NbCl5 | [phase-4](validation/phases/phase-4.md) |
+| [ext-torch215](#ext-torch215) | PyTorch 2.15 and its library parts (Triton 3.9, cuBLAS 13.4/13.8, NVRTC 13.2–13.5) | environment | FM | REJECTED (migration); Triton 3.9 alone OPEN | 2026-11-12 | Ada: 2.15 −2.8 % SrTiO3 10³ / −7.2 % NbCl5, all from Triton 3.9 (t9 −3.7 / −8.1 %); 5060 Ti +1.1 / +2.1 %; NVRTC ≥ 13.2 +1 % on sm_89/sm_120; A100 not measured | [torch-215 trial](../results/torch-215-trial-20261112/README.md) |
+| [prec-tf32x3-regsplit](#prec-tf32x3-regsplit) | tf32x3 by an explicit hi/lo register split on Triton 3.8 | none | FM | REJECTED | 2026-11-12 | no shared-memory saving under Triton 3.8 (offline compile, sm_89) | [torch-215 trial](../results/torch-215-trial-20261112/README.md) §6b |
+| [lin-gemm-num-stages](#lin-gemm-num-stages) | Pipeline stages of the Triton GEMMs (tf32x3_gemm 3→2, species_gemm 2→3) | `tile_rule.NUM_STAGES`, `species_gemm.NUM_STAGES` | FM | REJECTED / BELOW BOUND | 2026-11-12 | tf32x3_gemm at 2 stages +7.4 %; species_gemm at 3 stages −60 µs/step (0.35 % of the Ada step) | [torch-215 trial](../results/torch-215-trial-20261112/README.md) §6c |
 
 ## Chronology
 
@@ -4968,6 +4971,37 @@ the local PC (WSL `mace_cueq_oeq`); A100 = Modal A100-SXM4-80GB.
 - Why: the per-GPU rewrites are keyed by exact device names; the H200 has not been screened.
 - Sources: [H200 profile](../results/omat0-h200-profile-0ab2bd9a/README.md).
 
+
+<a id="ext-torch215"></a>
+#### ext-torch215: PyTorch 2.15 trial and CUDA library matrix (12 November 2026)
+- Switch: environment (torch 2.15.0+cu132 against production 2.14.1+cu130)
+- Engine: FM
+- Date/round: 12 November 2026, source `b7c19b19`, branch `fastmace/torch-215-trial`
+- What: 2.15 against 2.14.1 in same-process A/Bs, then a library matrix that changes one part at a time: cuBLAS 13.4.1 / 13.8.2, Triton 3.9 on Python 3.11, our NVRTC kernels by NVRTC 13.2 / 13.4 / 13.5, and 2.15 with NVRTC 13.0.
+- Status: REJECTED as a migration. Triton 3.9 alone stays OPEN (needs Python 3.11, its own gate and A/B).
+- Measured (matrix, mean of forward and reversed passes): on the RTX 4000 Ada, t9 −3.7 % SrTiO3 10³ / −8.1 % NbCl5 and 2.15 with NVRTC 13.0 the same, so the whole gain is Triton 3.9's tf32x3 code (GEMM kernels 3324 → 2607 µs). cuBLAS changes nothing. NVRTC 13.2–13.5 is about +1 % on SrTiO3 (w' backward 4–7 % slower on sm_89 and sm_120; the same SASS on sm_80/sm_90 by offline census). On the 5060 Ti nothing gains. A100: not measured (Alex 4990792 failed in setup; rerun waits for the owner's Alex hold to lift).
+- Why: Triton 3.9 keeps the tf32x3 split operands in registers; Triton 3.8 routes them through shared memory.
+- Also found: on the Ada, 22 % (SrTiO3) / 19 % (NbCl5) of the step's kernel time sits on lines we don't own. The work removals (`species_plan` argsort every step 0.75 % / 1.7 %, per-step compose 1.8 % / 9.8 %, layout copies 3.8–5.0 %) were handed to step-layout-cleanup.
+- Sources: [torch-215 trial](../results/torch-215-trial-20261112/README.md).
+
+<a id="prec-tf32x3-regsplit"></a>
+#### prec-tf32x3-regsplit: tf32x3 by an explicit register split on Triton 3.8 (12 November 2026)
+- Switch: none (offline lab `jobs/split_lab.py`)
+- Engine: FM
+- Date/round: 12 November 2026, torch-215 trial §6b
+- What: both Triton GEMMs rewritten as a hi/lo split in registers and three tf32 `tl.dot`, to get Triton 3.9's gain on Triton 3.8.
+- Status: REJECTED at the falsifier (triage stage 3).
+- Measured: compiled for sm_89, the split form uses no less shared memory than Triton 3.8's own tf32x3. The extra layout conversions remain.
+- Sources: [torch-215 trial](../results/torch-215-trial-20261112/README.md) §6b.
+
+<a id="lin-gemm-num-stages"></a>
+#### lin-gemm-num-stages: pipeline stages of the Triton GEMMs (12 November 2026)
+- Switch: `tile_rule.NUM_STAGES` (tf32x3_gemm, 3), `species_gemm.NUM_STAGES` (2)
+- Engine: FM
+- Date/round: 12 November 2026, torch-215 trial §6c
+- What: one step's recorded GEMM launches replayed in one process, 3 against 2 stages, ABBA rounds (leto, SrTiO3 10³).
+- Status: tf32x3_gemm at 2 stages REJECTED (+7.4 %, 1962 → 2108 µs/step). species_gemm at 3 stages is BELOW BOUND (−60 µs/step, 0.35 % of the step), recorded and not A/B'd. NbCl5: the lab's replay crashed, not measured.
+- Sources: [torch-215 trial](../results/torch-215-trial-20261112/README.md) §6c.
 
 <a id="ideas-r5"></a>
 ### ideas-r5: owner-pass forward and shared W fragments, lab bounds (6 November 2026)
