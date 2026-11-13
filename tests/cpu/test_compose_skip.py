@@ -205,6 +205,7 @@ def test_count_plan_is_on_for_the_h200_and_the_a100():
 
 def test_joined_layout_is_on_for_the_listed_gpus_only():
     assert compose_skip.JOINED_LAYOUT is None and compose_skip.joined_layout_default("NVIDIA H200")  # 0.9805 / 0.9815
+    assert compose_skip.joined_layout_default("NVIDIA RTX 4000 Ada Generation")  # Triton backend, step-layout-cleanup
     assert not compose_skip.joined_layout_default("NVIDIA GeForce RTX 5060 Ti")
 
 

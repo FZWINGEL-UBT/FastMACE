@@ -1,0 +1,7126 @@
+{
+ "structure": "SrTiO3",
+ "repeat": [
+  160,
+  160,
+  160
+ ],
+ "atoms": 20480000,
+ "receivers": 8192,
+ "edges": null,
+ "rattle": 0.0,
+ "strain": 0.0,
+ "model": "omat0-medium",
+ "backward_single_stream": null,
+ "device": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "alloc_conf": "expandable_segments:True",
+ "source_commit": "e253ce92",
+ "phases": {
+  "user": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2737938432,
+   "host_peak": 2779955200
+  },
+  "plan": {
+   "allocated": 0,
+   "reserved": 0,
+   "peak_above_before": 0,
+   "host_rss": 2739421184,
+   "host_peak": 2932244480
+  },
+  "build": {
+   "seconds": 45.38705748296343,
+   "allocated": 834688512,
+   "reserved": 2139095040,
+   "peak_above_before": 2056604672,
+   "host_rss": 4202446848,
+   "host_peak": 7985844224
+  },
+  "neighbours": {
+   "allocated": 834688512,
+   "reserved": 2139095040,
+   "peak_above_before": 2560,
+   "host_rss": 4223692800,
+   "host_peak": 7985844224
+  }
+ },
+ "phase": "done",
+ "call_rows": 8192,
+ "rewrites": [
+  "AppliedRewrite(name='generic_species_skip', result=CheckResult(passed=True, max_relative_error=5.716314943273929e-07, threshold=0.0001, modules=2, detail='ok', dtype='float32'), detail=['interactions.0', 'interactions.1'])",
+  "AppliedRewrite(name='generic_reassociate', result=CheckResult(passed=True, max_relative_error=7.279755298938403e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_segmented_first_sum', result=CheckResult(passed=True, max_relative_error=7.279755298938403e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.0'])",
+  "AppliedRewrite(name='generic_fused_radial_backward', result=CheckResult(passed=True, max_relative_error=4.217405125517884e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_streaming', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1', 'spherical_harmonics'])",
+  "AppliedRewrite(name='generic_chunked_conv_backward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='generic_fused_folded_forward', result=CheckResult(passed=True, max_relative_error=4.765107296171783e-07, threshold=0.0001, modules=1, detail='ok', dtype='float32'), detail=['interactions.1'])",
+  "AppliedRewrite(name='block_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='grouped_linear', result=CheckResult(passed=True, max_relative_error=3.1949991022052525e-07, threshold=0.0001, modules=10, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.linear', 'interactions.1.linear_up', 'interactions.1.linear', 'products.0.linear', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_1', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_fold_product_linear', result=CheckResult(passed=True, max_relative_error=4.970337440350773e-07, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['products.0.linear', 'interactions.1.linear_up', 'interactions.1.skip_tp', 'readouts.0.linear', 'interactions.0.linear', 'interactions.0.skip_tp', 'products.1.linear', 'interactions.1.skip_tp', 'readouts.1.linear_1'])",
+  "AppliedRewrite(name='tf32x3_gemms', result=CheckResult(passed=True, max_relative_error=4.6036815509829454e-07, threshold=0.0001, modules=12, detail='ok', dtype='float32'), detail=['node_embedding.linear', 'interactions.0.linear_up', 'interactions.0.skip_tp', 'interactions.0.first_reassociation', 'interactions.1.linear_up', 'interactions.1.linear', 'interactions.1.skip_tp', 'products.1.linear', 'readouts.0.linear', 'readouts.1.linear_2'])",
+  "AppliedRewrite(name='generic_radial_tables', result=CheckResult(passed=True, max_relative_error=9.110640918170247e-07, threshold=0.0001, modules=54, detail='ok', dtype='float32'), detail=['interactions.0 (894 pieces, 9 pairs, certificate 0.34, cached)', 'interactions.1 (622 pieces, 9 pairs, certificate 0.36, cached)'])",
+  "AppliedRewrite(name='generic_wprime_backward', result=CheckResult(passed=True, max_relative_error=1.1723467920849276e-06, threshold=0.0001, modules=5, detail='ok', dtype='float32'), detail=['interactions.1 (5616 groups, 5 terms, 137 MiB; spline 731 intervals, certificate 0.48)'])",
+  "AppliedRewrite(name='single_graph_strain', result=CheckResult(passed=True, max_relative_error=2.265465478596652e-16, threshold=1e-10, modules=4, detail='ok', dtype='float64'), detail='per model: bound by the force field (rewrites.engine.bind_strain_path)')"
+ ],
+ "plan_memory": null,
+ "mode": "auto",
+ "first_call_probe": "off",
+ "backward_chunk_edges": [
+  8192
+ ],
+ "ledgers": {
+  "build": [
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     20480000,
+     3
+    ],
+    "count": 1,
+    "bytes": 245760000,
+    "names": [
+     "field.data.positions",
+     "field.positions"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     5616,
+     1280,
+     6
+    ],
+    "count": 1,
+    "bytes": 172523520,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.gprime"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int64",
+    "shape": [
+     20480000
+    ],
+    "count": 1,
+    "bytes": 163840000,
+    "names": [
+     "field.atomic_numbers"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     6579,
+     1280,
+     4
+    ],
+    "count": 1,
+    "bytes": 134737920,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.spline_table"
+    ]
+   },
+   {
+    "device": "meta",
+    "dtype": "torch.float32",
+    "shape": [
+     20480000
+    ],
+    "count": 1,
+    "bytes": 81920000,
+    "names": [
+     "field.data.node_attrs",
+     "field.data.charges",
+     "field.data.density_coefficients"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.int32",
+    "shape": [
+     6579,
+     1280,
+     2
+    ],
+    "count": 1,
+    "bytes": 67368960,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.spline_packed"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     5832704
+    ],
+    "count": 1,
+    "bytes": 46661632,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "OrderedDict[weight]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     1,
+     5832704
+    ],
+    "count": 2,
+    "bytes": 46661632,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "dict[weight]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.uint8",
+    "shape": [
+     20480000
+    ],
+    "count": 2,
+    "bytes": 40960000,
+    "names": [
+     "field._species_index",
+     "tiled._species",
+     "field._sender_groups",
+     "field.neighbours.sender_groups"
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     6,
+     66
+    ],
+    "count": 2,
+    "bytes": 25546752,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[coef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_buffers]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     6,
+     66
+    ],
+    "count": 2,
+    "bytes": 17791488,
+    "names": [
+     "field._streaming.0._modules.radial_table.pcoef",
+     "field._streaming.0._modules.radial_table.coef"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     6,
+     66
+    ],
+    "count": 1,
+    "bytes": 12773376,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[coef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     89,
+     86,
+     128
+    ],
+    "count": 3,
+    "bytes": 11756544,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "dict[weight]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     1458176
+    ],
+    "count": 1,
+    "bytes": 11665408,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "OrderedDict[weight]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     1,
+     1458176
+    ],
+    "count": 2,
+    "bytes": 11665408,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "dict[weight]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 10644480,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[dcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "dict[_buffers]"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     896,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 10644480,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[dcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     6,
+     66
+    ],
+    "count": 1,
+    "bytes": 8895744,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[coef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 7413120,
+    "names": [
+     "field._streaming.0._modules.radial_table.dcoef"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     9,
+     624,
+     5,
+     66
+    ],
+    "count": 1,
+    "bytes": 7413120,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "list",
+      "dict[dcoef]"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator",
+      "cell",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     3,
+     16,
+     16,
+     16,
+     51
+    ],
+    "count": 1,
+    "bytes": 5013504,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "OrderedDict[U_matrix_3]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     585949
+    ],
+    "count": 1,
+    "bytes": 4687592,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "dict[_W3j_flat]",
+      "tuple"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     89,
+     51,
+     128
+    ],
+    "count": 1,
+    "bytes": 4647936,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "OrderedDict[weights_max]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     89,
+     23,
+     128
+    ],
+    "count": 2,
+    "bytes": 4192256,
+    "names": [],
+    "owners": [
+     [
+      "list",
+      "cell",
+      "OrderedDict[weights_max]"
+     ],
+     [
+      "list_iterator",
+      "cell",
+      "cell",
+      "tuple",
+      "list",
+      "cell"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "tuple",
+      "cell",
+      "tuple"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     3,
+     128,
+     128
+    ],
+    "count": 20,
+    "bytes": 3932160,
+    "names": []
+   }
+  ],
+  "after call 0": [
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     3978972,
+     512
+    ],
+    "count": 1,
+    "bytes": 8148934656,
+    "names": [
+     "tiled._g.state.tensors.x"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     668486,
+     512
+    ],
+    "count": 1,
+    "bytes": 1369059328,
+    "names": [
+     "tiled._g.state._window"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     715032
+    ],
+    "count": 612,
+    "bytes": 875199168,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[393]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     701998
+    ],
+    "count": 576,
+    "bytes": 808701696,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[392]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     20480000,
+     3
+    ],
+    "count": 2,
+    "bytes": 491520000,
+    "names": [
+     "field.data.positions",
+     "field.positions",
+     "tiled._g.pos"
+    ],
+    "owners": [
+     [
+      "cell",
+      "ForceOutput",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "list",
+      "cell",
+      "tuple",
+      "list_iterator"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "tuple",
+      "list_iterator"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     20480000,
+     3
+    ],
+    "count": 1,
+    "bytes": 491520000,
+    "names": [
+     "tiled._kept.reference",
+     "tiled._g.local_frame.0"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     677710
+    ],
+    "count": 336,
+    "bytes": 455421120,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[398]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     715032
+    ],
+    "count": 612,
+    "bytes": 437599584,
+    "names": []
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     701998
+    ],
+    "count": 576,
+    "bytes": 404350848,
+    "names": []
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     728770
+    ],
+    "count": 216,
+    "bytes": 314828640,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[407]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     3978972,
+     16
+    ],
+    "count": 1,
+    "bytes": 254654208,
+    "names": [
+     "tiled._g.state.tensors.sc"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     690514
+    ],
+    "count": 180,
+    "bytes": 248585040,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[412]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     689962
+    ],
+    "count": 180,
+    "bytes": 248386320,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[588]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int32",
+    "shape": [
+     20480000
+    ],
+    "count": 3,
+    "bytes": 245760000,
+    "names": [
+     "tiled._g.state._row_of",
+     "tiled._g.state._slot_of"
+    ],
+    "owners": [
+     [
+      "cell",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     677710
+    ],
+    "count": 336,
+    "bytes": 227710560,
+    "names": []
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     665720
+    ],
+    "count": 156,
+    "bytes": 207704640,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[594]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     5616,
+     1280,
+     6
+    ],
+    "count": 1,
+    "bytes": 172523520,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.gprime"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     578778
+    ],
+    "count": 144,
+    "bytes": 166688064,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[197]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int64",
+    "shape": [
+     20480000
+    ],
+    "count": 1,
+    "bytes": 163840000,
+    "names": [
+     "field.atomic_numbers"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     728770
+    ],
+    "count": 216,
+    "bytes": 157414320,
+    "names": []
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     6579,
+     1280,
+     4
+    ],
+    "count": 1,
+    "bytes": 134737920,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.spline_table"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     690514
+    ],
+    "count": 180,
+    "bytes": 124292520,
+    "names": []
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     689962
+    ],
+    "count": 180,
+    "bytes": 124193160,
+    "names": []
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     665720
+    ],
+    "count": 156,
+    "bytes": 103852320,
+    "names": []
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     589484
+    ],
+    "count": 72,
+    "bytes": 84885696,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[211]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "tuple",
+      "cell",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   }
+  ],
+  "after call 1": [
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     5166070,
+     512
+    ],
+    "count": 1,
+    "bytes": 10580111360,
+    "names": [
+     "tiled._g.state.tensors.x"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     689609,
+     512
+    ],
+    "count": 1,
+    "bytes": 1412319232,
+    "names": [
+     "tiled._g.state._window"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1410052
+    ],
+    "count": 350,
+    "bytes": 987036400,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[255]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1430730
+    ],
+    "count": 325,
+    "bytes": 929974500,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[266]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     1410052
+    ],
+    "count": 350,
+    "bytes": 493518200,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[255]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     20480000,
+     3
+    ],
+    "count": 2,
+    "bytes": 491520000,
+    "names": [
+     "field.data.positions",
+     "field.positions",
+     "tiled._g.pos"
+    ],
+    "owners": [
+     [
+      "cell",
+      "ForceOutput",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "list",
+      "cell",
+      "tuple",
+      "list_iterator"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "tuple",
+      "list_iterator"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float64",
+    "shape": [
+     20480000,
+     3
+    ],
+    "count": 1,
+    "bytes": 491520000,
+    "names": [
+     "tiled._kept.reference",
+     "tiled._g.local_frame.0"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     1430730
+    ],
+    "count": 325,
+    "bytes": 464987250,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[266]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1390594
+    ],
+    "count": 125,
+    "bytes": 347648500,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[254]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.float32",
+    "shape": [
+     5166070,
+     16
+    ],
+    "count": 1,
+    "bytes": 330628480,
+    "names": [
+     "tiled._g.state.tensors.sc"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1452334
+    ],
+    "count": 100,
+    "bytes": 290466800,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[388]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1469370
+    ],
+    "count": 90,
+    "bytes": 264486600,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[244]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1273454
+    ],
+    "count": 100,
+    "bytes": 254690800,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[134]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int32",
+    "shape": [
+     20480000
+    ],
+    "count": 3,
+    "bytes": 245760000,
+    "names": [
+     "tiled._g.state._row_of",
+     "tiled._g.state._slot_of"
+    ],
+    "owners": [
+     [
+      "cell",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "list_iterator"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     1390594
+    ],
+    "count": 125,
+    "bytes": 173824250,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[254]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     5616,
+     1280,
+     6
+    ],
+    "count": 1,
+    "bytes": 172523520,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.gprime"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int64",
+    "shape": [
+     20480000
+    ],
+    "count": 1,
+    "bytes": 163840000,
+    "names": [
+     "field.atomic_numbers"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     1452334
+    ],
+    "count": 100,
+    "bytes": 145233400,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[388]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1448610
+    ],
+    "count": 50,
+    "bytes": 144861000,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[243]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cuda:0",
+    "dtype": "torch.float32",
+    "shape": [
+     6579,
+     1280,
+     4
+    ],
+    "count": 1,
+    "bytes": 134737920,
+    "names": [
+     "field._streaming.0._modules.wprime_backward.spline_table"
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     1469370
+    ],
+    "count": 90,
+    "bytes": 132243300,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[244]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1292408
+    ],
+    "count": 50,
+    "bytes": 129240800,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[145]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.uint8",
+    "shape": [
+     1273454
+    ],
+    "count": 100,
+    "bytes": 127345400,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[134]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1255462
+    ],
+    "count": 50,
+    "bytes": 125546200,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[133]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   },
+   {
+    "device": "cpu",
+    "dtype": "torch.int16",
+    "shape": [
+     1491240
+    ],
+    "count": 40,
+    "bytes": 119299200,
+    "names": [],
+    "owners": [
+     [
+      "cell",
+      "tuple",
+      "list"
+     ],
+     [
+      "cell",
+      "cell",
+      "dict[366]",
+      "list",
+      "cell",
+      "tuple"
+     ],
+     [
+      "cell",
+      "cell",
+      "tuple",
+      "cell",
+      "dict[superset]",
+      "list"
+     ]
+    ]
+   }
+  ]
+ },
+ "host_positions": true,
+ "edges_within_cutoff": 1515520000,
+ "calls": [
+  {
+   "seconds": 221.98279908508994,
+   "allocated": 1164864000,
+   "reserved": 2403336192,
+   "peak_above_before": 1465930752,
+   "host_rss": 24272703488,
+   "host_peak": 24304918528,
+   "tiles": 3136,
+   "grid": [
+    16,
+    14,
+    14
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 7811,
+   "max_halo": 5630,
+   "max_edges": 582778,
+   "list_reused": false,
+   "list_rebuilds": 1,
+   "list_reuse": "on",
+   "receivers": 8192,
+   "edges": 1515520000,
+   "mode": "eager",
+   "mode_reason": "compiled force field: the first call measures its memory",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 37.07277383701876,
+   "lanes": "off: eager tiles",
+   "wavefront": {
+    "on": true,
+    "pool_rows": 3978972,
+    "pool_fraction": 0.1942857421875,
+    "boundary_skin": 6.3
+   },
+   "local_frame": "tiles",
+   "compiled_graphs": null,
+   "copy_stream": true,
+   "host_worker": true,
+   "loop_base": 1798045696,
+   "peak_before_tiles": 1976484864,
+   "tiles_s": 184.47845388692804,
+   "graph_cache": {
+    "tiles": 0,
+    "bytes": 0,
+    "budget": 0
+   },
+   "tiles_peak": 2300619264,
+   "global_bytes": 9952404080,
+   "heap_trims": 0,
+   "heap_trim_s": 0.0,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 6399578624,
+   "list_kept_pinned_bytes": 4294942720,
+   "list_cache_hits": 6272,
+   "list_cache": "on",
+   "host_bytes": 9952404080,
+   "state_dtype": "float32",
+   "state_dtype_reason": "the call's dtype: fits",
+   "allocated_before": 834688512,
+   "total_peak": 2300619264,
+   "digest": "876afb074f01eb8fbfca98b216dbcfd8a0af44a98738575edfb2c39befcdd96b"
+  },
+  {
+   "seconds": 206.3766666590236,
+   "allocated": 1325406208,
+   "reserved": 3464495104,
+   "peak_above_before": 2066512896,
+   "host_rss": 27380412416,
+   "host_peak": 27622858752,
+   "tiles": 1577,
+   "grid": [
+    13,
+    11,
+    11
+   ],
+   "edge_cap": 4611686018427387904,
+   "max_receivers": 16384,
+   "max_halo": 8882,
+   "max_edges": 1215116,
+   "list_reused": false,
+   "list_rebuilds": 2,
+   "list_reuse": "on",
+   "receivers": 16384,
+   "edges": 1515520000,
+   "mode": "compiled",
+   "mode_reason": "17.15 GiB left at the first call's peak >= the compiled residency and margin (1.07 GiB)",
+   "neighbours": "tiles",
+   "species": "index",
+   "search_s": 41.89863289287314,
+   "lanes": "off: no memory measurement",
+   "wavefront": {
+    "on": true,
+    "pool_rows": 5166070,
+    "pool_fraction": 0.25224951171875,
+    "boundary_skin": 6.3
+   },
+   "slots": {
+    "1": [
+     2476,
+     4495,
+     182272
+    ],
+    "6": [
+     16089,
+     9093,
+     1093632
+    ],
+    "7": [
+     16385,
+     9771,
+     1275904
+    ]
+   },
+   "slot_needs": {
+    "1": [
+     2250,
+     4086,
+     166500
+    ],
+    "6": [
+     14625,
+     8266,
+     1082250
+    ],
+    "7": [
+     16384,
+     8882,
+     1215116
+    ]
+   },
+   "slot_changes": 3,
+   "local_frame": "tiles",
+   "compiled_graphs": "off: not measured faster on this GPU or configuration",
+   "copy_stream": true,
+   "host_worker": true,
+   "loop_base": 1923739648,
+   "peak_before_tiles": 2574751744,
+   "tiles_s": 163.20869078300893,
+   "graph_cache": {
+    "tiles": 0,
+    "bytes": 0,
+    "budget": 0
+   },
+   "tiles_peak": 2985615872,
+   "global_bytes": 12507563352,
+   "heap_trims": 1,
+   "heap_trim_s": 0.147,
+   "list_cache_bytes": 0,
+   "list_kept_bytes": 6381353816,
+   "list_kept_pinned_bytes": 4294701312,
+   "list_cache_hits": 3154,
+   "list_cache": "on",
+   "host_bytes": 12507563352,
+   "state_dtype": "float32",
+   "state_dtype_reason": "the call's dtype: fits",
+   "allocated_before": 919102976,
+   "total_peak": 2985615872,
+   "digest": "825298d6525ef545bd37d39f7ae3556f98097ab909f300d99d159e1efe0e6750"
+  }
+ ],
+ "ledger": [
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    5166070,
+    512
+   ],
+   "count": 1,
+   "bytes": 10580111360,
+   "names": [
+    "tiled._g.state.tensors.x"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    689609,
+    512
+   ],
+   "count": 1,
+   "bytes": 1412319232,
+   "names": [
+    "tiled._g.state._window"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1410052
+   ],
+   "count": 350,
+   "bytes": 987036400,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[255]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1430730
+   ],
+   "count": 325,
+   "bytes": 929974500,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[266]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1410052
+   ],
+   "count": 350,
+   "bytes": 493518200,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[255]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    20480000,
+    3
+   ],
+   "count": 2,
+   "bytes": 491520000,
+   "names": [
+    "field.data.positions",
+    "field.positions",
+    "tiled._g.pos",
+    "out.1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    20480000,
+    3
+   ],
+   "count": 1,
+   "bytes": 491520000,
+   "names": [
+    "tiled._kept.reference",
+    "tiled._g.local_frame.0",
+    "positions"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1430730
+   ],
+   "count": 325,
+   "bytes": 464987250,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[266]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1390594
+   ],
+   "count": 125,
+   "bytes": 347648500,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[254]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    5166070,
+    16
+   ],
+   "count": 1,
+   "bytes": 330628480,
+   "names": [
+    "tiled._g.state.tensors.sc"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1452334
+   ],
+   "count": 100,
+   "bytes": 290466800,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "tuple",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[388]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "dict[superset]",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1469370
+   ],
+   "count": 90,
+   "bytes": 264486600,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[244]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1273454
+   ],
+   "count": 100,
+   "bytes": 254690800,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[134]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    20480000
+   ],
+   "count": 3,
+   "bytes": 245760000,
+   "names": [
+    "tiled._g.state._row_of",
+    "tiled._g.state._slot_of"
+   ],
+   "owners": [
+    [
+     "cell",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1390594
+   ],
+   "count": 125,
+   "bytes": 173824250,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[254]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    5616,
+    1280,
+    6
+   ],
+   "count": 1,
+   "bytes": 172523520,
+   "names": [
+    "field._streaming.0._modules.wprime_backward.gprime"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    20480000
+   ],
+   "count": 1,
+   "bytes": 163840000,
+   "names": [
+    "field.atomic_numbers"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1452334
+   ],
+   "count": 100,
+   "bytes": 145233400,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "tuple",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[388]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "dict[superset]",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1448610
+   ],
+   "count": 50,
+   "bytes": 144861000,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[243]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    6579,
+    1280,
+    4
+   ],
+   "count": 1,
+   "bytes": 134737920,
+   "names": [
+    "field._streaming.0._modules.wprime_backward.spline_table"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1469370
+   ],
+   "count": 90,
+   "bytes": 132243300,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[244]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1292408
+   ],
+   "count": 50,
+   "bytes": 129240800,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[145]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1273454
+   ],
+   "count": 100,
+   "bytes": 127345400,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[134]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1255462
+   ],
+   "count": 50,
+   "bytes": 125546200,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[133]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1491240
+   ],
+   "count": 40,
+   "bytes": 119299200,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "tuple",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[366]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "dict[superset]",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "meta",
+   "dtype": "torch.float32",
+   "shape": [
+    20480000
+   ],
+   "count": 1,
+   "bytes": 81920000,
+   "names": [
+    "field.data.node_attrs",
+    "field.data.charges",
+    "field.data.density_coefficients"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    20480000
+   ],
+   "count": 1,
+   "bytes": 81920000,
+   "names": [
+    "tiled._g.node_es"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1448610
+   ],
+   "count": 50,
+   "bytes": 72430500,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[243]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int32",
+   "shape": [
+    6579,
+    1280,
+    2
+   ],
+   "count": 1,
+   "bytes": 67368960,
+   "names": [
+    "field._streaming.0._modules.wprime_backward.spline_packed"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1292408
+   ],
+   "count": 50,
+   "bytes": 64620400,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[145]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1255462
+   ],
+   "count": 50,
+   "bytes": 62773100,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[133]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1491240
+   ],
+   "count": 40,
+   "bytes": 59649600,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "tuple",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[366]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "dict[superset]",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1327170
+   ],
+   "count": 20,
+   "bytes": 53086800,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[123]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1308060
+   ],
+   "count": 20,
+   "bytes": 52322400,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[122]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    5832704
+   ],
+   "count": 1,
+   "bytes": 46661632,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "OrderedDict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    5832704
+   ],
+   "count": 2,
+   "bytes": 46661632,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "dict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    15134
+   ],
+   "count": 350,
+   "bytes": 42375200,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.uint8",
+   "shape": [
+    20480000
+   ],
+   "count": 2,
+   "bytes": 40960000,
+   "names": [
+    "field._species_index",
+    "tiled._species",
+    "field._sender_groups",
+    "field.neighbours.sender_groups"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    2,
+    1275904
+   ],
+   "count": 2,
+   "bytes": 40828928,
+   "names": [
+    "tiled._slots.7.ei",
+    "tiled._slots.7.local"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    15345
+   ],
+   "count": 325,
+   "bytes": 39897000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    25998
+   ],
+   "count": 350,
+   "bytes": 36397200,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    2,
+    1093632
+   ],
+   "count": 2,
+   "bytes": 34996224,
+   "names": [
+    "tiled._slots.6.ei",
+    "tiled._slots.6.local"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    25915
+   ],
+   "count": 325,
+   "bytes": 33689500,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1275904,
+    3
+   ],
+   "count": 2,
+   "bytes": 30621696,
+   "names": [
+    "tiled._slots.7.shifts",
+    "tiled._slots.7.out.3.g_vec"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1327170
+   ],
+   "count": 20,
+   "bytes": 26543400,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[123]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1093632,
+    3
+   ],
+   "count": 2,
+   "bytes": 26247168,
+   "names": [
+    "tiled._slots.6.shifts",
+    "tiled._slots.6.out.3.g_vec"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1308060
+   ],
+   "count": 20,
+   "bytes": 26161200,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[122]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    896,
+    6,
+    66
+   ],
+   "count": 2,
+   "bytes": 25546752,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "dict[pcoef]",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[_buffers]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "_table_module.<locals>.RadialTableModule",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    5166070
+   ],
+   "count": 1,
+   "bytes": 20664280,
+   "names": [
+    "tiled._g.state._free_rows"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    195916
+   ],
+   "count": 50,
+   "bytes": 19591600,
+   "names": [
+    "tiled._kept.superset.13.1",
+    "tiled._kept.superset.15.1",
+    "tiled._kept.superset.17.1",
+    "tiled._kept.superset.19.1",
+    "tiled._kept.superset.21.1",
+    "tiled._kept.superset.23.1"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    624,
+    6,
+    66
+   ],
+   "count": 2,
+   "bytes": 17791488,
+   "names": [
+    "field._streaming.0._modules.radial_table.coef",
+    "field._streaming.0._modules.radial_table.pcoef"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    157276
+   ],
+   "count": 50,
+   "bytes": 15727600,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1509300
+   ],
+   "count": 5,
+   "bytes": 15093000,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[242]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    14939
+   ],
+   "count": 125,
+   "bytes": 14939000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    26113
+   ],
+   "count": 125,
+   "bytes": 13056500,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    896,
+    6,
+    66
+   ],
+   "count": 1,
+   "bytes": 12773376,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "dict[coef]",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "cell",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    15569
+   ],
+   "count": 100,
+   "bytes": 12455200,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1527524
+   ],
+   "count": 4,
+   "bytes": 12220192,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "tuple",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[363]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "dict[superset]",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    89,
+    86,
+    128
+   ],
+   "count": 3,
+   "bytes": 11756544,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "dict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    1458176
+   ],
+   "count": 1,
+   "bytes": 11665408,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "OrderedDict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    1458176
+   ],
+   "count": 2,
+   "bytes": 11665408,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "dict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    15765
+   ],
+   "count": 90,
+   "bytes": 11350800,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    13663
+   ],
+   "count": 100,
+   "bytes": 10930400,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    896,
+    5,
+    66
+   ],
+   "count": 1,
+   "bytes": 10644480,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "dict[dcoef]",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[_buffers]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "_table_module.<locals>.RadialTableModule",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    896,
+    5,
+    66
+   ],
+   "count": 1,
+   "bytes": 10644480,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "dict[dcoef]",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "cell",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "tuple",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    25735
+   ],
+   "count": 100,
+   "bytes": 10294000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    198832
+   ],
+   "count": 25,
+   "bytes": 9941600,
+   "names": [
+    "tiled._kept.superset.24.1",
+    "tiled._kept.superset.26.1",
+    "tiled._kept.superset.28.1",
+    "tiled._kept.superset.30.1",
+    "tiled._kept.superset.32.1",
+    "tiled._kept.superset.46.1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    195916
+   ],
+   "count": 50,
+   "bytes": 9795800,
+   "names": [
+    "tiled._kept.superset.13.3",
+    "tiled._kept.superset.15.3",
+    "tiled._kept.superset.17.3",
+    "tiled._kept.superset.19.3",
+    "tiled._kept.superset.21.3",
+    "tiled._kept.superset.23.3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    193148
+   ],
+   "count": 25,
+   "bytes": 9657400,
+   "names": [
+    "tiled._kept.superset.12.1",
+    "tiled._kept.superset.14.1",
+    "tiled._kept.superset.16.1",
+    "tiled._kept.superset.18.1",
+    "tiled._kept.superset.20.1",
+    "tiled._kept.superset.34.1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    26714
+   ],
+   "count": 90,
+   "bytes": 9617040,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    23684
+   ],
+   "count": 100,
+   "bytes": 9473600,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    624,
+    6,
+    66
+   ],
+   "count": 1,
+   "bytes": 8895744,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "dict[coef]",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "cell",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "tuple",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    159926
+   ],
+   "count": 25,
+   "bytes": 7996300,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    157276
+   ],
+   "count": 50,
+   "bytes": 7863800,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    154590
+   ],
+   "count": 25,
+   "bytes": 7729500,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1509300
+   ],
+   "count": 5,
+   "bytes": 7546500,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[242]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    624,
+    5,
+    66
+   ],
+   "count": 1,
+   "bytes": 7413120,
+   "names": [
+    "field._streaming.0._modules.radial_table.dcoef"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    624,
+    5,
+    66
+   ],
+   "count": 1,
+   "bytes": 7413120,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "dict[dcoef]",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "cell",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "tuple",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    15555
+   ],
+   "count": 50,
+   "bytes": 6222000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1527524
+   ],
+   "count": 4,
+   "bytes": 6110096,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "tuple",
+     "list"
+    ],
+    [
+     "cell",
+     "cell",
+     "dict[363]",
+     "list",
+     "cell",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "dict[superset]",
+     "list"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    2,
+    182272
+   ],
+   "count": 2,
+   "bytes": 5832704,
+   "names": [
+    "tiled._slots.1.ei",
+    "tiled._slots.1.local"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    13858
+   ],
+   "count": 50,
+   "bytes": 5543200,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    1363050
+   ],
+   "count": 2,
+   "bytes": 5452200,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[121]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    13481
+   ],
+   "count": 50,
+   "bytes": 5392400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    26818
+   ],
+   "count": 50,
+   "bytes": 5363600,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    15134
+   ],
+   "count": 350,
+   "bytes": 5296900,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    15990
+   ],
+   "count": 40,
+   "bytes": 5116800,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1275904
+   ],
+   "count": 1,
+   "bytes": 5103616,
+   "names": [
+    "tiled._slots.7.edge_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    16,
+    16,
+    16,
+    51
+   ],
+   "count": 1,
+   "bytes": 5013504,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "OrderedDict[U_matrix_3]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    15345
+   ],
+   "count": 325,
+   "bytes": 4987125,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    198832
+   ],
+   "count": 25,
+   "bytes": 4970800,
+   "names": [
+    "tiled._kept.superset.24.3",
+    "tiled._kept.superset.26.3",
+    "tiled._kept.superset.28.3",
+    "tiled._kept.superset.30.3",
+    "tiled._kept.superset.32.3",
+    "tiled._kept.superset.46.3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    193148
+   ],
+   "count": 25,
+   "bytes": 4828700,
+   "names": [
+    "tiled._kept.superset.12.3",
+    "tiled._kept.superset.14.3",
+    "tiled._kept.superset.16.3",
+    "tiled._kept.superset.18.3",
+    "tiled._kept.superset.20.3",
+    "tiled._kept.superset.34.3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    23768
+   ],
+   "count": 50,
+   "bytes": 4753600,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    128,
+    192
+   ],
+   "count": 16,
+   "bytes": 4718592,
+   "names": [
+    "field._tables.0.1._buffers.composed_7",
+    "field._tables.0.1.composed_7",
+    "field._tables.0.1._buffers.composed_5",
+    "field._tables.0.1.composed_5",
+    "field._tables.0.1._buffers.composed_3",
+    "field._tables.0.1.composed_3"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    192,
+    128
+   ],
+   "count": 16,
+   "bytes": 4718592,
+   "names": [
+    "field._tables.0.1._buffers.composed_6",
+    "field._tables.0.1.composed_6",
+    "field._tables.0.1._buffers.composed_4",
+    "field._tables.0.1.composed_4",
+    "field._tables.0.1._buffers.composed_2",
+    "field._tables.0.1.composed_2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    23572
+   ],
+   "count": 50,
+   "bytes": 4714400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    585949
+   ],
+   "count": 1,
+   "bytes": 4687592,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "dict[_W3j_flat]",
+     "tuple"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    89,
+    51,
+    128
+   ],
+   "count": 1,
+   "bytes": 4647936,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "OrderedDict[weights_max]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1093632
+   ],
+   "count": 1,
+   "bytes": 4374528,
+   "names": [
+    "tiled._slots.6.edge_mask"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    182272,
+    3
+   ],
+   "count": 2,
+   "bytes": 4374528,
+   "names": [
+    "tiled._slots.1.shifts",
+    "tiled._slots.1.out.3.g_vec"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    26576
+   ],
+   "count": 40,
+   "bytes": 4252160,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    89,
+    23,
+    128
+   ],
+   "count": 2,
+   "bytes": 4192256,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "OrderedDict[weights_max]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    204180
+   ],
+   "count": 10,
+   "bytes": 4083600,
+   "names": [
+    "tiled._kept.superset.2.1",
+    "tiled._kept.superset.4.1",
+    "tiled._kept.superset.6.1",
+    "tiled._kept.superset.8.1",
+    "tiled._kept.superset.10.1",
+    "tiled._kept.superset.22.1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    201240
+   ],
+   "count": 10,
+   "bytes": 4024800,
+   "names": [
+    "tiled._kept.superset.1.1",
+    "tiled._kept.superset.3.1",
+    "tiled._kept.superset.5.1",
+    "tiled._kept.superset.7.1",
+    "tiled._kept.superset.9.1",
+    "tiled._kept.superset.11.1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    159926
+   ],
+   "count": 25,
+   "bytes": 3998150,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    128,
+    128
+   ],
+   "count": 20,
+   "bytes": 3932160,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    154590
+   ],
+   "count": 25,
+   "bytes": 3864750,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    89,
+    28,
+    128
+   ],
+   "count": 3,
+   "bytes": 3827712,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "dict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    164070
+   ],
+   "count": 10,
+   "bytes": 3281400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    161310
+   ],
+   "count": 10,
+   "bytes": 3226200,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    8192,
+    89
+   ],
+   "count": 1,
+   "bytes": 2916352,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "cell"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    689609
+   ],
+   "count": 1,
+   "bytes": 2758436,
+   "names": [
+    "tiled._g.state._free"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1363050
+   ],
+   "count": 2,
+   "bytes": 2726100,
+   "names": [],
+   "owners": [
+    [
+     "cell",
+     "list",
+     "tuple"
+    ],
+    [
+     "cell",
+     "cell",
+     "list_iterator",
+     "cell",
+     "list",
+     "dict[121]"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "cell",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    384
+   ],
+   "count": 12,
+   "bytes": 2359296,
+   "names": [
+    "field._streaming.0._modules.linear.weight_t_1",
+    "field._streaming.0._modules.linear.weight_t_2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    14235
+   ],
+   "count": 20,
+   "bytes": 2277600,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    14040
+   ],
+   "count": 20,
+   "bytes": 2246400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    204180
+   ],
+   "count": 10,
+   "bytes": 2041800,
+   "names": [
+    "tiled._kept.superset.2.3",
+    "tiled._kept.superset.4.3",
+    "tiled._kept.superset.6.3",
+    "tiled._kept.superset.8.3",
+    "tiled._kept.superset.10.3",
+    "tiled._kept.superset.22.3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    201240
+   ],
+   "count": 10,
+   "bytes": 2012400,
+   "names": [
+    "tiled._kept.superset.1.3",
+    "tiled._kept.superset.3.3",
+    "tiled._kept.superset.5.3",
+    "tiled._kept.superset.7.3",
+    "tiled._kept.superset.9.3",
+    "tiled._kept.superset.11.3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    24420
+   ],
+   "count": 20,
+   "bytes": 1953600,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    24317
+   ],
+   "count": 20,
+   "bytes": 1945360,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    14939
+   ],
+   "count": 125,
+   "bytes": 1867375,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    164070
+   ],
+   "count": 10,
+   "bytes": 1640700,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    161310
+   ],
+   "count": 10,
+   "bytes": 1613100,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    128
+   ],
+   "count": 24,
+   "bytes": 1572864,
+   "names": [
+    "field._streaming.0._modules.linear_up.weight_0",
+    "field._streaming.0._modules.linear_up.weight_t_0",
+    "field._streaming.0._modules.linear_up.weight_1",
+    "field._streaming.0._modules.linear_up.weight_t_1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    15569
+   ],
+   "count": 100,
+   "bytes": 1556900,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    16,
+    16,
+    16,
+    23
+   ],
+   "count": 2,
+   "bytes": 1507328,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    15765
+   ],
+   "count": 90,
+   "bytes": 1418850,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    472465
+   ],
+   "count": 3,
+   "bytes": 1417395,
+   "names": [
+    "field._streaming.0._modules.conv_tp.kernel"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    7019
+   ],
+   "count": 50,
+   "bytes": 1403800,
+   "names": [
+    "tiled._kept.superset.13.0",
+    "tiled._kept.superset.15.0",
+    "tiled._kept.superset.17.0",
+    "tiled._kept.superset.19.0",
+    "tiled._kept.superset.21.0",
+    "tiled._kept.superset.23.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    13663
+   ],
+   "count": 100,
+   "bytes": 1366300,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    89,
+    3712
+   ],
+   "count": 1,
+   "bytes": 1321472,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "dict[sc_generated_weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    163840
+   ],
+   "count": 1,
+   "bytes": 1310720,
+   "names": [],
+   "owners": [
+    [
+     "list",
+     "cell",
+     "OrderedDict[weight]"
+    ],
+    [
+     "list_iterator",
+     "cell",
+     "cell",
+     "tuple",
+     "list",
+     "cell"
+    ],
+    [
+     "cell",
+     "cell",
+     "tuple",
+     "tuple",
+     "cell",
+     "tuple"
+    ]
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    163840
+   ],
+   "count": 2,
+   "bytes": 1310720,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6220
+   ],
+   "count": 50,
+   "bytes": 1244000,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    64,
+    1280
+   ],
+   "count": 3,
+   "bytes": 983040,
+   "names": [
+    "field._streaming.0._modules.radial_last.weight"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    2102
+   ],
+   "count": 50,
+   "bytes": 840800,
+   "names": [
+    "tiled._kept.tiles.13",
+    "tiled._kept.tiles.15",
+    "tiled._kept.tiles.17",
+    "tiled._kept.tiles.19",
+    "tiled._kept.tiles.21",
+    "tiled._kept.tiles.23"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    15555
+   ],
+   "count": 50,
+   "bytes": 777750,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    89,
+    4,
+    128
+   ],
+   "count": 2,
+   "bytes": 729088,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    182272
+   ],
+   "count": 1,
+   "bytes": 729088,
+   "names": [
+    "tiled._slots.1.edge_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    7050
+   ],
+   "count": 25,
+   "bytes": 705000,
+   "names": [
+    "tiled._kept.superset.24.0",
+    "tiled._kept.superset.26.0",
+    "tiled._kept.superset.28.0",
+    "tiled._kept.superset.30.0",
+    "tiled._kept.superset.32.0",
+    "tiled._kept.superset.46.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6993
+   ],
+   "count": 25,
+   "bytes": 699300,
+   "names": [
+    "tiled._kept.superset.12.0",
+    "tiled._kept.superset.14.0",
+    "tiled._kept.superset.16.0",
+    "tiled._kept.superset.18.0",
+    "tiled._kept.superset.20.0",
+    "tiled._kept.superset.34.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    13858
+   ],
+   "count": 50,
+   "bytes": 692900,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    13481
+   ],
+   "count": 50,
+   "bytes": 674050,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    1682
+   ],
+   "count": 50,
+   "bytes": 672800,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    64,
+    1280
+   ],
+   "count": 1,
+   "bytes": 655360,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    16200
+   ],
+   "count": 5,
+   "bytes": 648000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    15990
+   ],
+   "count": 40,
+   "bytes": 639600,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    26156,
+    3
+   ],
+   "count": 1,
+   "bytes": 627744,
+   "names": [
+    "tiled._slots.7.rows64"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6209
+   ],
+   "count": 25,
+   "bytes": 620900,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6173
+   ],
+   "count": 25,
+   "bytes": 617300,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    25182,
+    3
+   ],
+   "count": 1,
+   "bytes": 604368,
+   "names": [
+    "tiled._slots.6.rows64"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    27548
+   ],
+   "count": 5,
+   "bytes": 550960,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    89,
+    6,
+    128
+   ],
+   "count": 1,
+   "bytes": 546816,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    65536
+   ],
+   "count": 1,
+   "bytes": 524288,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    32768
+   ],
+   "count": 2,
+   "bytes": 524288,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    65536
+   ],
+   "count": 2,
+   "bytes": 524288,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    32768
+   ],
+   "count": 4,
+   "bytes": 524288,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    16384
+   ],
+   "count": 4,
+   "bytes": 524288,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    27349
+   ],
+   "count": 4,
+   "bytes": 437584,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    2132
+   ],
+   "count": 25,
+   "bytes": 426400,
+   "names": [
+    "tiled._kept.tiles.24",
+    "tiled._kept.tiles.26",
+    "tiled._kept.tiles.28",
+    "tiled._kept.tiles.30",
+    "tiled._kept.tiles.32",
+    "tiled._kept.tiles.46"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    209700
+   ],
+   "count": 1,
+   "bytes": 419400,
+   "names": [
+    "tiled._kept.superset.0.1"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    26156
+   ],
+   "count": 2,
+   "bytes": 418496,
+   "names": [
+    "tiled._slots.7.nodes",
+    "tiled._slots.7.row_ids"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    2074
+   ],
+   "count": 25,
+   "bytes": 414800,
+   "names": [
+    "tiled._kept.tiles.12",
+    "tiled._kept.tiles.14",
+    "tiled._kept.tiles.16",
+    "tiled._kept.tiles.18",
+    "tiled._kept.tiles.20",
+    "tiled._kept.tiles.34"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    25182
+   ],
+   "count": 2,
+   "bytes": 402912,
+   "names": [
+    "tiled._slots.6.nodes",
+    "tiled._slots.6.row_ids"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    64,
+    512
+   ],
+   "count": 3,
+   "bytes": 393216,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    384,
+    128
+   ],
+   "count": 2,
+   "bytes": 393216,
+   "names": [
+    "field._streaming.0._modules.linear.weight_1",
+    "field._streaming.0._modules.linear.weight_2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    128189
+   ],
+   "count": 3,
+   "bytes": 384567,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    1711
+   ],
+   "count": 25,
+   "bytes": 342200,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    168300
+   ],
+   "count": 1,
+   "bytes": 336600,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1280,
+    65
+   ],
+   "count": 1,
+   "bytes": 332800,
+   "names": [
+    "field._streaming.0._modules.generic_folded.folded_constant"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    1653
+   ],
+   "count": 25,
+   "bytes": 330600,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1280,
+    64
+   ],
+   "count": 1,
+   "bytes": 327680,
+   "names": [
+    "field._streaming.0._modules.generic_folded.folded_main"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    7245
+   ],
+   "count": 10,
+   "bytes": 289800,
+   "names": [
+    "tiled._kept.superset.2.0",
+    "tiled._kept.superset.4.0",
+    "tiled._kept.superset.6.0",
+    "tiled._kept.superset.8.0",
+    "tiled._kept.superset.10.0",
+    "tiled._kept.superset.22.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    7216
+   ],
+   "count": 10,
+   "bytes": 288640,
+   "names": [
+    "tiled._kept.superset.1.0",
+    "tiled._kept.superset.3.0",
+    "tiled._kept.superset.5.0",
+    "tiled._kept.superset.7.0",
+    "tiled._kept.superset.9.0",
+    "tiled._kept.superset.11.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    14235
+   ],
+   "count": 20,
+   "bytes": 284700,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    14040
+   ],
+   "count": 20,
+   "bytes": 280800,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    89,
+    1,
+    128
+   ],
+   "count": 3,
+   "bytes": 273408,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    16384
+   ],
+   "count": 2,
+   "bytes": 262144,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    64,
+    512
+   ],
+   "count": 1,
+   "bytes": 262144,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    16384
+   ],
+   "count": 4,
+   "bytes": 262144,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    256,
+    128
+   ],
+   "count": 2,
+   "bytes": 262144,
+   "names": [
+    "field._streaming.0._modules.linear.weight_0",
+    "field._streaming.0._modules.linear.weight_3"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    256
+   ],
+   "count": 2,
+   "bytes": 262144,
+   "names": [
+    "field._streaming.0._modules.linear.weight_t_0",
+    "field._streaming.0._modules.linear.weight_t_3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6400
+   ],
+   "count": 10,
+   "bytes": 256000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6382
+   ],
+   "count": 10,
+   "bytes": 255280,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    14625
+   ],
+   "count": 2,
+   "bytes": 234000,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    209700
+   ],
+   "count": 1,
+   "bytes": 209700,
+   "names": [
+    "tiled._kept.superset.0.3"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    25080
+   ],
+   "count": 2,
+   "bytes": 200640,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    64,
+    64
+   ],
+   "count": 12,
+   "bytes": 196608,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    2190
+   ],
+   "count": 10,
+   "bytes": 175200,
+   "names": [
+    "tiled._kept.tiles.2",
+    "tiled._kept.tiles.4",
+    "tiled._kept.tiles.6",
+    "tiled._kept.tiles.8",
+    "tiled._kept.tiles.10",
+    "tiled._kept.tiles.22"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    2160
+   ],
+   "count": 10,
+   "bytes": 172800,
+   "names": [
+    "tiled._kept.tiles.1",
+    "tiled._kept.tiles.3",
+    "tiled._kept.tiles.5",
+    "tiled._kept.tiles.7",
+    "tiled._kept.tiles.9",
+    "tiled._kept.tiles.11"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    168300
+   ],
+   "count": 1,
+   "bytes": 168300,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    6971,
+    3
+   ],
+   "count": 1,
+   "bytes": 167304,
+   "names": [
+    "tiled._slots.1.rows64"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    1755
+   ],
+   "count": 10,
+   "bytes": 140400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    1725
+   ],
+   "count": 10,
+   "bytes": 138000,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    624,
+    6,
+    1
+   ],
+   "count": 1,
+   "bytes": 134784,
+   "names": [
+    "field._streaming.0._modules.wprime_backward.density_coef"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    16385
+   ],
+   "count": 1,
+   "bytes": 131080,
+   "names": [
+    "tiled._g.arange",
+    "tiled.arange"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    64,
+    64
+   ],
+   "count": 4,
+   "bytes": 131072,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    9,
+    624,
+    5,
+    1
+   ],
+   "count": 1,
+   "bytes": 112320,
+   "names": [
+    "field._streaming.0._modules.wprime_backward.density_dcoef"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    6971
+   ],
+   "count": 2,
+   "bytes": 111536,
+   "names": [
+    "tiled._slots.1.nodes",
+    "tiled._slots.1.row_ids"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    2102
+   ],
+   "count": 50,
+   "bytes": 105100,
+   "names": [
+    "tiled._kept.superset.13.2",
+    "tiled._kept.superset.15.2",
+    "tiled._kept.superset.17.2",
+    "tiled._kept.superset.19.2",
+    "tiled._kept.superset.21.2",
+    "tiled._kept.superset.23.2"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    26156
+   ],
+   "count": 1,
+   "bytes": 104624,
+   "names": [
+    "tiled._slots.7.node_mask"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    25182
+   ],
+   "count": 1,
+   "bytes": 100728,
+   "names": [
+    "tiled._slots.6.node_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    11392
+   ],
+   "count": 1,
+   "bytes": 91136,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    11392
+   ],
+   "count": 2,
+   "bytes": 91136,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1682
+   ],
+   "count": 50,
+   "bytes": 84100,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    2048
+   ],
+   "count": 5,
+   "bytes": 81920,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    16200
+   ],
+   "count": 5,
+   "bytes": 81000,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    16385
+   ],
+   "count": 1,
+   "bytes": 65540,
+   "names": [
+    "tiled._slots.7.recv_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    16384
+   ],
+   "count": 4,
+   "bytes": 65536,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    16089
+   ],
+   "count": 1,
+   "bytes": 64356,
+   "names": [
+    "tiled._slots.6.recv_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    2132
+   ],
+   "count": 25,
+   "bytes": 53300,
+   "names": [
+    "tiled._kept.superset.24.2",
+    "tiled._kept.superset.26.2",
+    "tiled._kept.superset.28.2",
+    "tiled._kept.superset.30.2",
+    "tiled._kept.superset.32.2",
+    "tiled._kept.superset.46.2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    2074
+   ],
+   "count": 25,
+   "bytes": 51850,
+   "names": [
+    "tiled._kept.superset.12.2",
+    "tiled._kept.superset.14.2",
+    "tiled._kept.superset.16.2",
+    "tiled._kept.superset.18.2",
+    "tiled._kept.superset.20.2",
+    "tiled._kept.superset.34.2"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    89,
+    128
+   ],
+   "count": 1,
+   "bytes": 45568,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    89
+   ],
+   "count": 1,
+   "bytes": 45568,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1711
+   ],
+   "count": 25,
+   "bytes": 42775,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1653
+   ],
+   "count": 25,
+   "bytes": 41325,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    5120
+   ],
+   "count": 1,
+   "bytes": 40960,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    16,
+    16,
+    6
+   ],
+   "count": 1,
+   "bytes": 36864,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int32",
+   "shape": [
+    4096
+   ],
+   "count": 2,
+   "bytes": 32768,
+   "names": [
+    "field._streaming.0._modules.radial_table.bins"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    4096
+   ],
+   "count": 2,
+   "bytes": 32768,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int16",
+   "shape": [
+    3826
+   ],
+   "count": 4,
+   "bytes": 30608,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    86,
+    29
+   ],
+   "count": 3,
+   "bytes": 29928,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    7447
+   ],
+   "count": 1,
+   "bytes": 29788,
+   "names": [
+    "tiled._kept.superset.0.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    14625
+   ],
+   "count": 2,
+   "bytes": 29250,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    6971
+   ],
+   "count": 1,
+   "bytes": 27884,
+   "names": [
+    "tiled._slots.1.node_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    6582
+   ],
+   "count": 1,
+   "bytes": 26328,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    48
+   ],
+   "count": 1,
+   "bytes": 24576,
+   "names": [
+    "field._streaming.0._modules.skip_tp.w0"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    128,
+    16
+   ],
+   "count": 1,
+   "bytes": 24576,
+   "names": [
+    "field._streaming.0._modules.skip_tp.ws0"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    16,
+    128
+   ],
+   "count": 1,
+   "bytes": 24576,
+   "names": [
+    "field._streaming.0._modules.skip_tp.wt0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    2190
+   ],
+   "count": 10,
+   "bytes": 21900,
+   "names": [
+    "tiled._kept.superset.2.2",
+    "tiled._kept.superset.4.2",
+    "tiled._kept.superset.6.2",
+    "tiled._kept.superset.8.2",
+    "tiled._kept.superset.10.2",
+    "tiled._kept.superset.22.2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    2160
+   ],
+   "count": 10,
+   "bytes": 21600,
+   "names": [
+    "tiled._kept.superset.1.2",
+    "tiled._kept.superset.3.2",
+    "tiled._kept.superset.5.2",
+    "tiled._kept.superset.7.2",
+    "tiled._kept.superset.9.2",
+    "tiled._kept.superset.11.2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    2250
+   ],
+   "count": 1,
+   "bytes": 18000,
+   "names": [
+    "tiled._kept.tiles.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1755
+   ],
+   "count": 10,
+   "bytes": 17550,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1725
+   ],
+   "count": 10,
+   "bytes": 17250,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    16,
+    16,
+    4
+   ],
+   "count": 2,
+   "bytes": 16384,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    2048
+   ],
+   "count": 2,
+   "bytes": 16384,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    16
+   ],
+   "count": 2,
+   "bytes": 16384,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    16,
+    128
+   ],
+   "count": 2,
+   "bytes": 16384,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    10,
+    64
+   ],
+   "count": 6,
+   "bytes": 15360,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    3826
+   ],
+   "count": 4,
+   "bytes": 15304,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    1800
+   ],
+   "count": 1,
+   "bytes": 14400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    10,
+    64
+   ],
+   "count": 2,
+   "bytes": 10240,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int32",
+   "shape": [
+    621
+   ],
+   "count": 4,
+   "bytes": 9936,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    2476
+   ],
+   "count": 1,
+   "bytes": 9904,
+   "names": [
+    "tiled._slots.1.recv_mask"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    512
+   ],
+   "count": 2,
+   "bytes": 8192,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    896
+   ],
+   "count": 2,
+   "bytes": 7168,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    896
+   ],
+   "count": 2,
+   "bytes": 7168,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    128
+   ],
+   "count": 4,
+   "bytes": 6144,
+   "names": [
+    "tiled._slots.6.tables.0",
+    "tiled._slots.7.tables.0",
+    "field._tables.0.1._buffers.species_feats",
+    "field._tables.0.1.species_feats",
+    "tiled._slots.1.tables.0",
+    "field._tables.0.2"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    128
+   ],
+   "count": 5,
+   "bytes": 5120,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1280
+   ],
+   "count": 1,
+   "bytes": 5120,
+   "names": [
+    "field._streaming.0._modules.generic_folded.folded_last"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    624
+   ],
+   "count": 2,
+   "bytes": 4992,
+   "names": [
+    "field._streaming.0._modules.radial_table.starts",
+    "field._streaming.0._modules.radial_table.scales"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [
+    624
+   ],
+   "count": 2,
+   "bytes": 4992,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    28,
+    13
+   ],
+   "count": 3,
+   "bytes": 4368,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    23,
+    23
+   ],
+   "count": 1,
+   "bytes": 4232,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    21,
+    21
+   ],
+   "count": 1,
+   "bytes": 3528,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    731
+   ],
+   "count": 1,
+   "bytes": 2924,
+   "names": [
+    "field._streaming.0._modules.wprime_backward.spline_starts"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    19,
+    19
+   ],
+   "count": 1,
+   "bytes": 2888,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    119
+   ],
+   "count": 6,
+   "bytes": 2856,
+   "names": [
+    "field.source_model._modules.pair_repulsion_fn._buffers.covalent_radii",
+    "field.source_model._modules.pair_repulsion_fn.covalent_radii"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    89
+   ],
+   "count": 4,
+   "bytes": 2848,
+   "names": [
+    "user.model.atomic_energies",
+    "field.atomic_energies"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    17,
+    17
+   ],
+   "count": 1,
+   "bytes": 2312,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    2250
+   ],
+   "count": 1,
+   "bytes": 2250,
+   "names": [
+    "tiled._kept.superset.0.2"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    89
+   ],
+   "count": 3,
+   "bytes": 2136,
+   "names": [
+    "field.model._modules._orig_mod._buffers.atomic_numbers",
+    "field.model._modules._orig_mod.atomic_numbers",
+    "field.source_model._buffers.atomic_numbers",
+    "field.source_model.atomic_numbers"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    16,
+    1
+   ],
+   "count": 1,
+   "bytes": 2048,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    119
+   ],
+   "count": 2,
+   "bytes": 1904,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    15,
+    15
+   ],
+   "count": 1,
+   "bytes": 1800,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    1800
+   ],
+   "count": 1,
+   "bytes": 1800,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    13,
+    13
+   ],
+   "count": 1,
+   "bytes": 1352,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    41
+   ],
+   "count": 4,
+   "bytes": 1312,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    89
+   ],
+   "count": 3,
+   "bytes": 1068,
+   "names": [
+    "field.source_model._modules.atomic_energies_fn._buffers.atomic_energies",
+    "field.source_model._modules.atomic_energies_fn.atomic_energies"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    128
+   ],
+   "count": 2,
+   "bytes": 1024,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    128,
+    1
+   ],
+   "count": 2,
+   "bytes": 1024,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    11,
+    11
+   ],
+   "count": 1,
+   "bytes": 968,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    7,
+    5
+   ],
+   "count": 1,
+   "bytes": 840,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    5,
+    7
+   ],
+   "count": 1,
+   "bytes": 840,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    7,
+    1,
+    7
+   ],
+   "count": 2,
+   "bytes": 784,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [
+    89
+   ],
+   "count": 1,
+   "bytes": 712,
+   "names": [
+    "user.model.calculator.models.0.atomic_numbers"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    89
+   ],
+   "count": 1,
+   "bytes": 712,
+   "names": [
+    "field._e0_row"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    9,
+    9
+   ],
+   "count": 1,
+   "bytes": 648,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    5,
+    1,
+    5
+   ],
+   "count": 2,
+   "bytes": 400,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    7,
+    7
+   ],
+   "count": 1,
+   "bytes": 392,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [],
+   "count": 49,
+   "bytes": 392,
+   "names": [
+    "out.0"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    5,
+    3
+   ],
+   "count": 1,
+   "bytes": 360,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    3,
+    5
+   ],
+   "count": 1,
+   "bytes": 360,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    3
+   ],
+   "count": 5,
+   "bytes": 360,
+   "names": [
+    "field.neighbours.build_cell",
+    "field.neighbours.cell_t",
+    "tiled._g.local_frame.2",
+    "tiled._frame_cell.2",
+    "tiled._g.local_frame.1",
+    "tiled._frame_cell.1"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [],
+   "count": 34,
+   "bytes": 272,
+   "names": [
+    "user.model.calculator.models.0.r_max"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    16
+   ],
+   "count": 2,
+   "bytes": 256,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    16,
+    1
+   ],
+   "count": 2,
+   "bytes": 256,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    10,
+    1
+   ],
+   "count": 6,
+   "bytes": 240,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.uint8",
+   "shape": [
+    119
+   ],
+   "count": 2,
+   "bytes": 238,
+   "names": [
+    "field._column_of",
+    "field._group_of"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    3
+   ],
+   "count": 3,
+   "bytes": 216,
+   "names": [
+    "tiled._frame_cell.0",
+    "tiled._kept.cell"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3,
+    3
+   ],
+   "count": 6,
+   "bytes": 216,
+   "names": [
+    "field.data.rcell",
+    "field.data.cell",
+    "out.2",
+    "tiled._slots.7.out.3.g_eps",
+    "tiled._slots.6.out.3.g_eps",
+    "tiled._slots.1.out.3.g_eps"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    5,
+    5
+   ],
+   "count": 1,
+   "bytes": 200,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    3,
+    3
+   ],
+   "count": 5,
+   "bytes": 180,
+   "names": [
+    "field.data.polarizability",
+    "field.data.polarizability_weight",
+    "field.data.stress",
+    "field.data.virials",
+    "field.data.displacement"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.uint8",
+   "shape": [
+    41
+   ],
+   "count": 4,
+   "bytes": 164,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    10,
+    1
+   ],
+   "count": 2,
+   "bytes": 160,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    3,
+    1,
+    3
+   ],
+   "count": 2,
+   "bytes": 144,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [],
+   "count": 33,
+   "bytes": 132,
+   "names": [
+    "field.model._modules._orig_mod._buffers.r_max",
+    "field.model._modules._orig_mod.r_max",
+    "field.source_model._buffers.r_max",
+    "field.source_model.r_max",
+    "field.source_model._modules.pair_repulsion_fn._buffers.a_exp",
+    "field.source_model._modules.pair_repulsion_fn.a_exp"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    16
+   ],
+   "count": 2,
+   "bytes": 128,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    10
+   ],
+   "count": 3,
+   "bytes": 120,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    3
+   ],
+   "count": 5,
+   "bytes": 120,
+   "names": [
+    "field._tables.0.1._buffers.columns",
+    "field._tables.0.1.columns",
+    "field._streaming.0._modules.skip_tp.columns",
+    "field._streaming.0._modules.radial_table.columns"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    10
+   ],
+   "count": 1,
+   "bytes": 80,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    1
+   ],
+   "count": 9,
+   "bytes": 72,
+   "names": [
+    "field.data.head",
+    "field.data.batch",
+    "tiled._g.head",
+    "tiled._g.heads",
+    "tiled.heads",
+    "field._streaming.0._modules.conv_tp.dummy_transpose_perm"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1,
+    3
+   ],
+   "count": 6,
+   "bytes": 72,
+   "names": [
+    "field.data.dipole",
+    "field.data.dipole_weight",
+    "field.data.external_field",
+    "field.neighbours.candidate_unit_shifts",
+    "field.neighbours.unit_shifts",
+    "field.neighbours.shifts"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [],
+   "count": 8,
+   "bytes": 64,
+   "names": [
+    "field.model._modules._orig_mod._buffers.num_interactions",
+    "field.model._modules._orig_mod.num_interactions",
+    "field._streaming.0._buffers.streaming_count",
+    "field._streaming.0.streaming_count",
+    "field.neighbours.count",
+    "tiled._big"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    16,
+    1
+   ],
+   "count": 1,
+   "bytes": 64,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    4
+   ],
+   "count": 3,
+   "bytes": 48,
+   "names": [
+    "field.source_model._modules.pair_repulsion_fn._buffers.c",
+    "field.source_model._modules.pair_repulsion_fn.c"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    1
+   ],
+   "count": 12,
+   "bytes": 48,
+   "names": [
+    "field.data.charges_weight",
+    "field.data.elec_temp",
+    "field.data.energy",
+    "field.data.energy_weight",
+    "field.data.fermi_level",
+    "field.data.forces_weight"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    4
+   ],
+   "count": 1,
+   "bytes": 32,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    1,
+    1,
+    1
+   ],
+   "count": 4,
+   "bytes": 32,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int32",
+   "shape": [],
+   "count": 6,
+   "bytes": 24,
+   "names": [
+    "field.source_model._modules.pair_repulsion_fn._buffers.p",
+    "field.source_model._modules.pair_repulsion_fn.p"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    1
+   ],
+   "count": 2,
+   "bytes": 16,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int64",
+   "shape": [
+    2
+   ],
+   "count": 1,
+   "bytes": 16,
+   "names": [
+    "field.data.ptr"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float64",
+   "shape": [
+    1
+   ],
+   "count": 2,
+   "bytes": 16,
+   "names": [
+    "field._charge_sum",
+    "field._charge_offset"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.int32",
+   "shape": [
+    2,
+    1
+   ],
+   "count": 2,
+   "bytes": 16,
+   "names": [
+    "field.neighbours.candidate_index",
+    "field.neighbours.edge_index"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.float32",
+   "shape": [
+    3
+   ],
+   "count": 1,
+   "bytes": 12,
+   "names": [
+    "tiled._far"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float64",
+   "shape": [
+    1,
+    1
+   ],
+   "count": 1,
+   "bytes": 8,
+   "names": []
+  },
+  {
+   "device": "cpu (numpy)",
+   "dtype": "float64",
+   "shape": [],
+   "count": 1,
+   "bytes": 8,
+   "names": []
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.int64",
+   "shape": [],
+   "count": 1,
+   "bytes": 8,
+   "names": [
+    "user.model.calculator.models.0.num_interactions"
+   ]
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.uint8",
+   "shape": [
+    1
+   ],
+   "count": 6,
+   "bytes": 6,
+   "names": [
+    "field._streaming.0._modules.conv_tp.workspace_buffer"
+   ]
+  },
+  {
+   "device": "cpu",
+   "dtype": "torch.float32",
+   "shape": [],
+   "count": 1,
+   "bytes": 4,
+   "names": []
+  },
+  {
+   "device": "cuda:0",
+   "dtype": "torch.bool",
+   "shape": [
+    1,
+    3
+   ],
+   "count": 1,
+   "bytes": 3,
+   "names": [
+    "field.data.pbc"
+   ]
+  }
+ ],
+ "tiled": {
+  "energy_eV": -163625939.5422052,
+  "energy_per_atom_eV": -7.989547829209239,
+  "max_abs_force": 3.833845767076127e-06,
+  "stress": [
+   [
+    -0.02888324111700058,
+    -2.7859969886634417e-10,
+    -1.5974607747715197e-10
+   ],
+   [
+    -2.7859969886634417e-10,
+    -0.02888324484229088,
+    -1.3666753284624633e-09
+   ],
+   [
+    -1.5974607747715197e-10,
+    -1.3666753284624633e-09,
+    -0.02888323739171028
+   ]
+  ]
+ },
+ "valid": true,
+ "check": {
+  "initial_edges": 1515520000,
+  "expected_initial_edges": 1515520000,
+  "reference_edges_per_atom": 74.0,
+  "initial_ok": true,
+  "live_edges": null,
+  "fresh_edges": null,
+  "live_ok": true,
+  "max_abs_force": 3.833845767076127e-06,
+  "forces_ok": true
+ }
+}

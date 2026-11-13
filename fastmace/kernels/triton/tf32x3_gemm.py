@@ -21,6 +21,7 @@ from functools import cache
 
 import torch
 
+from fastmace.kernels.gpu_models import GPUModels
 from fastmace.kernels.triton import tile_rule
 
 # Rejected experiment, kept (FACTO's BF16x3, arXiv 2611.03276): FASTMACE_SPLIT_PRECISION picks Triton's split
@@ -78,12 +79,18 @@ def uses_tf32x3_tile(k: int, n: int) -> bool:
 # The compute capabilities whose products run on the CUTLASS backend (fastmace.kernels.cutlass.tf32x3: the A100's
 # 8.0, and 9.0 for the H100 and H200 since 5 November 2026) where its kernels load: there by its shape rule, else on cuBLAS IEEE. () puts Triton everywhere (A/B).
 CUTLASS_CAPABILITIES = ((8, 0), (9, 0))
+# Further GPU models on the CUTLASS backend, by device name: the RTX 4000 Ada (8.9; the sm_80 cubin, cutlass.tf32x3
+# FAMILY_GPUS) since step-layout-cleanup item 5 (12 November 2026, decision 66; with LINEAR_DIV, MD step b/a SrTiO3
+# 10x10x10 0.9364 / 0.9335, NbCl5 3x3x3 0.8912 / 0.8887; 3x float32 gate). () here and in CUTLASS_CAPABILITIES puts
+# Triton everywhere (A/B).
+CUTLASS_GPUS = GPUModels(("NVIDIA RTX 4000 Ada Generation",))
 _CUTLASS_ON = {}  # device index -> whether the CUTLASS kernels load there
 
 
 def _cutlass(device):
     index = device.index if device.index is not None else torch.cuda.current_device()
-    if tuple(torch.cuda.get_device_capability(index)) not in CUTLASS_CAPABILITIES:
+    if (tuple(torch.cuda.get_device_capability(index)) not in CUTLASS_CAPABILITIES
+            and torch.cuda.get_device_name(index) not in CUTLASS_GPUS):
         return False
     if index not in _CUTLASS_ON:
         from fastmace.kernels.cutlass import tf32x3
@@ -179,5 +186,5 @@ def tf32x3_matmul(a, b, b_t=None):
     return Tf32x3Matmul.apply(a, b, b_t)
 
 
-__all__ = ["CUTLASS_CAPABILITIES", "MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "backend", "supported",
+__all__ = ["CUTLASS_CAPABILITIES", "CUTLASS_GPUS", "MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "backend", "supported",
            "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]

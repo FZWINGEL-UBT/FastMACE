@@ -45,6 +45,9 @@ def parse_args(argv=None):
     p.add_argument("--b-host-positions", action="store_true",
                    help="side b: its own TiledForceField called with the float64 positions on the host "
                         "(TILE_HOST_ROWS; side a: on the device)")
+    p.add_argument("--host-positions", action="store_true",
+                   help="both sides called with the float64 positions on the host (TILE_HOST_ROWS), one "
+                        "TiledForceField (for constants such as TILE_HOST_ROWS_KEPT that act on host rows)")
     p.add_argument("--a-int32-maps", action="store_true",
                    help="side a: its own TiledForceField with the species index, sender groups and their tables in "
                         "int32 (as before the uint8 maps; swapped in before each of its calls)")
@@ -106,7 +109,7 @@ def main(argv=None):
     n = len(atoms)
     record = dict(structure=args.structure, repeat=list(repeat), atoms=n, model=args.model, order=args.order,
                   a=args.a, b=args.b, receivers=args.receivers, b_receivers=args.b_receivers,
-                  b_host_positions=args.b_host_positions, a_int32_maps=args.a_int32_maps, mode=args.mode, host_state=args.host_state,
+                  host_positions=args.host_positions, b_host_positions=args.b_host_positions, a_int32_maps=args.a_int32_maps, mode=args.mode, host_state=args.host_state,
                   alias_state=args.alias_state, wavefront=args.wavefront, device=torch.cuda.get_device_name(),
                   torch=torch.__version__, source_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"))
     args.output.mkdir(parents=True, exist_ok=True)
@@ -146,7 +149,7 @@ def main(argv=None):
         # --b-receivers: side b's own field (its own slots, state and kept lists; the force field is shared)
         own_b = args.b_receivers is not None or args.b_host_positions or args.a_int32_maps
         tiled_of = {"a": tiled, "b": tiled_field(args.b_receivers or args.receivers) if own_b else tiled}
-        positions = field._prepare_one_off(atoms)
+        positions = field._prepare_one_off(atoms, host=bool(args.host_positions))
         positions_of = {"a": positions, "b": positions}
         if args.b_host_positions:  # the same float64 values, a view of the atoms' array
             positions_of["b"] = field._prepare_one_off(atoms, host=True)

@@ -2049,6 +2049,59 @@ def test_host_rows_call_is_bitwise_the_device_rows_call(mode, monkeypatch):
         assert np.array_equal(host[1], device[1]) and np.array_equal(host[2], device[2])
 
 
+@pytest.mark.parametrize("mode", ["eager", "padded"])
+def test_host_rows_kept_lists_are_bitwise_the_device_rows(mode, monkeypatch):
+    """Host rows with kept lists (``list_reuse``): the kept lists' float64 distance test gathers each tile's rows on
+    the host instead of a whole-system float64 copy on the device (24 bytes per atom; the 397.5M go/no-go's first
+    call): the calls that search and the calls that reuse the kept lists, energy, forces and stress bitwise the
+    device-rows calls."""
+    from fastmace.model import tiled as tiled_module
+    from fastmace.neighbors import tile_list
+
+    monkeypatch.setattr(tiled_module, "TILE_LOCAL_FRAME", True)
+    monkeypatch.setattr(tiled_module, "TILE_HOST_ROWS_KEPT", True)
+    calc, atoms = calculator(), big_structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, compute_stress=True,
+                           rewrites=only(*MH1_PACKAGE))
+    rng = np.random.default_rng(3)
+    steps = [atoms.copy() for _ in range(3)]
+    for step in steps[1:]:  # within the skin: the kept lists are reused
+        step.positions = step.positions + rng.uniform(-0.02, 0.02, step.positions.shape)
+    results, reused = {}, {}
+    for host in (False, True):
+        if host:
+            monkeypatch.setattr(tile_list, "rows_on_host", lambda positions, device: True)
+            monkeypatch.setattr(tile_list, "CHUNK", 1000)
+        tiled = TiledForceField(field, TileConfig(40, mode=mode, neighbours="tiles", list_reuse_floor=0))
+        tiled.evaluate(atoms, stress=True)  # TorchScript's first call in a process rounds differently
+        results[host], reused[host] = [], []
+        for step in steps:
+            results[host].append(tiled.evaluate(step, stress=True))
+            reused[host].append(tiled.last["list_reused"])
+    assert reused[True] == reused[False] and any(reused[True])
+    assert tiled.last["host_rows_kept"] == "on: set"
+    for device, host in zip(results[False], results[True]):
+        assert host[0] == device[0]
+        assert np.array_equal(host[1], device[1]) and np.array_equal(host[2], device[2])
+
+
+def test_host_rows_kept_default_takes_them_only_where_the_device_copy_does_not_fit(monkeypatch):
+    """``TILE_HOST_ROWS_KEPT`` None: the host-rows distance test (exact, slower on reused lists) only where the
+    kept lists' float64 device copy (24 B/atom) and the call's later transient (``TILE_HOST_ROWS_KEPT_RESERVE``)
+    exceed the free device memory; off a GPU off; a set constant wins."""
+    from fastmace.model import tiled as tiled_module
+
+    tiled = TiledForceField.__new__(TiledForceField)
+    n, per_atom = 1000, 24 + tiled_module.TILE_HOST_ROWS_KEPT_RESERVE
+    monkeypatch.setattr(tiled_module, "TILE_HOST_ROWS_KEPT", None)
+    for free, on in ((per_atom * n - 1, True), (per_atom * n, False), (None, False)):
+        monkeypatch.setattr(TiledForceField, "_free_bytes", lambda self, free=free: free)
+        assert tiled._host_rows_kept(n) is on
+        assert tiled._host_rows_kept_state.startswith("on" if on else "off")
+    monkeypatch.setattr(tiled_module, "TILE_HOST_ROWS_KEPT", True)
+    assert tiled._host_rows_kept(n) and tiled._host_rows_kept_state == "on: set"
+
+
 def test_host_positions_need_the_tile_lists_and_are_a_view():
     """``_prepare_one_off(host=True)``: refused with the global list (it compacts on the device); without it the
     atoms' own float64 array, not a copy."""
@@ -2079,6 +2132,23 @@ def test_released_species_maps_are_uint8_with_the_same_values():
         assert torch.equal(field._species_index.long(), species)
         assert torch.equal(field._sender_groups.long(), groups)
         assert torch.equal(field.node_e0(), e0)
+        # The neighbour list's groups are the force field's tensor, not an int64 copy beside it (8 bytes per atom),
+        # and its edges the same.
+        assert field.neighbours.sender_groups is field._sender_groups
+        count = int(kept.neighbours.count)
+        assert int(field.neighbours.count) == count
+        for ours, theirs in zip(field.neighbours.edges(count), kept.neighbours.edges(count)):
+            assert torch.equal(ours, theirs)
+
+
+def test_the_tiled_call_drops_the_whole_system_block_order():
+    """``_bind_streaming_count(block_order=False)`` (the tiled call's bind): the whole-system BLOCK_ORDER order is
+    not kept unbound (4 bytes per atom); a call that binds it builds it again."""
+    calc, atoms = calculator(), structure()
+    field = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, engine=EAGER, rewrites=only(*MH1_PACKAGE))
+    field._block_order = torch.arange(len(atoms), dtype=torch.int32)
+    field._bind_streaming_count(block_order=False, plans=False)
+    assert field._block_order is None
 
 
 def test_large_caps_join_a_default_budget_of_host_state_calls_only(monkeypatch):

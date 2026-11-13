@@ -251,6 +251,41 @@ def species_plan(index, species, counting=False):
     return order, counts.index_add(0, index.long(), torch.ones_like(index, dtype=torch.int32))
 
 
+# The species plan as derived state of the species (step-layout-cleanup, 12 November 2026). The plan depends only on
+# the atoms' species, but the forwards built it every call: inside the captured MD step the stable argsort (a radix
+# sort) replayed every step (Ada attribution: 112 µs of a 16.9 ms SrTiO3 10³ step, 49 µs of NbCl5's 3.4 ms). The
+# force field now builds it once per species state into fixed buffers (``ForceField._setup_plans``), registers them
+# as derived state of the species (a species event refreshes them in place; a snapshot restore brings them back) and
+# binds them onto the modules before each call (``bind_plan``); a forward reads the bound plan (``bound_plan``) where
+# its rows are the plan's, and builds its own otherwise (tiles, ghosts, no force field). No version-counter cache:
+# the registry refreshes it explicitly, so a capture's snapshot restore cannot look like a species change.
+PLAN_BUFFERS = ("plan_kind", "plan_order", "plan_counts")
+
+
+def plan_of(node_attrs, columns, counting=False):
+    """``(kind, order, counts)`` of the one-hot ``node_attrs``' ``columns``, as a forward builds them: ``kind`` the
+    atoms' species position (int64, argmax), then ``species_plan``."""
+    onehot = node_attrs[:, columns]
+    kind = onehot.argmax(dim=1)
+    return (kind,) + species_plan(kind, onehot.shape[1], counting=counting)
+
+
+def bind_plan(module, plan):
+    """Point ``module``'s forward at ``plan`` (``(kind, order, counts)``, or None to unbind): a host-side pointer swap,
+    as ``FirstInteractionReassociation.bind`` does for the species table; captured graphs keep their addresses."""
+    for name, tensor in zip(PLAN_BUFFERS, plan if plan is not None else (None,) * 3):
+        if module._buffers.get(name) is not tensor:
+            module.register_buffer(name, tensor, persistent=False)
+
+
+def bound_plan(module, rows):
+    """The plan bound onto ``module`` (``bind_plan``) when it covers exactly ``rows`` atoms, else None."""
+    order = module._buffers.get("plan_order")
+    if order is None or order.shape[0] != rows:
+        return None
+    return module._buffers["plan_kind"], order, module._buffers["plan_counts"]
+
+
 def tile_rows(t, counts, size):
     """(species, first row, end row) of tile ``t`` in the sorted rows, the kernel's rule in Python (``counts``: a
     list); first == end past the last tile."""
@@ -424,11 +459,9 @@ def species_mm_joined(xs: list[torch.Tensor], ws: list[torch.Tensor], w_ts: list
                                 tiles(atoms, size, counts.shape[0]))
         return out
     offset = 0
-    for x, w in zip(xs, ws):
+    for x, w in zip(xs, ws):  # each path straight into its rows of the joined output (strided; no block copy)
         size = x.shape[1]
-        block = x.new_empty((atoms, size, n))
-        _launch(x, w, order, counts, block, precision)
-        out[:, offset:offset + size] = block
+        _launch(x, w, order, counts, out[:, offset:offset + size], precision)
         offset += size
     return out
 
@@ -540,10 +573,8 @@ def species_mm_rows(x: torch.Tensor, sizes: list[int], ws: list[torch.Tensor], w
             tf32x3.species_into(x, x.shape[1], row, w, out, row, counts, size, tiles(atoms, size, counts.shape[0]))
         return out
     offset = 0
-    for v, w, size in zip(_rows_views(x, sizes), ws, sizes):
-        block = x.new_empty((atoms, size, n))
-        _launch(v.contiguous(), w, order, counts, block, precision)
-        out[:, offset:offset + size] = block
+    for v, w, size in zip(_rows_views(x, sizes), ws, sizes):  # the paths read and written in place (strided launch)
+        _launch(v, w, order, counts, out[:, offset:offset + size], precision)
         offset += size
     return out
 
@@ -577,10 +608,8 @@ def species_mm_rows_grad(grad: torch.Tensor, sizes: list[int], w_ts: list[torch.
                                 tiles(atoms, size, counts.shape[0]))
         return gx
     views, offset = _rows_views(gx, sizes), 0
-    for v, w_t, size in zip(views, w_ts, sizes):
-        block = grad.new_empty((atoms, size, k))
-        _launch(grad[:, offset:offset + size].contiguous(), w_t, order, counts, block, precision)
-        v.copy_(block)
+    for v, w_t, size in zip(views, w_ts, sizes):  # read and written in place (strided launch), no copies
+        _launch(grad[:, offset:offset + size], w_t, order, counts, v, precision)
         offset += size
     return gx
 

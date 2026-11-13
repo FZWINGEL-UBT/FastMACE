@@ -153,6 +153,16 @@ TILE_LOCAL_FRAME_WIDTH = 32.0  # a power of two: bin multiples are exact in floa
 # tiles' form: each padded slot gets its float64 rows gathered on the host and copied in (``_fill``; an eager tile
 # gathers its own), the values ``positions64[nodes]`` reads on the device. False: the bins and offsets as before.
 TILE_HOST_ROWS = True
+# TILE_HOST_ROWS_KEPT (exact; 13 November 2026, results/billion-atoms-20261111/census-leto): with host positions, the
+# kept lists' float64 distance test gathers each tile's rows on the host instead of a whole-system float64 copy on
+# the device (24 bytes per atom in any call that keeps lists; the 397.5M go/no-go's first call carried it).
+# TILE_FILTER32 is off with it (its float32 copy is whole-system too). Exact, but slower where the lists are reused
+# (leto, SrTiO3 160^3 compiled, same process: 1.093 in order ab), so a capacity measure: None (default) takes it only
+# where the device copy and the call's later per-atom transient (TILE_HOST_ROWS_KEPT_RESERVE bytes per atom: the
+# census's forces 12, plan order 8, bins 19.5, local_of 4, node_es 4, rounded up) would not fit in the device memory
+# free at the call's start. True / False force it.
+TILE_HOST_ROWS_KEPT = None
+TILE_HOST_ROWS_KEPT_RESERVE = 48
 # TILE_WHOLE_BLOCK_ORDER (A/B only; billion-atom step 1): True binds the whole-system BLOCK_ORDER receiver order in the
 # tiled call as before (int32 [N], 4 B/atom; its per-tile kernels never read it). False (default): not built.
 TILE_WHOLE_BLOCK_ORDER = False
@@ -1682,6 +1692,22 @@ class TiledForceField:
         free, _ = torch.cuda.mem_get_info(self.device)
         return free + torch.cuda.memory_reserved(self.device) - torch.cuda.memory_allocated(self.device)
 
+    def _host_rows_kept(self, n):
+        """``TILE_HOST_ROWS_KEPT`` for this call (host positions, kept lists): the constant when set; else on only
+        where the kept lists' float64 device copy (24 bytes per atom) and the call's later per-atom transient
+        (``TILE_HOST_ROWS_KEPT_RESERVE``) would not fit in the device memory free now. The decision and its reason
+        go to ``last["host_rows_kept"]``."""
+        if TILE_HOST_ROWS_KEPT is not None:
+            on, reason = bool(TILE_HOST_ROWS_KEPT), "set"
+        else:
+            free = self._free_bytes()
+            need = (24 + int(TILE_HOST_ROWS_KEPT_RESERVE)) * n
+            on = free is not None and need > free
+            reason = ("off the GPU" if free is None else
+                      f"{need / 2**30:.1f} GiB of copy and transient {'>' if on else '<='} {free / 2**30:.1f} GiB free")
+        self._host_rows_kept_state = f"{'on' if on else 'off'}: {reason}"
+        return on
+
     def _source(self, positions, n):
         """``(source, row_ptr, edges per atom)`` of this call's edges: the force field's list, or (neighbours
         "tiles") a cell binning of ``positions`` (float64) that builds each tile's edges."""
@@ -1704,11 +1730,16 @@ class TiledForceField:
             bins = TileNeighbours.like(self.field.neighbours, cutoff=cutoff + (skin if kept is not None else 0.0))
             if not self._reusing:
                 bins.bin(positions)
-            # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device).
-            positions64 = positions.to(device=self.device, dtype=torch.float64) if kept is not None else None
+            # Float64 positions for the kept lists' distance test only (24 bytes per atom on the device). Host rows
+            # (TILE_HOST_ROWS): none on the device; each tile's test gathers its own rows on the host (the same
+            # values, as the tile lists' search), and no TILE_FILTER32 (its float32 copy is whole-system too).
+            host_rows = (kept is not None and _tile_list().rows_on_host(positions, self.device)
+                         and self._host_rows_kept(n))
+            positions64 = (None if kept is None else positions if host_rows
+                           else positions.to(device=self.device, dtype=torch.float64))
             # TILE_FILTER32: float32 positions (12 bytes per atom) and the band of squared lengths tested again
             # in float64; the float64 shifts of the 27 one-byte unit codes
-            fast = kept is not None and self._reusing and self._speed(TILE_FILTER32)
+            fast = kept is not None and self._reusing and not host_rows and self._speed(TILE_FILTER32)
             if fast:
                 positions32 = positions64.to(torch.float32)
                 codes = torch.arange(27, device=self.device)
@@ -1757,7 +1788,14 @@ class TiledForceField:
                         return _filter32(positions32, positions64, shifts27, band, cutoff, sender, receiver, unit,
                                          packed.long(), bins.float_dtype)
                 shifts64 = times_3x3(unit.to(torch.float64), bins.cell)
-                vectors = positions64[receiver] - positions64[sender] + shifts64
+                if host_rows:  # the tile's rows only, gathered on the host
+                    rows = torch.unique(torch.cat([receivers.long(), sender.long()]))  # sorted
+                    here = positions64[rows.cpu()].to(self.device)
+                    vectors = here[torch.searchsorted(rows, receiver.long())] \
+                        - here[torch.searchsorted(rows, sender.long())] + shifts64
+                    del rows, here
+                else:
+                    vectors = positions64[receiver] - positions64[sender] + shifts64
                 keep = (vectors * vectors).sum(dim=1) < cutoff ** 2
                 del vectors
                 return sender[keep], receiver[keep], unit[keep], shifts64[keep].to(bins.float_dtype)
@@ -2309,7 +2347,7 @@ class TiledForceField:
         field = self.field
         # species tables; then every tile edge is a real edge. No whole-system BLOCK_ORDER order: a tile has
         # fewer rows than N, so its kernels never read it (they launch with their rows' identity)
-        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER))
+        field._bind_streaming_count(block_order=bool(TILE_WHOLE_BLOCK_ORDER), plans=False)
         saved = []
         for module in field._streaming:
             saved.append((module, module._buffers.get("streaming_count")))
@@ -2434,6 +2472,7 @@ class TiledForceField:
                      else torch.zeros(1, dtype=torch.int64, device=batch.device)).long().expand(n)
         else:
             heads = (data["head"][batch] if "head" in data else torch.zeros_like(batch)).long()
+        self._host_rows_kept_state = None  # set by _source where host positions meet kept lists
         source, row_ptr, degree = self._source(positions, n)
         caps = self.config
         edge_cap = caps.edges if caps.edges is not None else (
@@ -2467,7 +2506,7 @@ class TiledForceField:
             torch.cuda.reset_peak_memory_stats(self.device)
         stats = dict(tiles=len(tiles), grid=grid, edge_cap=edge_cap, max_receivers=0, max_halo=0, max_edges=0,
                      list_reused=self._reusing, list_rebuilds=self.list_rebuilds,
-                     list_reuse=self.list_reuse_state,
+                     list_reuse=self.list_reuse_state, host_rows_kept=self._host_rows_kept_state,
                      receivers=self.receivers,
                      edges=0, mode=self.mode, mode_reason=self.mode_reason, neighbours=caps.neighbours,
                      species=caps.species)

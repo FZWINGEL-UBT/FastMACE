@@ -1,0 +1,2088 @@
+{
+ "trace": "/mnt/homes/zwingel/fm-compose/ada-2/profile/trace-attr-SrTiO3.json.gz",
+ "steps": 5,
+ "gpu_events": 975,
+ "events_per_step": 195.0,
+ "kernel_us_per_step": 16727.92,
+ "window_wall_us_per_step": 16714.16,
+ "in_step_gap_us_per_step": 148.52,
+ "between_step_gaps_us": [
+  1377.5
+ ],
+ "graph_events_with_stack": 975,
+ "by_class": {
+  "ours: NVRTC": {
+   "us_per_step": 8457.33,
+   "pct": 50.56
+  },
+  "ours: Triton": {
+   "us_per_step": 4574.44,
+   "pct": 27.35
+  },
+  "Inductor": {
+   "us_per_step": 2482.57,
+   "pct": 14.84
+  },
+  "other (eager ATen)": {
+   "us_per_step": 531.16,
+   "pct": 3.18
+  },
+  "cuEquivariance": {
+   "us_per_step": 351.7,
+   "pct": 2.1
+  },
+  "memset/fill": {
+   "us_per_step": 238.31,
+   "pct": 1.42
+  },
+  "cuBLAS": {
+   "us_per_step": 55.12,
+   "pct": 0.33
+  },
+  "copy": {
+   "us_per_step": 37.3,
+   "pct": 0.22
+  }
+ },
+ "not_ours_us_per_step": 3696.15,
+ "by_site": [
+  {
+   "us_per_step": 5282.74,
+   "pct": 31.58,
+   "key": "fastmace/kernels/oeq_streaming/wprime_backward.py:1447:__call__  <-  fastmace/kernels/oeq_streaming/wprime_backward.py:1531:streaming_conv_wprime_backward_blocks  [ours: NVRTC]",
+   "class": "ours: NVRTC",
+   "kernels": [
+    [
+     "oeq_projected_backward_wprime",
+     5282.74
+    ]
+   ]
+  },
+  {
+   "us_per_step": 2724.37,
+   "pct": 16.29,
+   "key": "fastmace/kernels/oeq_streaming/spline_forward.py:902:__call__  <-  fastmace/kernels/oeq_streaming/spline_forward.py:959:spline_message_blocks  [ours: NVRTC]",
+   "class": "ours: NVRTC",
+   "kernels": [
+    [
+     "spline_forward0",
+     2724.37
+    ]
+   ]
+  },
+  {
+   "us_per_step": 1611.11,
+   "pct": 9.63,
+   "key": "fastmace/kernels/triton/tf32x3_gemm.py:117:_launch  <-  fastmace/kernels/triton/tf32x3_gemm.py:131:tf32x3_mm  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "gemm",
+     1611.11
+    ]
+   ]
+  },
+  {
+   "us_per_step": 1028.68,
+   "pct": 6.15,
+   "key": "fastmace/kernels/triton/species_gemm.py:333:_launch  <-  fastmace/kernels/triton/species_gemm.py:352:species_mm  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "gemm",
+     1028.68
+    ]
+   ]
+  },
+  {
+   "us_per_step": 752.54,
+   "pct": 4.5,
+   "key": "fastmace/kernels/triton/tabled_outer_sum.py:686:tabled_outer_sum_backward  <-  mace/modules/utils.py:26:compute_forces  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "kernel",
+     752.54
+    ]
+   ]
+  },
+  {
+   "us_per_step": 590.48,
+   "pct": 3.53,
+   "key": "fastmace/kernels/triton/tabled_outer_sum.py:611:tabled_outer_sum_forward  <-  fastmace/model/compile.py:330:lean_forward  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "kernel",
+     590.48
+    ]
+   ]
+  },
+  {
+   "us_per_step": 578.64,
+   "pct": 3.46,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:211  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_cat_view_24",
+     224.29
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_23",
+     180.95
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_22",
+     102.07
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_21",
+     56.46
+    ]
+   ]
+  },
+  {
+   "us_per_step": 476.92,
+   "pct": 2.85,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:530  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_cat_div_slice_view_28",
+     261.54
+    ],
+    [
+     "triton_poi_fused_cat_view_27",
+     215.38
+    ]
+   ]
+  },
+  {
+   "us_per_step": 387.94,
+   "pct": 2.32,
+   "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native:",
+     101.05
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std",
+     64.99
+    ],
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail",
+     45.73
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::BUnaryFunctor<long, long, lo",
+     32.22
+    ]
+   ]
+  },
+  {
+   "us_per_step": 360.16,
+   "pct": 2.15,
+   "key": "Inductor: fastmace/kernels/triton/tabled_outer_sum.py:739  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_backward_transpose_unsqueeze_v",
+     360.16
+    ]
+   ]
+  },
+  {
+   "us_per_step": 313.14,
+   "pct": 1.87,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:530  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_4",
+     313.14
+    ]
+   ]
+  },
+  {
+   "us_per_step": 287.4,
+   "pct": 1.72,
+   "key": "fastmace/kernels/cuda/sc_generated.py:257:_launch  <-  fastmace/kernels/cuda/sc_generated.py:264:backward  [ours: NVRTC]",
+   "class": "ours: NVRTC",
+   "kernels": [
+    [
+     "sc_generated_backward",
+     287.4
+    ]
+   ]
+  },
+  {
+   "us_per_step": 256.2,
+   "pct": 1.53,
+   "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "kernel",
+     256.2
+    ]
+   ]
+  },
+  {
+   "us_per_step": 236.44,
+   "pct": 1.41,
+   "key": "mace/modules/utils.py:26:compute_forces  <-  mace/modules/utils.py:197:get_outputs  [cuEquivariance]",
+   "class": "cuEquivariance",
+   "kernels": [
+    [
+     "segmented_polynomial_bwd_algo1_1",
+     236.44
+    ]
+   ]
+  },
+  {
+   "us_per_step": 188.94,
+   "pct": 1.13,
+   "key": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:171  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_8",
+     87.53
+    ],
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_7",
+     51.1
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_9",
+     23.99
+    ],
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_6",
+     13.03
+    ]
+   ]
+  },
+  {
+   "us_per_step": 185.32,
+   "pct": 1.11,
+   "key": "fastmace/kernels/triton/tabled_outer_sum.py:600:tabled_outer_sum_forward  <-  fastmace/model/compile.py:330:lean_forward  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     185.32
+    ]
+   ]
+  },
+  {
+   "us_per_step": 163.94,
+   "pct": 0.98,
+   "key": "Inductor: fastmace/rewrites/engine.py:427  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_scatter_add_select_unsqueeze_19",
+     71.98
+    ],
+    [
+     "triton_poi_fused__to_copy_add_arange_div_exp_full_like_index_linalg_vector_norm_lt_maximum",
+     62.06
+    ],
+    [
+     "triton_poi_fused__to_copy_add_index_mul_scatter_add_select_squeeze_stack_sum_view_zeros_30",
+     14.82
+    ],
+    [
+     "triton_poi_fused_add_index_select_sub_16",
+     11.63
+    ]
+   ]
+  },
+  {
+   "us_per_step": 157.83,
+   "pct": 0.94,
+   "key": "fastmace/kernels/cuda/sc_generated.py:257:_launch  <-  fastmace/kernels/cuda/sc_generated.py:261:forward  [ours: NVRTC]",
+   "class": "ours: NVRTC",
+   "kernels": [
+    [
+     "sc_generated_forward",
+     157.83
+    ]
+   ]
+  },
+  {
+   "us_per_step": 149.26,
+   "pct": 0.89,
+   "key": "Inductor: fastmace/kernels/triton/tabled_outer_sum.py:757  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_edge_sh3_backward_14",
+     149.26
+    ]
+   ]
+  },
+  {
+   "us_per_step": 115.26,
+   "pct": 0.69,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [cuEquivariance]",
+   "class": "cuEquivariance",
+   "kernels": [
+    [
+     "segmented_polynomial_algo1_1",
+     115.26
+    ]
+   ]
+  },
+  {
+   "us_per_step": 106.88,
+   "pct": 0.64,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail",
+     93.33
+    ],
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortHistogramKernel<at_cuda_detai",
+     8.66
+    ],
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortExclusiveSumKernel<at_cuda_de",
+     2.46
+    ],
+    [
+     "at::native::(anonymous namespace)::fill_reverse_indices_kernel(long*, int, at::cuda::detai",
+     2.43
+    ]
+   ]
+  },
+  {
+   "us_per_step": 103.41,
+   "pct": 0.62,
+   "key": "fastmace/kernels/triton/fused_integrator.py:294:stage  <-  fastmace/engine/graph.py:1154:_stage_acp  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "inside_kernel",
+     103.41
+    ]
+   ]
+  },
+  {
+   "us_per_step": 92.6,
+   "pct": 0.55,
+   "key": "Inductor: fastmace/rewrites/engine.py:427  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_15",
+     89.52
+    ],
+    [
+     "triton_poi_fused_add_16",
+     1.15
+    ],
+    [
+     "triton_poi_fused_new_zeros_2",
+     1.02
+    ],
+    [
+     "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_1",
+     0.91
+    ]
+   ]
+  },
+  {
+   "us_per_step": 71.92,
+   "pct": 0.43,
+   "key": "fastmace/kernels/triton/fused_integrator.py:298:stage  <-  fastmace/engine/graph.py:1154:_stage_acp  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "scatter_kernel",
+     71.92
+    ]
+   ]
+  },
+  {
+   "us_per_step": 49.36,
+   "pct": 0.3,
+   "key": "Inductor: mace/modules/blocks.py:1383  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused__to_copy_add_div_eq_exp_expand_gather_index_mul_neg_pow_rsub_scalar_tenso",
+     49.36
+    ]
+   ]
+  },
+  {
+   "us_per_step": 42.34,
+   "pct": 0.25,
+   "key": "fastmace/kernels/triton/edge_sh.py:154:edge_sh3_backward  <-  mace/modules/utils.py:26:compute_forces  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "_backward",
+     42.34
+    ]
+   ]
+  },
+  {
+   "us_per_step": 40.06,
+   "pct": 0.24,
+   "key": "fastmace/kernels/triton/radial_table.py:209:radial_table_backward  <-  mace/modules/utils.py:26:compute_forces  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "backward",
+     40.06
+    ]
+   ]
+  },
+  {
+   "us_per_step": 39.19,
+   "pct": 0.23,
+   "key": "fastmace/kernels/triton/edge_sh.py:139:edge_sh3  <-  fastmace/model/compile.py:330:lean_forward  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "_forward",
+     39.19
+    ]
+   ]
+  },
+  {
+   "us_per_step": 36.57,
+   "pct": 0.22,
+   "key": "fastmace/kernels/triton/tf32x3_gemm.py:106:_launch  <-  fastmace/kernels/triton/tf32x3_gemm.py:131:tf32x3_mm  [cuBLAS]",
+   "class": "cuBLAS",
+   "kernels": [
+    [
+     "ampere_sgemm_32x128_nn",
+     25.25
+    ],
+    [
+     "void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 2, 2, false, false, ",
+     7.74
+    ],
+    [
+     "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, float, float",
+     1.93
+    ],
+    [
+     "void gemmk1_kernel<int, float, 256, 5, false, false, false, false, cublasGemvTensorStrided",
+     1.65
+    ]
+   ]
+  },
+  {
+   "us_per_step": 30.77,
+   "pct": 0.18,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:395  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_sc_generated_backward_slice_backward_view_10",
+     30.77
+    ]
+   ]
+  },
+  {
+   "us_per_step": 23.09,
+   "pct": 0.14,
+   "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [copy]",
+   "class": "copy",
+   "kernels": [
+    [
+     "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::Tenso",
+     10.89
+    ],
+    [
+     "Memcpy",
+     10.19
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::converting_copy_kernel_cuda<",
+     1.29
+    ],
+    [
+     "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl<at::native::direct",
+     0.71
+    ]
+   ]
+  },
+  {
+   "us_per_step": 22.54,
+   "pct": 0.13,
+   "key": "fastmace/kernels/triton/radial_table.py:176:radial_table_forward  <-  fastmace/model/compile.py:330:lean_forward  [ours: Triton]",
+   "class": "ours: Triton",
+   "kernels": [
+    [
+     "forward",
+     22.54
+    ]
+   ]
+  },
+  {
+   "us_per_step": 19.41,
+   "pct": 0.12,
+   "key": "fastmace/kernels/oeq_streaming/wprime_backward.py:1528:streaming_conv_wprime_backward_blocks  <-  mace/modules/utils.py:26:compute_forces  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     19.41
+    ]
+   ]
+  },
+  {
+   "us_per_step": 18.64,
+   "pct": 0.11,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     18.64
+    ]
+   ]
+  },
+  {
+   "us_per_step": 18.55,
+   "pct": 0.11,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [cuBLAS]",
+   "class": "cuBLAS",
+   "kernels": [
+    [
+     "std::enable_if<true, void>::type internal::gemvx::kernel<int, int, float, float, float, fl",
+     12.12
+    ],
+    [
+     "ampere_sgemm_32x128_nn",
+     6.43
+    ]
+   ]
+  },
+  {
+   "us_per_step": 17.15,
+   "pct": 0.1,
+   "key": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:164  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_25",
+     14.67
+    ],
+    [
+     "triton_poi_fused_add_mul_silu_tf32x3_mm_view_29",
+     2.48
+    ]
+   ]
+  },
+  {
+   "us_per_step": 16.07,
+   "pct": 0.1,
+   "key": "Inductor: fastmace/kernels/oeq_streaming/wprime_backward.py:1296  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_gather_radial_table_backward_slice_slice_backward_tabled_outer_sum_ba",
+     16.07
+    ]
+   ]
+  },
+  {
+   "us_per_step": 12.84,
+   "pct": 0.08,
+   "key": "fastmace/kernels/triton/fused_integrator.py:279:stage  <-  fastmace/engine/graph.py:1154:_stage_acp  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<double, at::native::func_wrapp",
+     12.84
+    ]
+   ]
+  },
+  {
+   "us_per_step": 12.67,
+   "pct": 0.08,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:396  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_cat_view_26",
+     12.67
+    ]
+   ]
+  },
+  {
+   "us_per_step": 12.19,
+   "pct": 0.07,
+   "key": "fastmace/integrators/langevin.py:261:second_half  <-  fastmace/engine/graph.py:1165:_stage_b  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std",
+     5.48
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<double, double",
+     3.6
+    ],
+    [
+     "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native:",
+     3.1
+    ]
+   ]
+  }
+ ],
+ "not_ours_by_site": [
+  {
+   "us_per_step": 578.64,
+   "pct": 3.46,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:211  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_cat_view_24",
+     224.29
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_23",
+     180.95
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_22",
+     102.07
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_21",
+     56.46
+    ]
+   ]
+  },
+  {
+   "us_per_step": 476.92,
+   "pct": 2.85,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:530  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_cat_div_slice_view_28",
+     261.54
+    ],
+    [
+     "triton_poi_fused_cat_view_27",
+     215.38
+    ]
+   ]
+  },
+  {
+   "us_per_step": 387.94,
+   "pct": 2.32,
+   "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native:",
+     101.05
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std",
+     64.99
+    ],
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail",
+     45.73
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::BUnaryFunctor<long, long, lo",
+     32.22
+    ]
+   ]
+  },
+  {
+   "us_per_step": 360.16,
+   "pct": 2.15,
+   "key": "Inductor: fastmace/kernels/triton/tabled_outer_sum.py:739  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_backward_transpose_unsqueeze_v",
+     360.16
+    ]
+   ]
+  },
+  {
+   "us_per_step": 313.14,
+   "pct": 1.87,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:530  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_red_fused_add_div_mul_neg_slice_slice_backward_sum_view_4",
+     313.14
+    ]
+   ]
+  },
+  {
+   "us_per_step": 236.44,
+   "pct": 1.41,
+   "key": "mace/modules/utils.py:26:compute_forces  <-  mace/modules/utils.py:197:get_outputs  [cuEquivariance]",
+   "class": "cuEquivariance",
+   "kernels": [
+    [
+     "segmented_polynomial_bwd_algo1_1",
+     236.44
+    ]
+   ]
+  },
+  {
+   "us_per_step": 188.94,
+   "pct": 1.13,
+   "key": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:171  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_8",
+     87.53
+    ],
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_7",
+     51.1
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_9",
+     23.99
+    ],
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_6",
+     13.03
+    ]
+   ]
+  },
+  {
+   "us_per_step": 185.32,
+   "pct": 1.11,
+   "key": "fastmace/kernels/triton/tabled_outer_sum.py:600:tabled_outer_sum_forward  <-  fastmace/model/compile.py:330:lean_forward  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     185.32
+    ]
+   ]
+  },
+  {
+   "us_per_step": 163.94,
+   "pct": 0.98,
+   "key": "Inductor: fastmace/rewrites/engine.py:427  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_scatter_add_select_unsqueeze_19",
+     71.98
+    ],
+    [
+     "triton_poi_fused__to_copy_add_arange_div_exp_full_like_index_linalg_vector_norm_lt_maximum",
+     62.06
+    ],
+    [
+     "triton_poi_fused__to_copy_add_index_mul_scatter_add_select_squeeze_stack_sum_view_zeros_30",
+     14.82
+    ],
+    [
+     "triton_poi_fused_add_index_select_sub_16",
+     11.63
+    ]
+   ]
+  },
+  {
+   "us_per_step": 149.26,
+   "pct": 0.89,
+   "key": "Inductor: fastmace/kernels/triton/tabled_outer_sum.py:757  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_edge_sh3_backward_14",
+     149.26
+    ]
+   ]
+  },
+  {
+   "us_per_step": 115.26,
+   "pct": 0.69,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [cuEquivariance]",
+   "class": "cuEquivariance",
+   "kernels": [
+    [
+     "segmented_polynomial_algo1_1",
+     115.26
+    ]
+   ]
+  },
+  {
+   "us_per_step": 106.88,
+   "pct": 0.64,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortOnesweepKernel<at_cuda_detail",
+     93.33
+    ],
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortHistogramKernel<at_cuda_detai",
+     8.66
+    ],
+    [
+     "void at_cuda_detail::cub::detail::radix_sort::DeviceRadixSortExclusiveSumKernel<at_cuda_de",
+     2.46
+    ],
+    [
+     "at::native::(anonymous namespace)::fill_reverse_indices_kernel(long*, int, at::cuda::detai",
+     2.43
+    ]
+   ]
+  },
+  {
+   "us_per_step": 92.6,
+   "pct": 0.55,
+   "key": "Inductor: fastmace/rewrites/engine.py:427  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_15",
+     89.52
+    ],
+    [
+     "triton_poi_fused_add_16",
+     1.15
+    ],
+    [
+     "triton_poi_fused_new_zeros_2",
+     1.02
+    ],
+    [
+     "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_1",
+     0.91
+    ]
+   ]
+  },
+  {
+   "us_per_step": 49.36,
+   "pct": 0.3,
+   "key": "Inductor: mace/modules/blocks.py:1383  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused__to_copy_add_div_eq_exp_expand_gather_index_mul_neg_pow_rsub_scalar_tenso",
+     49.36
+    ]
+   ]
+  },
+  {
+   "us_per_step": 36.57,
+   "pct": 0.22,
+   "key": "fastmace/kernels/triton/tf32x3_gemm.py:106:_launch  <-  fastmace/kernels/triton/tf32x3_gemm.py:131:tf32x3_mm  [cuBLAS]",
+   "class": "cuBLAS",
+   "kernels": [
+    [
+     "ampere_sgemm_32x128_nn",
+     25.25
+    ],
+    [
+     "void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 2, 2, false, false, ",
+     7.74
+    ],
+    [
+     "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, float, float, float",
+     1.93
+    ],
+    [
+     "void gemmk1_kernel<int, float, 256, 5, false, false, false, false, cublasGemvTensorStrided",
+     1.65
+    ]
+   ]
+  },
+  {
+   "us_per_step": 30.77,
+   "pct": 0.18,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:395  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_sc_generated_backward_slice_backward_view_10",
+     30.77
+    ]
+   ]
+  },
+  {
+   "us_per_step": 23.09,
+   "pct": 0.14,
+   "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [copy]",
+   "class": "copy",
+   "kernels": [
+    [
+     "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::Tenso",
+     10.89
+    ],
+    [
+     "Memcpy",
+     10.19
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::converting_copy_kernel_cuda<",
+     1.29
+    ],
+    [
+     "void at::native::elementwise_kernel<128, 4, at::native::gpu_kernel_impl<at::native::direct",
+     0.71
+    ]
+   ]
+  },
+  {
+   "us_per_step": 19.41,
+   "pct": 0.12,
+   "key": "fastmace/kernels/oeq_streaming/wprime_backward.py:1528:streaming_conv_wprime_backward_blocks  <-  mace/modules/utils.py:26:compute_forces  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     19.41
+    ]
+   ]
+  },
+  {
+   "us_per_step": 18.64,
+   "pct": 0.11,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     18.64
+    ]
+   ]
+  },
+  {
+   "us_per_step": 18.55,
+   "pct": 0.11,
+   "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [cuBLAS]",
+   "class": "cuBLAS",
+   "kernels": [
+    [
+     "std::enable_if<true, void>::type internal::gemvx::kernel<int, int, float, float, float, fl",
+     12.12
+    ],
+    [
+     "ampere_sgemm_32x128_nn",
+     6.43
+    ]
+   ]
+  },
+  {
+   "us_per_step": 17.15,
+   "pct": 0.1,
+   "key": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:164  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_25",
+     14.67
+    ],
+    [
+     "triton_poi_fused_add_mul_silu_tf32x3_mm_view_29",
+     2.48
+    ]
+   ]
+  },
+  {
+   "us_per_step": 16.07,
+   "pct": 0.1,
+   "key": "Inductor: fastmace/kernels/oeq_streaming/wprime_backward.py:1296  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_add_gather_radial_table_backward_slice_slice_backward_tabled_outer_sum_ba",
+     16.07
+    ]
+   ]
+  },
+  {
+   "us_per_step": 12.84,
+   "pct": 0.08,
+   "key": "fastmace/kernels/triton/fused_integrator.py:279:stage  <-  fastmace/engine/graph.py:1154:_stage_acp  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at::native::reduce_kernel<512, 1, at::native::ReduceOp<double, at::native::func_wrapp",
+     12.84
+    ]
+   ]
+  },
+  {
+   "us_per_step": 12.67,
+   "pct": 0.08,
+   "key": "Inductor: fastmace/rewrites/generic/modules.py:396  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_cat_view_26",
+     12.67
+    ]
+   ]
+  },
+  {
+   "us_per_step": 12.19,
+   "pct": 0.07,
+   "key": "fastmace/integrators/langevin.py:261:second_half  <-  fastmace/engine/graph.py:1165:_stage_b  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::CUDAFunctor_add<double>, std",
+     5.48
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::AUnaryFunctor<double, double",
+     3.6
+    ],
+    [
+     "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native:",
+     3.1
+    ]
+   ]
+  },
+  {
+   "us_per_step": 10.73,
+   "pct": 0.06,
+   "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [memset/fill]",
+   "class": "memset/fill",
+   "kernels": [
+    [
+     "Memset",
+     9.96
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::FillFunctor<long>, std::arra",
+     0.4
+    ],
+    [
+     "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native:",
+     0.37
+    ]
+   ]
+  },
+  {
+   "us_per_step": 9.77,
+   "pct": 0.06,
+   "key": "fastmace/kernels/triton/fused_integrator.py:297:stage  <-  fastmace/engine/graph.py:1154:_stage_acp  [other (eager ATen)]",
+   "class": "other (eager ATen)",
+   "kernels": [
+    [
+     "void at_cuda_detail::cub::detail::scan::DeviceScanKernel<at_cuda_detail::cub::detail::scan",
+     8.9
+    ],
+    [
+     "void at_cuda_detail::cub::detail::scan::DeviceScanInitKernel<at_cuda_detail::cub::ScanTile",
+     0.88
+    ]
+   ]
+  },
+  {
+   "us_per_step": 8.88,
+   "pct": 0.05,
+   "key": "Inductor: mace/modules/blocks.py:500  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_poi_fused_clone_permute_unsqueeze_14",
+     7.19
+    ],
+    [
+     "triton_poi_fused_bmm_clone_permute_view_15",
+     1.68
+    ]
+   ]
+  },
+  {
+   "us_per_step": 6.12,
+   "pct": 0.04,
+   "key": "fastmace/kernels/triton/tf32x3_gemm.py:106:_launch  <-  fastmace/kernels/triton/tf32x3_gemm.py:131:tf32x3_mm  [copy]",
+   "class": "copy",
+   "kernels": [
+    [
+     "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native:",
+     6.12
+    ]
+   ]
+  },
+  {
+   "us_per_step": 4.99,
+   "pct": 0.03,
+   "key": "Inductor: fastmace/rewrites/sc_generated.py:88  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+   "class": "Inductor",
+   "kernels": [
+    [
+     "triton_per_fused__to_copy_argmax_10",
+     4.99
+    ]
+   ]
+  }
+ ],
+ "small_kernels": {
+  "threshold_us": 5.0,
+  "us_per_step": 143.06,
+  "count_per_step": 84.0,
+  "by_site": [
+   {
+    "us_per_step": 23.58,
+    "pct": 0.14,
+    "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [other (eager ATen)]",
+    "count_per_step": 7.4
+   },
+   {
+    "us_per_step": 18.64,
+    "pct": 0.11,
+    "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [memset/fill]",
+    "count_per_step": 20.0
+   },
+   {
+    "us_per_step": 14.53,
+    "pct": 0.09,
+    "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [other (eager ATen)]",
+    "count_per_step": 6.2
+   },
+   {
+    "us_per_step": 12.19,
+    "pct": 0.07,
+    "key": "fastmace/integrators/langevin.py:261:second_half  <-  fastmace/engine/graph.py:1165:_stage_b  [other (eager ATen)]",
+    "count_per_step": 6.0
+   },
+   {
+    "us_per_step": 11.58,
+    "pct": 0.07,
+    "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [copy]",
+    "count_per_step": 5.8
+   },
+   {
+    "us_per_step": 7.19,
+    "pct": 0.04,
+    "key": "fastmace/kernels/triton/tf32x3_gemm.py:106:_launch  <-  fastmace/kernels/triton/tf32x3_gemm.py:131:tf32x3_mm  [cuBLAS]",
+    "count_per_step": 2.8
+   },
+   {
+    "us_per_step": 5.0,
+    "pct": 0.03,
+    "key": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)  [memset/fill]",
+    "count_per_step": 2.6
+   },
+   {
+    "us_per_step": 4.83,
+    "pct": 0.03,
+    "key": "Inductor: fastmace/rewrites/generic/modules.py:180  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 1.0
+   },
+   {
+    "us_per_step": 4.31,
+    "pct": 0.03,
+    "key": "Inductor: fastmace/kernels/oeq_streaming/wprime_backward.py:1647  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 1.0
+   },
+   {
+    "us_per_step": 3.91,
+    "pct": 0.02,
+    "key": "fastmace/kernels/triton/fused_integrator.py:274:stage  <-  fastmace/engine/graph.py:1154:_stage_acp  [ours: Triton]",
+    "count_per_step": 1.0
+   },
+   {
+    "us_per_step": 3.44,
+    "pct": 0.02,
+    "key": "Inductor: fastmace/rewrites/engine.py:427  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 4.0
+   },
+   {
+    "us_per_step": 3.08,
+    "pct": 0.02,
+    "key": "Inductor: fastmace/rewrites/engine.py:427  <-  mace/modules/utils.py:26:compute_forces  [Inductor]",
+    "count_per_step": 3.0
+   },
+   {
+    "us_per_step": 3.05,
+    "pct": 0.02,
+    "key": "mace/modules/utils.py:26:compute_forces  <-  mace/modules/utils.py:197:get_outputs  [memset/fill]",
+    "count_per_step": 3.0
+   },
+   {
+    "us_per_step": 2.54,
+    "pct": 0.02,
+    "key": "fastmace/model/forces.py:1173:_outputs  <-  fastmace/model/forces.py:1075:__call__  [copy]",
+    "count_per_step": 1.0
+   },
+   {
+    "us_per_step": 2.48,
+    "pct": 0.01,
+    "key": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:164  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 1.0
+   },
+   {
+    "us_per_step": 2.48,
+    "pct": 0.01,
+    "key": "fastmace/engine/graph.py:1128:_force_stage  <-  fastmace/engine/graph.py:1164:_stage_b  [copy]",
+    "count_per_step": 1.0
+   },
+   {
+    "us_per_step": 2.0,
+    "pct": 0.01,
+    "key": "Inductor: fastmace/kernels/triton/species_gemm.py:249  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 2.0
+   },
+   {
+    "us_per_step": 1.95,
+    "pct": 0.01,
+    "key": "fastmace/model/compile.py:330:lean_forward  <-  fastmace/model/forces.py:1204:_split_outputs  [copy]",
+    "count_per_step": 2.0
+   },
+   {
+    "us_per_step": 1.92,
+    "pct": 0.01,
+    "key": "Inductor: fastmace/rewrites/sc_generated.py:88  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 0.4
+   },
+   {
+    "us_per_step": 1.79,
+    "pct": 0.01,
+    "key": "Inductor: fastmace/kernels/triton/species_gemm.py:250  <-  fastmace/model/compile.py:330:lean_forward  [Inductor]",
+    "count_per_step": 2.0
+   }
+  ]
+ },
+ "copies_fills": [
+  {
+   "us_per_step": 360.16,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_backward_transpose_unsqueeze_view_12",
+   "site": "Inductor: fastmace/kernels/triton/tabled_outer_sum.py:739"
+  },
+  {
+   "us_per_step": 261.54,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_add_cat_div_slice_view_28",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:530"
+  },
+  {
+   "us_per_step": 224.29,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_cat_view_24",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:211"
+  },
+  {
+   "us_per_step": 215.38,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_cat_view_27",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:530"
+  },
+  {
+   "us_per_step": 185.32,
+   "class": "memset/fill",
+   "kernel": "Memset",
+   "site": "fastmace/kernels/triton/tabled_outer_sum.py:600:tabled_outer_sum_forward"
+  },
+  {
+   "us_per_step": 180.95,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_23",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:211"
+  },
+  {
+   "us_per_step": 102.07,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_22",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:211"
+  },
+  {
+   "us_per_step": 101.05,
+   "class": "other (eager ATen)",
+   "kernel": "void at::native::index_elementwise_kernel<128, 4, at::native::gpu_index_kernel<at::native::index_ker",
+   "site": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)"
+  },
+  {
+   "us_per_step": 89.52,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_15",
+   "site": "Inductor: fastmace/rewrites/engine.py:427"
+  },
+  {
+   "us_per_step": 87.53,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_8",
+   "site": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:171"
+  },
+  {
+   "us_per_step": 71.98,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_scatter_add_select_unsqueeze_19",
+   "site": "Inductor: fastmace/rewrites/engine.py:427"
+  },
+  {
+   "us_per_step": 62.06,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__to_copy_add_arange_div_exp_full_like_index_linalg_vector_norm_lt_maximum_minimum_m",
+   "site": "Inductor: fastmace/rewrites/engine.py:427"
+  },
+  {
+   "us_per_step": 56.46,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_21",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:211"
+  },
+  {
+   "us_per_step": 51.1,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_7",
+   "site": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:171"
+  },
+  {
+   "us_per_step": 49.36,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__to_copy_add_div_eq_exp_expand_gather_index_mul_neg_pow_rsub_scalar_tensor_select_s",
+   "site": "Inductor: mace/modules/blocks.py:1383"
+  },
+  {
+   "us_per_step": 23.99,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_9",
+   "site": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:171"
+  },
+  {
+   "us_per_step": 19.41,
+   "class": "memset/fill",
+   "kernel": "Memset",
+   "site": "fastmace/kernels/oeq_streaming/wprime_backward.py:1528:streaming_conv_wprime_backward_blocks"
+  },
+  {
+   "us_per_step": 18.64,
+   "class": "memset/fill",
+   "kernel": "Memset",
+   "site": "fastmace/model/compile.py:330:lean_forward"
+  },
+  {
+   "us_per_step": 16.07,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_add_gather_radial_table_backward_slice_slice_backward_tabled_outer_sum_backward_tra",
+   "site": "Inductor: fastmace/kernels/oeq_streaming/wprime_backward.py:1296"
+  },
+  {
+   "us_per_step": 14.87,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_20",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:211"
+  },
+  {
+   "us_per_step": 14.82,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__to_copy_add_index_mul_scatter_add_select_squeeze_stack_sum_view_zeros_30",
+   "site": "Inductor: fastmace/rewrites/engine.py:427"
+  },
+  {
+   "us_per_step": 14.67,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_25",
+   "site": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:164"
+  },
+  {
+   "us_per_step": 13.03,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_6",
+   "site": "Inductor: fastmace/kernels/triton/tf32x3_gemm.py:171"
+  },
+  {
+   "us_per_step": 12.67,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_cat_view_26",
+   "site": "Inductor: fastmace/rewrites/generic/modules.py:396"
+  },
+  {
+   "us_per_step": 10.89,
+   "class": "copy",
+   "kernel": "void at::native::unrolled_elementwise_kernel<at::native::direct_copy_kernel_cuda(at::TensorIteratorB",
+   "site": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)"
+  },
+  {
+   "us_per_step": 10.19,
+   "class": "copy",
+   "kernel": "Memcpy",
+   "site": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)"
+  },
+  {
+   "us_per_step": 9.96,
+   "class": "memset/fill",
+   "kernel": "Memset",
+   "site": "(eager, outside the CUDA graphs: neighbour-list rebuild steps)"
+  },
+  {
+   "us_per_step": 7.19,
+   "class": "Inductor",
+   "kernel": "triton_poi_fused_clone_permute_unsqueeze_14",
+   "site": "Inductor: mace/modules/blocks.py:500"
+  },
+  {
+   "us_per_step": 6.12,
+   "class": "copy",
+   "kernel": "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::direct_co",
+   "site": "fastmace/kernels/triton/tf32x3_gemm.py:106:_launch"
+  },
+  {
+   "us_per_step": 4.99,
+   "class": "Inductor",
+   "kernel": "triton_per_fused__to_copy_argmax_10",
+   "site": "Inductor: fastmace/rewrites/sc_generated.py:88"
+  }
+ ],
+ "copies_fills_us_per_step": 2338.64,
+ "inductor_by_aten": [
+  {
+   "us_per_step": 452.34,
+   "aten": "cat, view",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:211",
+    "fastmace/rewrites/generic/modules.py:396",
+    "fastmace/rewrites/generic/modules.py:433"
+   ]
+  },
+  {
+   "us_per_step": 360.16,
+   "aten": "add, gather, slice_backward, transpose, unsqueeze, view",
+   "lines": [
+    "fastmace/kernels/triton/tabled_outer_sum.py:739",
+    "fastmace/kernels/triton/tabled_outer_sum.py:757",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:196"
+   ]
+  },
+  {
+   "us_per_step": 354.35,
+   "aten": "_unsafe_view, clone, slice, transpose, view, fastmace.species_mm",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:211",
+    "fastmace/rewrites/generic/modules.py:433",
+    "fastmace/rewrites/mh1/modules.py:321"
+   ]
+  },
+  {
+   "us_per_step": 313.14,
+   "aten": "add, div, mul, neg, slice, slice_backward",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:530",
+    "fastmace/rewrites/generic/modules.py:547",
+    "mace/modules/blocks.py:501"
+   ]
+  },
+  {
+   "us_per_step": 261.54,
+   "aten": "add, cat, div, slice, view",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:530",
+    "fastmace/rewrites/generic/modules.py:547",
+    "mace/modules/irreps_tools.py:105"
+   ]
+  },
+  {
+   "us_per_step": 151.66,
+   "aten": "_unsafe_view, add, clone, div, slice, slice_backward",
+   "lines": [
+    "fastmace/kernels/triton/tf32x3_gemm.py:171",
+    "fastmace/kernels/triton/tf32x3_gemm.py:179",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:530"
+   ]
+  },
+  {
+   "us_per_step": 149.26,
+   "aten": "add, fastmace.edge_sh3_backward",
+   "lines": [
+    "fastmace/kernels/triton/tabled_outer_sum.py:757",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:196",
+    "fastmace/rewrites/generic/modules.py:211"
+   ]
+  },
+  {
+   "us_per_step": 111.42,
+   "aten": "",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "fastmace/rewrites/generic/modules.py:423",
+    "fastmace/rewrites/mh1/modules.py:666"
+   ]
+  },
+  {
+   "us_per_step": 90.43,
+   "aten": "add, div, eq, index_put, masked_fill, mul",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "mace/modules/radial.py:140",
+    "mace/modules/radial.py:215"
+   ]
+  },
+  {
+   "us_per_step": 73.68,
+   "aten": "scatter_add, select, unsqueeze",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "fastmace/rewrites/generic/modules.py:378",
+    "fastmace/rewrites/generic/modules.py:465"
+   ]
+  },
+  {
+   "us_per_step": 38.66,
+   "aten": "_unsafe_view, clone, slice, fastmace.tf32x3_mm",
+   "lines": [
+    "fastmace/kernels/triton/tf32x3_gemm.py:164",
+    "fastmace/kernels/triton/tf32x3_gemm.py:171",
+    "fastmace/kernels/triton/tf32x3_gemm.py:179",
+    "fastmace/model/compile.py:331"
+   ]
+  },
+  {
+   "us_per_step": 30.77,
+   "aten": "add, slice_backward, view, fastmace.sc_generated_backward",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:395",
+    "fastmace/rewrites/generic/modules.py:396",
+    "fastmace/rewrites/generic/modules.py:749"
+   ]
+  },
+  {
+   "us_per_step": 16.07,
+   "aten": "add, gather, slice, slice_backward, transpose, unsqueeze",
+   "lines": [
+    "fastmace/kernels/oeq_streaming/wprime_backward.py:1296",
+    "fastmace/kernels/oeq_streaming/wprime_backward.py:1667",
+    "fastmace/kernels/oeq_streaming/wprime_backward.py:2147",
+    "fastmace/kernels/triton/tabled_outer_sum.py:739"
+   ]
+  },
+  {
+   "us_per_step": 14.82,
+   "aten": "_to_copy, add, index, mul, scatter_add, select",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "mace/modules/blocks.py:1383",
+    "mace/modules/radial.py:218"
+   ]
+  },
+  {
+   "us_per_step": 11.9,
+   "aten": "add, div, slice, slice_backward, view, fastmace.tf32x3_mm",
+   "lines": [
+    "fastmace/kernels/triton/tf32x3_gemm.py:171",
+    "fastmace/kernels/triton/tf32x3_gemm.py:179",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:530"
+   ]
+  },
+  {
+   "us_per_step": 11.63,
+   "aten": "add, index, select, sub",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "mace/modules/utils.py:268",
+    "mace/modules/utils.py:269"
+   ]
+  },
+  {
+   "us_per_step": 7.19,
+   "aten": "clone, permute, unsqueeze",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "mace/modules/blocks.py:500"
+   ]
+  },
+  {
+   "us_per_step": 4.99,
+   "aten": "_to_copy, argmax",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/sc_generated.py:88",
+    "mace/modules/radial.py:196"
+   ]
+  },
+  {
+   "us_per_step": 4.83,
+   "aten": "argmax, index, index_add, ones_like, zeros",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:180",
+    "fastmace/rewrites/generic/modules.py:211",
+    "fastmace/rewrites/generic/modules.py:395"
+   ]
+  },
+  {
+   "us_per_step": 4.31,
+   "aten": "_to_copy, arange, full_like, lt, searchsorted, select",
+   "lines": [
+    "fastmace/kernels/oeq_streaming/wprime_backward.py:1647",
+    "fastmace/kernels/oeq_streaming/wprime_backward.py:2147",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427"
+   ]
+  },
+  {
+   "us_per_step": 3.5,
+   "aten": "zeros",
+   "lines": [
+    "fastmace/kernels/triton/species_gemm.py:250",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "fastmace/rewrites/generic/modules.py:211"
+   ]
+  },
+  {
+   "us_per_step": 2.69,
+   "aten": "mul, silu_backward",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "mace/modules/blocks.py:111"
+   ]
+  },
+  {
+   "us_per_step": 2.48,
+   "aten": "add, mul, silu, view, fastmace.tf32x3_mm",
+   "lines": [
+    "fastmace/kernels/triton/tf32x3_gemm.py:164",
+    "fastmace/kernels/triton/tf32x3_gemm.py:179",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:395"
+   ]
+  },
+  {
+   "us_per_step": 2.0,
+   "aten": "_to_copy",
+   "lines": [
+    "fastmace/kernels/triton/species_gemm.py:249",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:211",
+    "fastmace/rewrites/generic/modules.py:395"
+   ]
+  },
+  {
+   "us_per_step": 1.68,
+   "aten": "bmm, clone, permute, view",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "mace/modules/blocks.py:500"
+   ]
+  },
+  {
+   "us_per_step": 1.38,
+   "aten": "_to_copy, add, expand, gather, index, mul",
+   "lines": [
+    "fastmace/kernels/triton/tf32x3_gemm.py:171",
+    "fastmace/kernels/triton/tf32x3_gemm.py:179",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427"
+   ]
+  },
+  {
+   "us_per_step": 1.15,
+   "aten": "add",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "mace/modules/utils.py:270",
+    "mace/modules/utils.py:651"
+   ]
+  },
+  {
+   "us_per_step": 1.02,
+   "aten": "new_zeros",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/engine.py:427",
+    "mace/modules/utils.py:270",
+    "mace/modules/utils.py:651"
+   ]
+  },
+  {
+   "us_per_step": 0.9,
+   "aten": "index_add, ones_like, zeros",
+   "lines": [
+    "fastmace/kernels/triton/species_gemm.py:250",
+    "fastmace/kernels/triton/species_gemm.py:251",
+    "fastmace/model/compile.py:331",
+    "fastmace/rewrites/generic/modules.py:211"
+   ]
+  },
+  {
+   "us_per_step": 0.89,
+   "aten": "add, zeros",
+   "lines": [
+    "fastmace/model/compile.py:331",
+    "mace/tools/scatter.py:45"
+   ]
+  }
+ ],
+ "inductor_origins_found": 48,
+ "inductor_kernels": 48,
+ "top_gaps": [
+  {
+   "us_per_step": 16.85,
+   "after": "Memset",
+   "before": "void at::native::vectorized_elementwise_kernel<2, "
+  },
+  {
+   "us_per_step": 16.47,
+   "after": "Memcpy",
+   "before": "noise_kernel"
+  },
+  {
+   "us_per_step": 14.58,
+   "after": "Memset",
+   "before": "void at_cuda_detail::cub::detail::radix_sort::Devi"
+  },
+  {
+   "us_per_step": 13.7,
+   "after": "Memcpy",
+   "before": "Memcpy"
+  },
+  {
+   "us_per_step": 12.57,
+   "after": "void at_cuda_detail::cub::detail::radix_sort::Devi",
+   "before": "Memset"
+  },
+  {
+   "us_per_step": 9.95,
+   "after": "Memcpy",
+   "before": "void at::native::vectorized_elementwise_kernel<2, "
+  },
+  {
+   "us_per_step": 8.17,
+   "after": "void at::native::vectorized_elementwise_kernel<2, ",
+   "before": "void at::native::vectorized_elementwise_kernel<2, "
+  },
+  {
+   "us_per_step": 6.87,
+   "after": "Memcpy",
+   "before": "Memset"
+  },
+  {
+   "us_per_step": 5.66,
+   "after": "Memcpy",
+   "before": "void at::native::unrolled_elementwise_kernel<at::n"
+  },
+  {
+   "us_per_step": 5.63,
+   "after": "Memset",
+   "before": "Memset"
+  },
+  {
+   "us_per_step": 5.23,
+   "after": "scatter_kernel",
+   "before": "Memcpy"
+  },
+  {
+   "us_per_step": 3.62,
+   "after": "Memset",
+   "before": "void at::native::reduce_kernel<512, 1, at::native:"
+  },
+  {
+   "us_per_step": 2.86,
+   "after": "at::native::(anonymous namespace)::fill_reverse_in",
+   "before": "Memset"
+  },
+  {
+   "us_per_step": 2.49,
+   "after": "void at::native::vectorized_elementwise_kernel<2, ",
+   "before": "void at::native::index_elementwise_kernel<128, 4, "
+  },
+  {
+   "us_per_step": 2.14,
+   "after": "void at::native::unrolled_elementwise_kernel<at::n",
+   "before": "void at::native::unrolled_elementwise_kernel<at::n"
+  }
+ ],
+ "ledger_bounds": {
+  "species-only-kernels (Inductor kernels with argmax / cumsum in their origin, + the node_attrs gemv)": {
+   "us_per_step": 17.55,
+   "pct": 0.11,
+   "kernels": [
+    [
+     "triton_per_fused__to_copy_argmax_10",
+     4.99,
+     [
+      "_to_copy",
+      "argmax"
+     ]
+    ],
+    [
+     "triton_poi_fused_argmax_index_index_add_ones_like_zeros_11",
+     4.83,
+     [
+      "argmax",
+      "index",
+      "index_add",
+      "ones_like",
+      "zeros"
+     ]
+    ],
+    [
+     "gemv2T (cuBLAS, node_attrs x reference energies)",
+     7.74,
+     []
+    ]
+   ]
+  },
+  "layout-only Inductor kernels (origin only cat / view / clone / transpose / slice / zeros ...)": {
+   "us_per_step": 859.05,
+   "pct": 5.14,
+   "kernels": [
+    [
+     "triton_poi_fused_cat_view_24",
+     224.29,
+     [
+      "cat",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused_cat_view_27",
+     215.38,
+     [
+      "cat",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_23",
+     180.95,
+     [
+      "_unsafe_view",
+      "clone",
+      "fastmace.species_mm",
+      "slice",
+      "transpose",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_22",
+     102.07,
+     [
+      "_unsafe_view",
+      "clone",
+      "fastmace.species_mm",
+      "slice",
+      "transpose",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_21",
+     56.46,
+     [
+      "_unsafe_view",
+      "clone",
+      "fastmace.species_mm",
+      "slice",
+      "transpose",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_9",
+     23.99,
+     [
+      "_unsafe_view",
+      "clone",
+      "fastmace.tf32x3_mm",
+      "slice"
+     ]
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_20",
+     14.87,
+     [
+      "_unsafe_view",
+      "clone",
+      "fastmace.species_mm",
+      "slice",
+      "transpose",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_tf32x3_mm_25",
+     14.67,
+     [
+      "_unsafe_view",
+      "clone",
+      "fastmace.tf32x3_mm",
+      "slice"
+     ]
+    ],
+    [
+     "triton_poi_fused_cat_view_26",
+     12.67,
+     [
+      "cat",
+      "view"
+     ]
+    ],
+    [
+     "triton_poi_fused_clone_permute_unsqueeze_14",
+     7.19,
+     [
+      "clone",
+      "permute",
+      "unsqueeze"
+     ]
+    ],
+    [
+     "triton_poi_fused_new_zeros_2",
+     1.02,
+     [
+      "new_zeros"
+     ]
+    ],
+    [
+     "triton_poi_fused__to_copy_13",
+     1.0,
+     [
+      "_to_copy"
+     ]
+    ],
+    [
+     "triton_poi_fused__to_copy_12",
+     0.99,
+     [
+      "_to_copy"
+     ]
+    ],
+    [
+     "triton_poi_fused_zeros_4",
+     0.89,
+     [
+      "zeros"
+     ]
+    ]
+   ]
+  },
+  "species-only-kernels (old name regex)": {
+   "us_per_step": 17.56,
+   "pct": 0.1,
+   "kernels": [
+    [
+     "void gemv2T_kernel_val<int, int, float, float, float, float, 128, 16, 2, 2, false, false, cublasGemvParamsEx<int, cublas",
+     7.74
+    ],
+    [
+     "triton_per_fused__to_copy_argmax_10",
+     4.99
+    ],
+    [
+     "triton_poi_fused_argmax_index_index_add_ones_like_zeros_11",
+     4.83
+    ]
+   ]
+  },
+  "i0-copies-zero-fill (fills, clones, cat / transpose copies)": {
+   "us_per_step": 1914.27,
+   "pct": 11.44,
+   "kernels": [
+    [
+     "triton_poi_fused_add_gather_slice_backward_tabled_outer_sum_backward_transpose_unsqueeze_view_12",
+     360.16
+    ],
+    [
+     "triton_poi_fused_add_cat_div_slice_view_28",
+     261.54
+    ],
+    [
+     "triton_poi_fused_cat_view_24",
+     224.29
+    ],
+    [
+     "triton_poi_fused_cat_view_27",
+     215.38
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_23",
+     180.95
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_22",
+     102.07
+    ],
+    [
+     "triton_poi_fused_add_div_eq_index_put_masked_fill_mul_neg_new_zeros_scalar_tensor_15",
+     89.52
+    ],
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_8",
+     87.53
+    ],
+    [
+     "triton_poi_fused__to_copy_add_arange_div_exp_full_like_index_linalg_vector_norm_lt_maximum_minimum_mul_pow_rsub_scatter_",
+     62.06
+    ],
+    [
+     "triton_poi_fused__unsafe_view_clone_slice_species_mm_transpose_view_21",
+     56.46
+    ],
+    [
+     "triton_poi_fused__unsafe_view_add_clone_div_slice_slice_backward_tf32x3_mm_view_7",
+     51.1
+    ],
+    [
+     "triton_poi_fused__to_copy_add_div_eq_exp_expand_gather_index_mul_neg_pow_rsub_scalar_tensor_select_sub_unsqueeze_view_wh",
+     49.36
+    ]
+   ]
+  },
+  "launch-memsets (memsets and eager fills)": {
+   "us_per_step": 4.36,
+   "pct": 0.03,
+   "kernels": [
+    [
+     "at::native::(anonymous namespace)::fill_reverse_indices_kernel(long*, int, at::cuda::detail::IntDivider<unsigned int>)",
+     2.43
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<float>, std::array<char*, 1ul>, false>(int, at",
+     1.16
+    ],
+    [
+     "void at::native::vectorized_elementwise_kernel<2, at::native::FillFunctor<long>, std::array<char*, 1ul>, false>(int, at:",
+     0.4
+    ],
+    [
+     "void at::native::elementwise_kernel<128, 2, at::native::gpu_kernel_impl_nocast<at::native::FillFunctor<int> >(at::Tensor",
+     0.37
+    ]
+   ]
+  },
+  "launch-combo-sizerule (small Inductor kernels + gaps)": {
+   "small_inductor_us_per_step": 36.17,
+   "small_inductor_launches_per_step": 22.0,
+   "gaps_us_per_step": 148.52
+  }
+ }
+}

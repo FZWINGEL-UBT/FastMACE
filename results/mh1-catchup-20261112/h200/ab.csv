@@ -1,0 +1,8 @@
+idea,switch,gpu,profile,timeout,kind,name
+mh1-h200-tf32,--b tf32x3_gemms=on,H200,fifth,,ab,tf32
+mh1-h200-wp,--b wprime_backward=on,H200,fifth,,ab,wp
+mh1-h200-tf32wp,--b tf32x3_gemms=on wprime_backward=on,H200,fifth,,ab,tf32wp
+mh1-h200-tf32wptw,--b tf32x3_gemms=on wprime_backward=on --b-constant fastmace.kernels.oeq_streaming.wprime_backward:TABLE_W=True,H200,fifth,,ab,tf32wptw
+mh1-h200-gepi,--b gate_epilogue=on,H200,fifth,,ab,gepi
+mh1-h200-wpgepi,--b wprime_backward=on gate_epilogue=on,H200,fifth,,ab,wpgepi
+mh1-h200-int32,fastmace.neighbors.skin:EDGE_INDEX_INT32=True,H200,fifth,,ab,int32
