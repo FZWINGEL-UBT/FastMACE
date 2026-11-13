@@ -58,3 +58,23 @@ def test_supercell_is_bitwise_ases(capacity, structure, repeat, rattle, strain, 
     assert sorted(got.arrays) == sorted(want.arrays)
     for name in want.arrays:
         np.testing.assert_array_equal(got.arrays[name], want.arrays[name])
+
+
+def test_output_digest_sees_every_byte_of_energy_forces_and_stress(capacity):
+    """``--digest``: the same outputs give the same SHA-256; one force bit, the energy or the stress changes it."""
+    import types
+
+    import torch
+
+    def out(forces, energy=1.5, stress=True):
+        return types.SimpleNamespace(energy=torch.tensor([energy], dtype=torch.float64), forces=forces,
+                                     stress=torch.eye(3, dtype=torch.float64) if stress else None)
+
+    forces = torch.arange(30, dtype=torch.float32).reshape(10, 3)
+    base = capacity.output_digest(out(forces))
+    assert capacity.output_digest(out(forces.clone())) == base
+    flipped = forces.clone()
+    flipped.view(torch.int32)[7, 2] ^= 1
+    assert capacity.output_digest(out(flipped)) != base
+    assert capacity.output_digest(out(forces, energy=1.25)) != base
+    assert capacity.output_digest(out(forces, stress=False)) != base

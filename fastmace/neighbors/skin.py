@@ -210,8 +210,13 @@ class SkinNeighbourList:
         # Optional per-atom group (sender species, segmented first sum): secondary sort key. A device
         # tensor at a fixed address that its owner refreshes in place (a derived buffer of the species,
         # SPEC §8.5), read on every build; ``group_count`` is fixed (the superset size), max() + 1 if
-        # not given.
+        # not given. An integer tensor is kept as given (the owner's own tensor where it is on this device, so its
+        # in-place refreshes reach the list; a uint8 or int32 map is not widened to an int64 copy, 8 bytes per atom);
+        # the order keys widen the gathered groups.
         self.sender_groups = (None if sender_groups is None else
+                              torch.as_tensor(sender_groups, device=self.device)
+                              if torch.is_tensor(sender_groups) and not sender_groups.is_floating_point()
+                              and sender_groups.dtype != torch.bool else
                               torch.as_tensor(sender_groups, dtype=torch.int64, device=self.device))
         self.group_count = (1 if self.sender_groups is None else
                             int(group_count) if group_count is not None else int(self.sender_groups.max()) + 1)
@@ -505,7 +510,7 @@ class SkinNeighbourList:
         if self.sort_receivers:
             primary = receiver
             if constants["groups"] is not None:  # receiver, then sender group
-                primary = receiver * constants["group_count"] + constants["groups"][sender]
+                primary = receiver * constants["group_count"] + constants["groups"][sender].long()
             if length2 is not None and self._length_sorted(natoms, constants):
                 primary = primary * LENGTH_BINS + length_bins(length2, self.cutoff + self.skin)
             return (primary * natoms + sender) * nimages + image

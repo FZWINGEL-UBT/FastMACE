@@ -142,6 +142,8 @@ SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
                                 "TILE_HEAP_TRIM": "malloc_trim after dropped kept lists; memory only, default on",
                                 "TILE_LOCAL_FRAME": "tile-local float64-built edge vectors (idea 11); None = by size, A/B",
                                 "TILE_HOST_ROWS": "host float64 positions keep the tile-local frame; default on, A/B",
+                                "TILE_HOST_ROWS_KEPT": "host rows in the kept lists' distance test; None = where the "
+                                                       "device copy does not fit, A/B",
                                 "TILE_WHOLE_BLOCK_ORDER": "whole-system BLOCK_ORDER order in the tiled call; default "
                                                           "off, A/B only",
                                 "TILE_LARGE_CAPS": "host-state receiver caps 32,768 / 65,536 in the budget; None = "

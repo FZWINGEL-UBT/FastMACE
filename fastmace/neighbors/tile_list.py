@@ -164,7 +164,7 @@ class TileNeighbours:
         del vectors
         keep = (r2 < self.cutoff ** 2) & ~((sender == receiver) & (unit == 0).all(dim=1))
         sender, receiver, unit, shifts64, r2 = sender[keep], receiver[keep], unit[keep], shifts64[keep], r2[keep]
-        primary = receiver if self.groups is None else receiver * self.group_count + self.groups[sender]
+        primary = receiver if self.groups is None else receiver * self.group_count + self.groups[sender].long()
         if (1 if self.groups is None else self.group_count) * natoms * natoms <= KEY_LIMIT:
             order = torch.sort(primary * natoms + sender).indices
         else:  # lexicographic (primary, sender) without the key's overflow: the same order

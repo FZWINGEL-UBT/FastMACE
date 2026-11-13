@@ -1105,6 +1105,8 @@ class MACEForceField:
         if not block_order:
             for kernel in ordered:
                 kernel.order = None
+            # Not kept unbound (the tiled call: 4 bytes per atom); a whole-system call that binds it builds it again.
+            self._block_order = None
             return
         if ordered and self._block_order is None:
             from fastmace.kernels.oeq_streaming.spline_forward import receiver_order
